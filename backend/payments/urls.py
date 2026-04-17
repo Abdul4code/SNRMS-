@@ -7,6 +7,7 @@ from .views import (
     FeeConfigListView,
     FeeConfigUpdateView,
     PaymentDetailView,
+    PaymentStatsView,
     SubmitPaymentView,
 )
 
@@ -37,6 +38,13 @@ urlpatterns = [
         '<uuid:pk>/confirm/',
         ConfirmPaymentView.as_view(),
         name='payment-confirm',
+    ),
+
+    # Payment stats (finance/chairman)
+    path(
+        'stats/',
+        PaymentStatsView.as_view(),
+        name='payment-stats',
     ),
 
     # Fee breakdown (public)

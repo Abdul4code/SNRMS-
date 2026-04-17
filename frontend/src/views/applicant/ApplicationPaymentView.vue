@@ -120,11 +120,28 @@
           </ul>
         </div>
 
+        <!-- Rejection notice -->
+        <div v-if="rejectedPayment" class="rounded-2xl p-4 flex items-start gap-3"
+             style="background: #fef2f2; border: 1px solid rgba(220,38,38,0.25)">
+          <svg class="w-5 h-5 flex-shrink-0 mt-0.5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+          </svg>
+          <div>
+            <p class="text-sm font-bold text-red-700">Payment Evidence Rejected</p>
+            <p v-if="rejectedPayment.finance_remarks" class="text-sm text-red-600 mt-0.5">
+              Reason: {{ rejectedPayment.finance_remarks }}
+            </p>
+            <p class="text-xs text-red-500 mt-1">Please re-submit with the correct details below.</p>
+          </div>
+        </div>
+
         <!-- Payment submission form — only if there's a pending/rejected payment record -->
         <div v-if="pendingPayment" class="rounded-2xl overflow-hidden"
              style="background: #fff; border: 1px solid #e2e8f0">
           <div class="px-5 py-4" style="border-bottom: 1px solid #f1f5f9">
-            <h2 class="text-sm font-bold text-slate-900">Submit Payment Evidence</h2>
+            <h2 class="text-sm font-bold text-slate-900">
+              {{ rejectedPayment ? 'Re-submit Payment Evidence' : 'Submit Payment Evidence' }}
+            </h2>
             <p class="text-xs text-slate-500 mt-0.5">Enter the details from your bank teller or payment receipt</p>
           </div>
 
@@ -272,6 +289,7 @@ interface PaymentRecord {
   payment_date?: string
   status: string
   amount_submitted?: number
+  finance_remarks?: string
 }
 
 const route = useRoute()
@@ -282,6 +300,7 @@ const stageLabel = ref('Stage A — Application Processing')
 const appStatus = ref('')
 const payments = ref<PaymentRecord[]>([])
 const pendingPayment = ref<PaymentRecord | null>(null)
+const rejectedPayment = computed(() => payments.value.find(p => p.status === 'rejected') ?? null)
 const submitting = ref(false)
 const tellerSubmitted = ref(false)
 const errorMsg = ref('')

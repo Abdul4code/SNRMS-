@@ -52,6 +52,7 @@ class PaymentSummarySerializer(serializers.Serializer):
 
 class ApplicationListSerializer(serializers.ModelSerializer):
     street_type_name = serializers.CharField(source='street_type.name', read_only=True)
+    applicant_name = serializers.CharField(source='applicant.full_name', read_only=True)
 
     class Meta:
         model = Application
@@ -60,6 +61,7 @@ class ApplicationListSerializer(serializers.ModelSerializer):
             'reference_number',
             'proposed_street_name',
             'street_type_name',
+            'applicant_name',
             'status',
             'created_at',
             'updated_at',

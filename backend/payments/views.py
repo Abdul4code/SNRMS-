@@ -1,3 +1,4 @@
+from django.db.models import Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, status
@@ -251,6 +252,37 @@ class ConfirmPaymentView(APIView):
             PaymentSerializer(payment).data,
             status=status.HTTP_200_OK,
         )
+
+
+# ---------------------------------------------------------------------------
+# PaymentStatsView
+# ---------------------------------------------------------------------------
+
+class PaymentStatsView(APIView):
+    """
+    GET /api/payments/stats/
+
+    Finance / Chairman only. Returns confirmed payment totals grouped by stage.
+    Response: { stage_a: { count, total }, stage_c: { count, total }, renewal: { count, total } }
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not _is_finance_or_chairman(request.user):
+            return Response(
+                {'detail': 'Only finance staff can view payment stats.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        confirmed_qs = Payment.objects.filter(status=PaymentStatus.CONFIRMED)
+        result = {}
+        for stage_key in (PaymentStage.STAGE_A, PaymentStage.STAGE_C, PaymentStage.RENEWAL):
+            qs = confirmed_qs.filter(stage=stage_key)
+            count = qs.count()
+            total = qs.aggregate(total=Sum('amount_expected'))['total'] or 0
+            result[stage_key] = {'count': count, 'total': str(total)}
+
+        return Response(result)
 
 
 # ---------------------------------------------------------------------------

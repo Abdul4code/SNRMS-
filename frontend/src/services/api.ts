@@ -165,6 +165,8 @@ export const paymentApi = {
     api.get('/payments/fees/config/'),
   updateFeeConfig: (id: number | string, data: Record<string, unknown>) =>
     api.patch(`/payments/fees/config/${id}/`, data),
+  getStats: () =>
+    api.get('/payments/stats/'),
 }
 
 // ─── Notification API ────────────────────────────────────────────────────────

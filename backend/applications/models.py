@@ -30,7 +30,10 @@ VALID_TRANSITIONS = {
     ApplicationStatus.DRAFT: [ApplicationStatus.SUBMITTED, ApplicationStatus.WITHDRAWN],
     ApplicationStatus.SUBMITTED: [ApplicationStatus.AWAITING_STAGE_A_PAYMENT, ApplicationStatus.WITHDRAWN],
     ApplicationStatus.AWAITING_STAGE_A_PAYMENT: [ApplicationStatus.AWAITING_STAGE_A_PAYMENT_CONFIRMATION],
-    ApplicationStatus.AWAITING_STAGE_A_PAYMENT_CONFIRMATION: [ApplicationStatus.STAGE_A_CONFIRMED],
+    ApplicationStatus.AWAITING_STAGE_A_PAYMENT_CONFIRMATION: [
+        ApplicationStatus.STAGE_A_CONFIRMED,
+        ApplicationStatus.AWAITING_STAGE_A_PAYMENT,
+    ],
     ApplicationStatus.STAGE_A_CONFIRMED: [ApplicationStatus.UNDER_NAMING_COMMITTEE_REVIEW],
     ApplicationStatus.UNDER_NAMING_COMMITTEE_REVIEW: [
         ApplicationStatus.APPROVED_BY_COMMITTEE,

@@ -11,7 +11,7 @@ from applications.models import ApplicationStatus
 from config.models import FeeComponent, FeeConfiguration
 from notifications.models import Notification, NotificationType
 
-from .models import Payment, PaymentStatus
+from .models import Payment, PaymentStage, PaymentStatus
 
 
 # ---------------------------------------------------------------------------
@@ -255,7 +255,8 @@ def confirm_renewal_payment(payment: Payment, actor) -> Payment:
 
 def reject_payment(payment: Payment, actor, remarks: str = '') -> Payment:
     """
-    Mark the payment as rejected, store finance remarks, and notify the applicant.
+    Mark the payment as rejected, store finance remarks, transition the application
+    back to the awaiting-payment state, and notify the applicant.
     """
     now = timezone.now()
     payment.status = PaymentStatus.REJECTED
@@ -266,16 +267,38 @@ def reject_payment(payment: Payment, actor, remarks: str = '') -> Payment:
         'status', 'confirmed_by', 'confirmed_at', 'finance_remarks', 'updated_at'
     ])
 
+    # Refresh from DB to get the current status (select_related caches the join-time value)
     application = payment.application
+    application.refresh_from_db(fields=['status'])
+
+    # Roll the application back so the applicant can re-submit payment evidence
+    rejection_remark = f'Payment rejected by finance. {remarks}' if remarks else 'Payment rejected by finance.'
+    try:
+        if (payment.stage == PaymentStage.STAGE_A and
+                application.status == ApplicationStatus.AWAITING_STAGE_A_PAYMENT_CONFIRMATION):
+            application.transition_to(
+                ApplicationStatus.AWAITING_STAGE_A_PAYMENT,
+                actor=actor,
+                remarks=rejection_remark,
+            )
+        elif (payment.stage == PaymentStage.STAGE_C and
+                application.status == ApplicationStatus.AWAITING_STAGE_C_PAYMENT):
+            pass  # Stage C has no confirmation intermediate; status already correct
+        elif (payment.stage == PaymentStage.RENEWAL and
+                application.status == ApplicationStatus.AWAITING_RENEWAL_PAYMENT):
+            pass  # Renewal has no confirmation intermediate; status already correct
+    except ValueError:
+        pass  # transition not valid — leave status as-is
 
     _notify_applicant(
         payment,
         notification_type=NotificationType.PAYMENT_REJECTED,
         title='Payment Rejected',
         message=(
-            f'Your payment for application {application.reference_number} '
+            f'Your payment evidence for application {application.reference_number} '
             f'has been rejected by finance. '
-            + (f'Remarks: {remarks}' if remarks else 'Please re-submit with the correct details.')
+            + (f'Reason: {remarks}. ' if remarks else '')
+            + 'Please re-submit with the correct details.'
         ),
     )
 

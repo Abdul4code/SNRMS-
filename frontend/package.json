@@ -17,7 +17,9 @@
     "@headlessui/vue": "^1.7.23",
     "@heroicons/vue": "^2.2.0",
     "@tailwindcss/vite": "^4.2.2",
+    "@types/leaflet": "^1.9.21",
     "axios": "^1.15.0",
+    "leaflet": "^1.9.4",
     "pinia": "^3.0.4",
     "vue": "^3.5.31",
     "vue-router": "^5.0.4"

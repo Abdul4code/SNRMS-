@@ -30,6 +30,52 @@
         </div>
       </div>
 
+      <!-- Finance: confirmed payment amounts by stage -->
+      <div v-if="auth.isFinance" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div class="rounded-2xl p-5"
+             style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04)">
+          <div class="flex items-center gap-2 mb-3">
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                 style="background: rgba(5,150,105,0.08); border: 1px solid rgba(5,150,105,0.15)">
+              <BanknotesIcon class="w-4 h-4" style="color: #059669" />
+            </div>
+            <p class="text-xs font-bold text-slate-600 uppercase tracking-wider">Stage A Confirmed</p>
+          </div>
+          <p class="text-2xl font-bold tracking-tight" style="color: #059669">
+            {{ formatAmount(paymentAmounts.stage_a.total) }}
+          </p>
+          <p class="text-xs text-slate-400 mt-1">{{ paymentAmounts.stage_a.count }} payment{{ paymentAmounts.stage_a.count !== 1 ? 's' : '' }}</p>
+        </div>
+        <div class="rounded-2xl p-5"
+             style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04)">
+          <div class="flex items-center gap-2 mb-3">
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                 style="background: rgba(2,132,199,0.08); border: 1px solid rgba(2,132,199,0.15)">
+              <BanknotesIcon class="w-4 h-4" style="color: #0284c7" />
+            </div>
+            <p class="text-xs font-bold text-slate-600 uppercase tracking-wider">Stage C Confirmed</p>
+          </div>
+          <p class="text-2xl font-bold tracking-tight" style="color: #0284c7">
+            {{ formatAmount(paymentAmounts.stage_c.total) }}
+          </p>
+          <p class="text-xs text-slate-400 mt-1">{{ paymentAmounts.stage_c.count }} payment{{ paymentAmounts.stage_c.count !== 1 ? 's' : '' }}</p>
+        </div>
+        <div class="rounded-2xl p-5"
+             style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04)">
+          <div class="flex items-center gap-2 mb-3">
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                 style="background: rgba(124,58,237,0.08); border: 1px solid rgba(124,58,237,0.15)">
+              <BanknotesIcon class="w-4 h-4" style="color: #7c3aed" />
+            </div>
+            <p class="text-xs font-bold text-slate-600 uppercase tracking-wider">Renewals Confirmed</p>
+          </div>
+          <p class="text-2xl font-bold tracking-tight" style="color: #7c3aed">
+            {{ formatAmount(paymentAmounts.renewal.total) }}
+          </p>
+          <p class="text-xs text-slate-400 mt-1">{{ paymentAmounts.renewal.count }} payment{{ paymentAmounts.renewal.count !== 1 ? 's' : '' }}</p>
+        </div>
+      </div>
+
       <!-- Pending actions card -->
       <div class="rounded-2xl overflow-hidden"
            style="background: #fff; border: 1px solid #e2e8f0">
@@ -156,10 +202,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, reactive, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import { ChevronRightIcon, CheckCircleIcon, UserGroupIcon, CurrencyDollarIcon, MapIcon } from '@heroicons/vue/24/outline'
-import { applicationApi } from '@/services/api'
+import { ChevronRightIcon, CheckCircleIcon, UserGroupIcon, CurrencyDollarIcon, MapIcon, BanknotesIcon } from '@heroicons/vue/24/outline'
+import { applicationApi, paymentApi } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import StatusBadge from '@/components/StatusBadge.vue'
 
@@ -176,8 +222,29 @@ const auth = useAuthStore()
 const allApps = ref<Application[]>([])
 const loadingApps = ref(false)
 
+// Finance-specific stat counts loaded separately
+const financeStats = reactive({ pending: 0, confirmed: 0, rejected: 0 })
+const paymentAmounts = reactive({
+  stage_a: { count: 0, total: '0' },
+  stage_c: { count: 0, total: '0' },
+  renewal: { count: 0, total: '0' },
+})
+
+const FINANCE_PENDING_STATUSES = [
+  'awaiting_stage_a_payment_confirmation',
+  'awaiting_stage_c_payment',
+  'awaiting_renewal_payment',
+]
+const FINANCE_CONFIRMED_STATUSES = [
+  'stage_a_confirmed', 'under_naming_committee_review', 'approved_by_committee',
+  'rejected_by_committee', 'awaiting_chairman_approval', 'approved_by_chairman',
+  'rejected_by_chairman', 'awaiting_stage_c_payment', 'stage_c_confirmed',
+  'certificate_issued', 'expired', 'renewal_submitted', 'awaiting_renewal_payment',
+  'renewal_payment_confirmed', 'renewed',
+]
+
 const ROLE_PENDING_STATUS: Record<string, string[]> = {
-  finance: ['awaiting_stage_a_payment_confirmation', 'awaiting_stage_c_payment', 'awaiting_renewal_payment'],
+  finance: FINANCE_PENDING_STATUSES,
   naming_committee: ['under_naming_committee_review'],
   committee_chairman: ['awaiting_chairman_approval', 'stage_c_confirmed'],
 }
@@ -195,6 +262,14 @@ const pendingStatuses = computed(() => ROLE_PENDING_STATUS[auth.user?.role ?? ''
 const pendingApps = computed(() => allApps.value.filter(a => pendingStatuses.value.includes(a.status)))
 
 const stats = computed(() => {
+  if (auth.isFinance) {
+    return [
+      { label: 'Awaiting Confirmation', value: financeStats.pending, color: financeStats.pending > 0 ? '#d97706' : '#0f172a', urgent: financeStats.pending > 0 },
+      { label: 'Pending Action', value: financeStats.pending, color: financeStats.pending > 0 ? '#d97706' : '#0f172a', urgent: financeStats.pending > 0 },
+      { label: 'Payments Confirmed', value: financeStats.confirmed, color: '#059669', urgent: false },
+      { label: 'Payments Rejected', value: financeStats.rejected, color: '#dc2626', urgent: false },
+    ].filter((_, i) => i !== 1) // remove duplicate — show 3 meaningful cards
+  }
   const counts: Record<string, number> = {}
   allApps.value.forEach(a => { counts[a.status] = (counts[a.status] ?? 0) + 1 })
   const pending = pendingApps.value.length
@@ -210,6 +285,47 @@ function formatDate(d: string) {
   return new Date(d).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+function formatAmount(value: string | number): string {
+  const num = typeof value === 'string' ? parseFloat(value) : value
+  if (isNaN(num)) return '₦0'
+  return '₦' + num.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+async function loadFinanceStats() {
+  try {
+    const [pendingRes, confirmedRes, rejectedRes, amountsRes] = await Promise.all([
+      applicationApi.list({ status: FINANCE_PENDING_STATUSES.join(','), page_size: 1 }).catch(() => null),
+      Promise.all(
+        FINANCE_CONFIRMED_STATUSES.map(s =>
+          applicationApi.list({ status: s, page_size: 1 }).catch(() => ({ data: { count: 0 } }))
+        )
+      ),
+      applicationApi.list({ status: 'awaiting_stage_a_payment', page_size: 1 }).catch(() => null),
+      paymentApi.getStats().catch(() => null),
+    ])
+
+    const pendingData = pendingRes?.data
+    financeStats.pending = Array.isArray(pendingData) ? pendingData.length : (pendingData?.count ?? 0)
+
+    financeStats.confirmed = confirmedRes.reduce((sum, r) => {
+      const d = r?.data
+      return sum + (Array.isArray(d) ? d.length : (d?.count ?? 0))
+    }, 0)
+
+    const rejectedData = rejectedRes?.data
+    financeStats.rejected = Array.isArray(rejectedData) ? rejectedData.length : (rejectedData?.count ?? 0)
+
+    if (amountsRes?.data) {
+      const d = amountsRes.data
+      if (d.stage_a) { paymentAmounts.stage_a.count = d.stage_a.count; paymentAmounts.stage_a.total = d.stage_a.total }
+      if (d.stage_c) { paymentAmounts.stage_c.count = d.stage_c.count; paymentAmounts.stage_c.total = d.stage_c.total }
+      if (d.renewal) { paymentAmounts.renewal.count = d.renewal.count; paymentAmounts.renewal.total = d.renewal.total }
+    }
+  } catch {
+    // stats stay at 0 on error
+  }
+}
+
 onMounted(async () => {
   loadingApps.value = true
   try {
@@ -218,5 +334,6 @@ onMounted(async () => {
   } finally {
     loadingApps.value = false
   }
+  if (auth.isFinance) loadFinanceStats()
 })
 </script>
