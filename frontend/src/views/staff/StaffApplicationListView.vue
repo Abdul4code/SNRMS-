@@ -1,82 +1,119 @@
 <template>
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <div class="mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">All Applications</h1>
-      <p class="text-sm text-gray-500 mt-0.5">Review and manage street name registration applications</p>
+  <div class="min-h-screen" style="background: #f1f5f9">
+
+    <!-- Header band -->
+    <div style="background: #0a1628; border-bottom: 1px solid rgba(255,255,255,0.06)">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1">Staff Portal</p>
+        <h1 class="text-white text-xl font-bold tracking-tight">All Applications</h1>
+        <p class="text-slate-400 text-sm mt-0.5">Review and manage street name registration requests</p>
+      </div>
     </div>
 
-    <!-- Filters -->
-    <div class="bg-white rounded-xl border border-gray-200 p-4 mb-5 flex flex-wrap gap-3 items-end">
-      <div class="flex-1 min-w-40">
-        <label class="form-label text-xs">Status</label>
-        <select v-model="filters.status" class="form-input text-sm" @change="() => { page = 1; load() }">
-          <option value="">All Statuses</option>
-          <option v-for="s in STATUS_OPTIONS" :key="s.value" :value="s.value">{{ s.label }}</option>
-        </select>
-      </div>
-      <div class="min-w-36">
-        <label class="form-label text-xs">From</label>
-        <input v-model="filters.date_from" type="date" class="form-input text-sm" @change="() => { page = 1; load() }" />
-      </div>
-      <div class="min-w-36">
-        <label class="form-label text-xs">To</label>
-        <input v-model="filters.date_to" type="date" class="form-input text-sm" @change="() => { page = 1; load() }" />
-      </div>
-      <button class="btn-secondary text-sm" @click="clearFilters">Clear</button>
-    </div>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-4">
 
-    <!-- Table -->
-    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div v-if="loading" class="flex justify-center py-16">
-        <div class="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full" />
-      </div>
-      <div v-else-if="!applications.length" class="text-center py-16 text-gray-500">
-        No applications found.
-      </div>
-      <div v-else class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead class="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Ref</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Street Name</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase hidden sm:table-cell">Applicant</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase hidden md:table-cell">Updated</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Action</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100">
-            <tr v-for="app in applications" :key="app.id" class="hover:bg-gray-50">
-              <td class="px-4 py-3 font-mono text-xs text-gray-600">{{ app.reference_number || `#${app.id}` }}</td>
-              <td class="px-4 py-3 font-medium text-gray-900">{{ app.proposed_street_name }}</td>
-              <td class="px-4 py-3 text-gray-600 hidden sm:table-cell">{{ app.applicant_name || app.applicant }}</td>
-              <td class="px-4 py-3"><StatusBadge :status="app.status" /></td>
-              <td class="px-4 py-3 text-gray-500 text-xs hidden md:table-cell">{{ formatDate(app.updated_at || app.created_at) }}</td>
-              <td class="px-4 py-3">
-                <RouterLink
-                  :to="`/staff/applications/${app.id}`"
-                  class="text-blue-600 hover:text-blue-700 font-medium text-xs mr-3"
-                >
-                  View
-                </RouterLink>
-                <!-- Role-specific quick action badges -->
-                <span v-if="showReviewBtn(app)" class="text-purple-600 text-xs font-medium">Review</span>
-                <span v-else-if="showApproveBtn(app)" class="text-emerald-600 text-xs font-medium">Approve</span>
-                <span v-else-if="showConfirmBtn(app)" class="text-yellow-700 text-xs font-medium">Confirm Payment</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <!-- Filter bar -->
+      <div class="flex flex-wrap gap-3 items-end rounded-2xl p-4"
+           style="background: #fff; border: 1px solid #e2e8f0">
+        <div class="flex-1 min-w-40">
+          <label class="block text-xs font-semibold text-slate-600 mb-1.5">Status</label>
+          <select v-model="filters.status" class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  @change="() => { page = 1; load() }">
+            <option value="">All Statuses</option>
+            <option v-for="s in STATUS_OPTIONS" :key="s.value" :value="s.value">{{ s.label }}</option>
+          </select>
+        </div>
+        <div class="min-w-36">
+          <label class="block text-xs font-semibold text-slate-600 mb-1.5">From</label>
+          <input v-model="filters.date_from" type="date"
+                 class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                 @change="() => { page = 1; load() }" />
+        </div>
+        <div class="min-w-36">
+          <label class="block text-xs font-semibold text-slate-600 mb-1.5">To</label>
+          <input v-model="filters.date_to" type="date"
+                 class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                 @change="() => { page = 1; load() }" />
+        </div>
+        <button v-if="filters.status || filters.date_from || filters.date_to"
+                class="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 hover:bg-slate-50 transition-colors"
+                @click="clearFilters">
+          <XMarkIcon class="w-3.5 h-3.5" />
+          Clear
+        </button>
+        <span class="ml-auto text-xs text-slate-400 font-medium hidden sm:block self-end pb-1">
+          {{ totalCount }} application{{ totalCount === 1 ? '' : 's' }}
+        </span>
       </div>
 
-      <!-- Pagination -->
-      <div v-if="totalPages > 1" class="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
-        <p class="text-sm text-gray-600">
-          Page {{ page }} of {{ totalPages }} &nbsp;({{ totalCount }} total)
-        </p>
-        <div class="flex gap-2">
-          <button :disabled="page <= 1" class="btn-secondary text-xs" @click="changePage(page - 1)">← Prev</button>
-          <button :disabled="page >= totalPages" class="btn-secondary text-xs" @click="changePage(page + 1)">Next →</button>
+      <!-- Table card -->
+      <div class="rounded-2xl overflow-hidden"
+           style="background: #fff; border: 1px solid #e2e8f0">
+
+        <div v-if="loading" class="flex items-center justify-center py-16">
+          <div class="w-9 h-9 rounded-full border-2 border-slate-200 border-t-emerald-500 animate-spin"></div>
+        </div>
+
+        <div v-else-if="!applications.length"
+             class="flex flex-col items-center py-16 gap-2">
+          <DocumentTextIcon class="w-10 h-10 text-slate-300" />
+          <p class="text-sm font-medium text-slate-500">No applications found.</p>
+        </div>
+
+        <div v-else class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0">
+                <th class="px-5 py-3.5 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Ref</th>
+                <th class="px-5 py-3.5 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Street Name</th>
+                <th class="px-5 py-3.5 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden sm:table-cell">Applicant</th>
+                <th class="px-5 py-3.5 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+                <th class="px-5 py-3.5 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden md:table-cell">Updated</th>
+                <th class="px-5 py-3.5 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(app, i) in applications" :key="app.id"
+                  :style="i < applications.length - 1 ? 'border-bottom: 1px solid #f8fafc' : ''"
+                  class="hover:bg-slate-50/60 transition-colors">
+                <td class="px-5 py-4 font-mono text-xs text-slate-400 font-medium">{{ app.reference_number || `APP-${app.id}` }}</td>
+                <td class="px-5 py-4 font-semibold text-slate-900">{{ app.proposed_street_name }}</td>
+                <td class="px-5 py-4 text-slate-500 text-sm hidden sm:table-cell">{{ app.applicant_name || app.applicant }}</td>
+                <td class="px-5 py-4"><StatusBadge :status="app.status" /></td>
+                <td class="px-5 py-4 text-xs text-slate-400 hidden md:table-cell">{{ formatDate(app.updated_at || app.created_at) }}</td>
+                <td class="px-5 py-4 text-right">
+                  <RouterLink :to="`/staff/applications/${app.id}`"
+                              class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition-colors">
+                    <span v-if="showReviewBtn(app)">Review</span>
+                    <span v-else-if="showApproveBtn(app)">Approve</span>
+                    <span v-else-if="showConfirmBtn(app)">Confirm</span>
+                    <span v-else>View</span>
+                    <ChevronRightIcon class="w-3.5 h-3.5" />
+                  </RouterLink>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <div v-if="totalPages > 1" class="flex items-center justify-between px-5 py-3.5"
+             style="border-top: 1px solid #f1f5f9; background: #f8fafc">
+          <p class="text-xs text-slate-500">
+            Page {{ page }} of {{ totalPages }} &nbsp;·&nbsp; {{ totalCount }} total
+          </p>
+          <div class="flex gap-2">
+            <button :disabled="page <= 1"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 border border-slate-200 hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    @click="changePage(page - 1)">
+              ← Prev
+            </button>
+            <button :disabled="page >= totalPages"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 border border-slate-200 hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    @click="changePage(page + 1)">
+              Next →
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -86,6 +123,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
+import { XMarkIcon, ChevronRightIcon, DocumentTextIcon } from '@heroicons/vue/24/outline'
 import { applicationApi } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import StatusBadge from '@/components/StatusBadge.vue'
@@ -135,10 +173,7 @@ function showApproveBtn(app: Application) {
   return auth.isChairman && app.status === 'awaiting_chairman_approval'
 }
 function showConfirmBtn(app: Application) {
-  return (
-    auth.isFinance &&
-    ['awaiting_stage_a_payment', 'awaiting_stage_c_payment', 'awaiting_renewal_payment'].includes(app.status)
-  )
+  return auth.isFinance && ['awaiting_stage_a_payment', 'awaiting_stage_c_payment', 'awaiting_renewal_payment'].includes(app.status)
 }
 
 function formatDate(d: string) {

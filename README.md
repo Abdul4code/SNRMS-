@@ -61,6 +61,9 @@ python manage.py create_chairman \
   --first-name John \
   --last-name Doe
 
+# Create Admin superuser (Django admin login uses email)
+python manage.py shell -c "from accounts.models import User, Role; email='admin@ibeju-lekki.local'; u, _ = User.objects.get_or_create(email=email, defaults={'first_name':'Admin','last_name':'Admin','is_staff':True,'is_superuser':True,'role':Role.COMMITTEE_CHAIRMAN}); u.first_name='Admin'; u.last_name='Admin'; u.is_staff=True; u.is_superuser=True; u.role=Role.COMMITTEE_CHAIRMAN; u.set_password('ibeju-lekki'); u.save(); print('Admin superuser ready:', email)"
+
 # Start development server
 python manage.py runserver
 ```
@@ -121,6 +124,9 @@ draft → submitted → awaiting_stage_a_payment → stage_a_confirmed
 ```bash
 # Bootstrap the first Chairman account
 python manage.py create_chairman --email x@y.com --password P@ss1 --first-name A --last-name B
+
+# Create Admin superuser (email login)
+python manage.py shell -c "from accounts.models import User, Role; email='admin@ibeju-lekki.local'; u, _ = User.objects.get_or_create(email=email, defaults={'first_name':'Admin','last_name':'Admin','is_staff':True,'is_superuser':True,'role':Role.COMMITTEE_CHAIRMAN}); u.first_name='Admin'; u.last_name='Admin'; u.is_staff=True; u.is_superuser=True; u.role=Role.COMMITTEE_CHAIRMAN; u.set_password('ibeju-lekki'); u.save(); print('Admin superuser ready:', email)"
 
 # Seed street types and default fee configurations
 python manage.py seed_data

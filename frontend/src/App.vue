@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-slate-50">
+  <div class="min-h-screen" style="background: #f1f5f9">
     <TheNavbar v-if="auth.isAuthenticated" />
     <main>
       <RouterView />

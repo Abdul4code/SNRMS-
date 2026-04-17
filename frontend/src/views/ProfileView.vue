@@ -1,117 +1,210 @@
 <template>
-  <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">Profile</h1>
+  <div class="min-h-screen" style="background: #f1f5f9">
 
-    <!-- Profile info card -->
-    <AppCard title="Personal Information" class="mb-5">
-      <div v-if="profileError" class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{{ profileError }}</div>
-      <div v-if="profileSuccess" class="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">{{ profileSuccess }}</div>
-
-      <!-- View mode -->
-      <template v-if="!editingProfile">
-        <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-          <div>
-            <dt class="text-xs text-gray-500 uppercase font-semibold">First Name</dt>
-            <dd class="mt-1 text-gray-900">{{ auth.user?.first_name }}</dd>
+    <!-- Header band -->
+    <div style="background: #0a1628; border-bottom: 1px solid rgba(255,255,255,0.06)">
+      <div class="max-w-2xl mx-auto px-4 sm:px-6 py-6">
+        <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1">Account</p>
+        <div class="flex items-center gap-4">
+          <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-bold text-white flex-shrink-0"
+               style="background: linear-gradient(135deg, #059669, #047857)">
+            {{ initials }}
           </div>
           <div>
-            <dt class="text-xs text-gray-500 uppercase font-semibold">Last Name</dt>
-            <dd class="mt-1 text-gray-900">{{ auth.user?.last_name }}</dd>
-          </div>
-          <div>
-            <dt class="text-xs text-gray-500 uppercase font-semibold">Email</dt>
-            <dd class="mt-1 text-gray-900">{{ auth.user?.email }}</dd>
-          </div>
-          <div>
-            <dt class="text-xs text-gray-500 uppercase font-semibold">Phone</dt>
-            <dd class="mt-1 text-gray-900">{{ auth.user?.phone || '—' }}</dd>
-          </div>
-          <div>
-            <dt class="text-xs text-gray-500 uppercase font-semibold">Role</dt>
-            <dd class="mt-1">
-              <span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full capitalize">
-                {{ auth.user?.role?.replace(/_/g, ' ') }}
+            <h1 class="text-white text-xl font-bold tracking-tight">{{ auth.user?.full_name }}</h1>
+            <div class="flex items-center gap-2 mt-1">
+              <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
+                    style="background: rgba(5,150,105,0.2); color: #34d399; border: 1px solid rgba(52,211,153,0.25)">
+                {{ roleLabel }}
               </span>
-            </dd>
+              <span class="text-slate-400 text-xs">·</span>
+              <span class="text-slate-400 text-xs">Member since {{ formatDate(auth.user?.created_at) }}</span>
+            </div>
           </div>
-          <div>
-            <dt class="text-xs text-gray-500 uppercase font-semibold">Member Since</dt>
-            <dd class="mt-1 text-gray-900">{{ formatDate(auth.user?.created_at) }}</dd>
-          </div>
-        </dl>
-        <div class="mt-4">
-          <button class="btn-secondary text-sm" @click="startEditProfile">Edit Profile</button>
         </div>
-      </template>
+      </div>
+    </div>
 
-      <!-- Edit mode -->
-      <template v-else>
-        <form @submit.prevent="saveProfile" class="space-y-4">
-          <div class="grid grid-cols-2 gap-4">
+    <div class="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-4">
+
+      <!-- Personal info card -->
+      <div class="rounded-2xl overflow-hidden" style="background: #fff; border: 1px solid #e2e8f0">
+        <div class="px-5 py-4 flex items-center justify-between" style="border-bottom: 1px solid #f1f5f9">
+          <h2 class="text-sm font-bold text-slate-900">Personal Information</h2>
+          <button v-if="!editingProfile" class="text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition-colors"
+                  @click="startEditProfile">
+            Edit
+          </button>
+        </div>
+
+        <!-- Alerts -->
+        <transition enter-active-class="transition duration-200 ease-out"
+                    enter-from-class="opacity-0 -translate-y-1" enter-to-class="opacity-100 translate-y-0">
+          <div v-if="profileError" class="mx-5 mt-5 flex items-start gap-3 rounded-xl border border-red-100 bg-red-50 p-3.5">
+            <svg class="w-4 h-4 mt-0.5 flex-shrink-0 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+            </svg>
+            <p class="text-sm text-red-700">{{ profileError }}</p>
+          </div>
+        </transition>
+        <transition enter-active-class="transition duration-200 ease-out"
+                    enter-from-class="opacity-0 -translate-y-1" enter-to-class="opacity-100 translate-y-0">
+          <div v-if="profileSuccess" class="mx-5 mt-5 flex items-start gap-3 rounded-xl border border-emerald-100 bg-emerald-50 p-3.5">
+            <svg class="w-4 h-4 mt-0.5 flex-shrink-0 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"/>
+            </svg>
+            <p class="text-sm text-emerald-700">{{ profileSuccess }}</p>
+          </div>
+        </transition>
+
+        <!-- View mode -->
+        <template v-if="!editingProfile">
+          <dl class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
-              <label class="form-label">First Name</label>
-              <input v-model="profileForm.first_name" type="text" required class="form-input" />
+              <dt class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">First Name</dt>
+              <dd class="text-sm font-semibold text-slate-900">{{ auth.user?.first_name }}</dd>
             </div>
             <div>
-              <label class="form-label">Last Name</label>
-              <input v-model="profileForm.last_name" type="text" required class="form-input" />
+              <dt class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Last Name</dt>
+              <dd class="text-sm font-semibold text-slate-900">{{ auth.user?.last_name }}</dd>
             </div>
+            <div>
+              <dt class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Email Address</dt>
+              <dd class="text-sm text-slate-700">{{ auth.user?.email }}</dd>
+            </div>
+            <div>
+              <dt class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Phone Number</dt>
+              <dd class="text-sm text-slate-700">{{ auth.user?.phone || '—' }}</dd>
+            </div>
+          </dl>
+        </template>
+
+        <!-- Edit mode -->
+        <template v-else>
+          <form @submit.prevent="saveProfile" class="p-5 space-y-4" novalidate>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1.5">First Name <span class="text-red-500">*</span></label>
+                <input v-model="profileForm.first_name" type="text" required
+                       class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:bg-white transition-all"/>
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1.5">Last Name <span class="text-red-500">*</span></label>
+                <input v-model="profileForm.last_name" type="text" required
+                       class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:bg-white transition-all"/>
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1.5">Phone Number</label>
+              <input v-model="profileForm.phone" type="tel" placeholder="+234 800 000 0000"
+                     class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:bg-white transition-all"/>
+            </div>
+            <div class="flex gap-3">
+              <button type="submit" :disabled="profileSaving"
+                      class="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-60"
+                      style="background: linear-gradient(135deg, #059669, #047857)">
+                <svg v-if="profileSaving" class="animate-spin w-4 h-4 opacity-80" viewBox="0 0 24 24" fill="none">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+                {{ profileSaving ? 'Saving…' : 'Save Changes' }}
+              </button>
+              <button type="button"
+                      class="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 hover:bg-slate-50 transition-all"
+                      @click="editingProfile = false">
+                Cancel
+              </button>
+            </div>
+          </form>
+        </template>
+      </div>
+
+      <!-- Change password card -->
+      <div class="rounded-2xl overflow-hidden" style="background: #fff; border: 1px solid #e2e8f0">
+        <div class="px-5 py-4" style="border-bottom: 1px solid #f1f5f9">
+          <h2 class="text-sm font-bold text-slate-900">Change Password</h2>
+        </div>
+
+        <transition enter-active-class="transition duration-200 ease-out"
+                    enter-from-class="opacity-0 -translate-y-1" enter-to-class="opacity-100 translate-y-0">
+          <div v-if="pwdError" class="mx-5 mt-5 flex items-start gap-3 rounded-xl border border-red-100 bg-red-50 p-3.5">
+            <svg class="w-4 h-4 mt-0.5 flex-shrink-0 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+            </svg>
+            <p class="text-sm text-red-700">{{ pwdError }}</p>
+          </div>
+        </transition>
+        <transition enter-active-class="transition duration-200 ease-out"
+                    enter-from-class="opacity-0 -translate-y-1" enter-to-class="opacity-100 translate-y-0">
+          <div v-if="pwdSuccess" class="mx-5 mt-5 flex items-start gap-3 rounded-xl border border-emerald-100 bg-emerald-50 p-3.5">
+            <svg class="w-4 h-4 mt-0.5 flex-shrink-0 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"/>
+            </svg>
+            <p class="text-sm text-emerald-700">{{ pwdSuccess }}</p>
+          </div>
+        </transition>
+
+        <form @submit.prevent="savePassword" class="p-5 space-y-4" novalidate>
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Current Password <span class="text-red-500">*</span></label>
+            <input v-model="pwdForm.old_password" type="password" required
+                   class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:bg-white transition-all"/>
           </div>
           <div>
-            <label class="form-label">Phone</label>
-            <input v-model="profileForm.phone" type="tel" class="form-input" />
+            <label class="block text-sm font-semibold text-slate-700 mb-1.5">New Password <span class="text-red-500">*</span></label>
+            <input v-model="pwdForm.new_password" type="password" required minlength="8"
+                   class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:bg-white transition-all"/>
           </div>
-          <div class="flex gap-3">
-            <button type="submit" :disabled="profileSaving" class="btn-primary text-sm">
-              {{ profileSaving ? 'Saving…' : 'Save Changes' }}
-            </button>
-            <button type="button" class="btn-secondary text-sm" @click="editingProfile = false">Cancel</button>
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Confirm New Password <span class="text-red-500">*</span></label>
+            <input v-model="pwdForm.confirm_password" type="password" required
+                   :class="['block w-full rounded-xl border bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:border-transparent focus:bg-white transition-all',
+                            pwdForm.confirm_password && pwdForm.new_password !== pwdForm.confirm_password
+                              ? 'border-red-300 focus:ring-red-400'
+                              : 'border-slate-200 focus:ring-emerald-500']"/>
+            <p v-if="pwdForm.confirm_password && pwdForm.new_password !== pwdForm.confirm_password"
+               class="mt-1 text-xs text-red-500">Passwords do not match</p>
           </div>
+          <button type="submit"
+                  :disabled="pwdSaving || pwdForm.new_password !== pwdForm.confirm_password || !pwdForm.old_password"
+                  class="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                  style="background: linear-gradient(135deg, #059669, #047857)">
+            <svg v-if="pwdSaving" class="animate-spin w-4 h-4 opacity-80" viewBox="0 0 24 24" fill="none">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+            {{ pwdSaving ? 'Updating…' : 'Update Password' }}
+          </button>
         </form>
-      </template>
-    </AppCard>
+      </div>
 
-    <!-- Change password card -->
-    <AppCard title="Change Password">
-      <div v-if="pwdError" class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{{ pwdError }}</div>
-      <div v-if="pwdSuccess" class="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">{{ pwdSuccess }}</div>
-
-      <form @submit.prevent="savePassword" class="space-y-4">
-        <div>
-          <label class="form-label">Current Password</label>
-          <input v-model="pwdForm.old_password" type="password" required class="form-input" />
-        </div>
-        <div>
-          <label class="form-label">New Password</label>
-          <input v-model="pwdForm.new_password" type="password" required minlength="8" class="form-input" />
-        </div>
-        <div>
-          <label class="form-label">Confirm New Password</label>
-          <input v-model="pwdForm.confirm_password" type="password" required class="form-input" />
-          <p v-if="pwdForm.confirm_password && pwdForm.new_password !== pwdForm.confirm_password" class="mt-1 text-xs text-red-600">
-            Passwords do not match
-          </p>
-        </div>
-        <button
-          type="submit"
-          :disabled="pwdSaving || pwdForm.new_password !== pwdForm.confirm_password"
-          class="btn-primary text-sm"
-        >
-          {{ pwdSaving ? 'Updating…' : 'Update Password' }}
-        </button>
-      </form>
-    </AppCard>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import AppCard from '@/components/AppCard.vue'
 
 const auth = useAuthStore()
 
-// ── Profile edit ─────────────────────────────────────────────────────────────
+const initials = computed(() => {
+  const u = auth.user
+  if (!u) return '?'
+  if (u.first_name && u.last_name) return (u.first_name[0] + u.last_name[0]).toUpperCase()
+  return (u.email?.[0] ?? '?').toUpperCase()
+})
+
+const roleLabel = computed(() => {
+  const map: Record<string, string> = {
+    applicant: 'Applicant',
+    finance: 'Finance Officer',
+    naming_committee: 'Naming Committee',
+    committee_chairman: 'Committee Chairman',
+  }
+  return map[auth.user?.role ?? ''] ?? auth.user?.role ?? ''
+})
+
 const editingProfile = ref(false)
 const profileSaving = ref(false)
 const profileError = ref('')
@@ -144,7 +237,6 @@ async function saveProfile() {
   }
 }
 
-// ── Password change ───────────────────────────────────────────────────────────
 const pwdSaving = ref(false)
 const pwdError = ref('')
 const pwdSuccess = ref('')
@@ -163,10 +255,7 @@ async function savePassword() {
     pwdForm.value = { old_password: '', new_password: '', confirm_password: '' }
   } catch (err: unknown) {
     const e = err as { response?: { data?: { detail?: string; old_password?: string[] } } }
-    pwdError.value =
-      e.response?.data?.old_password?.[0] ||
-      e.response?.data?.detail ||
-      'Failed to update password.'
+    pwdError.value = e.response?.data?.old_password?.[0] || e.response?.data?.detail || 'Failed to update password.'
   } finally {
     pwdSaving.value = false
   }
