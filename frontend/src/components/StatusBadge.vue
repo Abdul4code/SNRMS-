@@ -13,6 +13,7 @@ const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-700',
   submitted: 'bg-blue-100 text-blue-700',
   awaiting_stage_a_payment: 'bg-yellow-100 text-yellow-700',
+  awaiting_stage_a_payment_confirmation: 'bg-orange-100 text-orange-700',
   awaiting_stage_c_payment: 'bg-yellow-100 text-yellow-700',
   awaiting_renewal_payment: 'bg-yellow-100 text-yellow-700',
   stage_a_confirmed: 'bg-green-100 text-green-700',

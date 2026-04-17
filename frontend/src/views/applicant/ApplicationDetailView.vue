@@ -29,18 +29,33 @@
             </div>
             <!-- Action buttons -->
             <div class="flex flex-wrap gap-2">
-              <button v-if="application.status === 'draft'" :disabled="actionLoading"
+              <RouterLink v-if="application.status === 'draft' && !allDocsUploaded"
+                          :to="`/applications/${application.id}/documents`"
+                          class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all"
+                          style="background: linear-gradient(135deg, #059669, #047857); box-shadow: 0 4px 14px rgba(5,150,105,0.35)">
+                Upload Documents
+              </RouterLink>
+              <button v-if="application.status === 'draft' && allDocsUploaded"
+                      :disabled="actionLoading"
                       class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-60"
-                      style="background: linear-gradient(135deg, #059669, #047857); box-shadow: 0 4px 14px rgba(5,150,105,0.35)"
-                      @click="handleSubmit">
-                {{ actionLoading ? 'Submitting…' : 'Submit Application' }}
+                      style="background: linear-gradient(135deg, #0284c7, #0369a1); box-shadow: 0 4px 14px rgba(2,132,199,0.35)"
+                      @click="handleRequestPayment">
+                {{ actionLoading ? 'Processing…' : 'Proceed to Payment' }}
               </button>
               <RouterLink v-if="PAYMENT_STATUSES.includes(application.status)"
                           :to="`/applications/${application.id}/payment`"
                           class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all"
                           style="background: linear-gradient(135deg, #0284c7, #0369a1); box-shadow: 0 4px 14px rgba(2,132,199,0.35)">
-                Make Payment
+                Proceed to Payment
               </RouterLink>
+              <span v-if="application.status === 'awaiting_stage_a_payment_confirmation'"
+                    class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold"
+                    style="background: rgba(234,179,8,0.1); color: #92400e; border: 1px solid rgba(234,179,8,0.3)">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"/>
+                </svg>
+                Payment Submitted
+              </span>
               <button v-if="RENEWAL_STATUSES.includes(application.status)" :disabled="actionLoading"
                       class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-slate-700 border border-slate-200 bg-white hover:bg-slate-50 transition-all disabled:opacity-60"
                       @click="handleRenewal">
@@ -90,6 +105,10 @@
                 <div>
                   <dt class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Street Type</dt>
                   <dd class="text-sm text-slate-700">{{ application.street_type_name }}</dd>
+                </div>
+                <div>
+                  <dt class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Ward</dt>
+                  <dd class="text-sm text-slate-700">{{ application.ward_display || '—' }}</dd>
                 </div>
                 <div class="sm:col-span-2">
                   <dt class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Location Description</dt>
@@ -194,17 +213,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRoute, RouterLink } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
+import { useRoute, RouterLink, useRouter } from 'vue-router'
 import { DocumentIcon, ChevronRightIcon, ClockIcon } from '@heroicons/vue/24/outline'
 import { applicationApi, documentApi } from '@/services/api'
 import StatusBadge from '@/components/StatusBadge.vue'
+
+const REQUIRED_DOC_TYPES = [
+  'nin_verification_slip',
+  'passport_photograph',
+  'royal_fathers_recognition_letter',
+  'survey_property_document',
+]
 
 interface Application {
   id: number
   reference_number?: string
   proposed_street_name: string
   street_type_name?: string
+  ward_display?: string
   location_description: string
   status: string
   created_at: string
@@ -218,6 +245,7 @@ const PAYMENT_STATUSES = ['awaiting_stage_a_payment', 'awaiting_stage_c_payment'
 const RENEWAL_STATUSES = ['certificate_issued', 'expired', 'renewed']
 
 const route = useRoute()
+const router = useRouter()
 const application = ref<Application | null>(null)
 const documents = ref<Document[]>([])
 const history = ref<HistoryEntry[]>([])
@@ -225,6 +253,10 @@ const loading = ref(false)
 const actionLoading = ref(false)
 const actionError = ref('')
 const actionSuccess = ref('')
+
+const allDocsUploaded = computed(() =>
+  REQUIRED_DOC_TYPES.every(type => documents.value.some(d => d.document_type === type))
+)
 
 async function loadApplication() {
   loading.value = true
@@ -259,6 +291,20 @@ async function handleSubmit() {
   }
 }
 
+async function handleRequestPayment() {
+  actionError.value = ''
+  actionLoading.value = true
+  try {
+    await applicationApi.requestPayment(application.value!.id)
+    router.push(`/applications/${application.value!.id}/payment`)
+  } catch (err: unknown) {
+    const e = err as { response?: { data?: { detail?: string } } }
+    actionError.value = e.response?.data?.detail || 'Failed to proceed to payment.'
+  } finally {
+    actionLoading.value = false
+  }
+}
+
 async function handleWithdraw() {
   if (!confirm('Are you sure you want to withdraw this application?')) return
   actionLoading.value = true
@@ -279,8 +325,8 @@ async function handleRenewal() {
   actionLoading.value = true
   actionError.value = ''
   try {
-    await applicationApi.submit(application.value!.id)
-    actionSuccess.value = 'Renewal submitted.'
+    await applicationApi.renew(application.value!.id)
+    actionSuccess.value = 'Renewal request submitted.'
     await loadApplication()
   } catch (err: unknown) {
     const e = err as { response?: { data?: { detail?: string } } }

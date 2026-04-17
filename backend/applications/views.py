@@ -20,6 +20,7 @@ from .services import (
     issue_certificate,
     notify_applicant,
     submit_application,
+    submit_payment_reference,
 )
 
 
@@ -73,6 +74,12 @@ class ApplicationListCreateView(generics.ListCreateAPIView):
 
         if not _is_staff_role(user):
             qs = qs.filter(applicant=user)
+        else:
+            # Staff never need to see draft or withdrawn applications
+            qs = qs.exclude(status__in=[
+                ApplicationStatus.DRAFT,
+                ApplicationStatus.WITHDRAWN,
+            ])
 
         status_filter = self.request.query_params.get('status')
         if status_filter:
@@ -475,6 +482,53 @@ class CertificateIssueView(APIView):
 
         try:
             issue_certificate(application, actor=request.user)
+        except ValueError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            ApplicationDetailSerializer(application, context={'request': request}).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+# ---------------------------------------------------------------------------
+# RequestPaymentView
+# ---------------------------------------------------------------------------
+
+class RequestPaymentView(APIView):
+    """
+    POST /api/applications/<pk>/request-payment/
+
+    Applicant finalises document upload and requests Stage A payment.
+    If still draft:  draft → submitted → awaiting_stage_a_payment (+ creates Payment record).
+    If submitted:    submitted → awaiting_stage_a_payment (+ creates Payment record).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        if request.user.role != Role.APPLICANT:
+            return Response(
+                {'detail': 'Only applicants can request payment.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        application = _get_application_or_404(pk, request.user)
+        if application is None:
+            return Response({'detail': 'Application not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if application.applicant != request.user:
+            return Response({'detail': 'You do not own this application.'}, status=status.HTTP_403_FORBIDDEN)
+
+        if application.status not in (ApplicationStatus.DRAFT, ApplicationStatus.SUBMITTED):
+            return Response(
+                {'detail': f'Cannot request payment for an application with status "{application.status}".'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            if application.status == ApplicationStatus.DRAFT:
+                submit_application(application, actor=request.user)
+            submit_payment_reference(application, actor=request.user)
         except ValueError as exc:
             return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 

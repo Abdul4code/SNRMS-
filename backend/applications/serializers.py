@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from accounts.serializers import UserSerializer
-from .models import Application, ApplicationStatus, StatusHistory
+from .models import Application, ApplicationStatus, StatusHistory, Ward
 
 
 class StatusHistorySerializer(serializers.ModelSerializer):
@@ -70,6 +70,7 @@ class ApplicationListSerializer(serializers.ModelSerializer):
 class ApplicationDetailSerializer(serializers.ModelSerializer):
     applicant = UserSerializer(read_only=True)
     street_type_name = serializers.CharField(source='street_type.name', read_only=True)
+    ward_display = serializers.CharField(source='get_ward_display', read_only=True)
     status_history = StatusHistorySerializer(many=True, read_only=True)
     documents = serializers.SerializerMethodField()
     payments = serializers.SerializerMethodField()
@@ -84,6 +85,8 @@ class ApplicationDetailSerializer(serializers.ModelSerializer):
             'street_type',
             'street_type_name',
             'location_description',
+            'ward',
+            'ward_display',
             'lga_area',
             'status',
             'committee_remarks',
@@ -113,11 +116,14 @@ class ApplicationCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Application
         fields = [
+            'id',
             'proposed_street_name',
             'street_type',
             'location_description',
+            'ward',
             'lga_area',
         ]
+        read_only_fields = ['id']
 
     def create(self, validated_data):
         request = self.context.get('request')
@@ -132,6 +138,7 @@ class ApplicationUpdateSerializer(serializers.ModelSerializer):
             'proposed_street_name',
             'street_type',
             'location_description',
+            'ward',
             'lga_area',
         ]
 

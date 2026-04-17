@@ -7,6 +7,7 @@ class ApplicationStatus(models.TextChoices):
     DRAFT = 'draft', 'Draft'
     SUBMITTED = 'submitted', 'Submitted'
     AWAITING_STAGE_A_PAYMENT = 'awaiting_stage_a_payment', 'Awaiting Stage A Payment'
+    AWAITING_STAGE_A_PAYMENT_CONFIRMATION = 'awaiting_stage_a_payment_confirmation', 'Awaiting Stage A Payment Confirmation'
     STAGE_A_CONFIRMED = 'stage_a_confirmed', 'Stage A Confirmed'
     UNDER_NAMING_COMMITTEE_REVIEW = 'under_naming_committee_review', 'Under Naming Committee Review'
     APPROVED_BY_COMMITTEE = 'approved_by_committee', 'Approved by Committee'
@@ -28,7 +29,8 @@ class ApplicationStatus(models.TextChoices):
 VALID_TRANSITIONS = {
     ApplicationStatus.DRAFT: [ApplicationStatus.SUBMITTED, ApplicationStatus.WITHDRAWN],
     ApplicationStatus.SUBMITTED: [ApplicationStatus.AWAITING_STAGE_A_PAYMENT, ApplicationStatus.WITHDRAWN],
-    ApplicationStatus.AWAITING_STAGE_A_PAYMENT: [ApplicationStatus.STAGE_A_CONFIRMED],
+    ApplicationStatus.AWAITING_STAGE_A_PAYMENT: [ApplicationStatus.AWAITING_STAGE_A_PAYMENT_CONFIRMATION],
+    ApplicationStatus.AWAITING_STAGE_A_PAYMENT_CONFIRMATION: [ApplicationStatus.STAGE_A_CONFIRMED],
     ApplicationStatus.STAGE_A_CONFIRMED: [ApplicationStatus.UNDER_NAMING_COMMITTEE_REVIEW],
     ApplicationStatus.UNDER_NAMING_COMMITTEE_REVIEW: [
         ApplicationStatus.APPROVED_BY_COMMITTEE,
@@ -57,6 +59,12 @@ VALID_TRANSITIONS = {
 }
 
 
+class Ward(models.TextChoices):
+    WARD_A = 'ward_a', 'Ward A - Central'
+    WARD_B = 'ward_b', 'Ward B - North'
+    WARD_C = 'ward_c', 'Ward C - South'
+
+
 class Application(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     reference_number = models.CharField(max_length=30, unique=True, blank=True)
@@ -70,6 +78,7 @@ class Application(models.Model):
         related_name='applications'
     )
     location_description = models.TextField()
+    ward = models.CharField(max_length=20, choices=Ward.choices, default=Ward.WARD_A)
     lga_area = models.CharField(max_length=200, default='Ibeju-Lekki')
     status = models.CharField(
         max_length=50, choices=ApplicationStatus.choices,

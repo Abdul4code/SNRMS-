@@ -5,12 +5,10 @@ from django.conf import settings
 
 
 class DocumentType(models.TextChoices):
-    SURVEY_PLAN = 'survey_plan', 'Survey Plan'
-    LAND_OWNERSHIP = 'land_ownership', 'Land Ownership/Title Document'
-    SITE_PHOTOGRAPH = 'site_photograph', 'Site Photograph'
-    LETTER_OF_INTENT = 'letter_of_intent', 'Letter of Intent'
-    CAC_CERTIFICATE = 'cac_certificate', 'CAC Certificate (for organisations)'
-    OTHER = 'other', 'Other'
+    NIN_VERIFICATION_SLIP = 'nin_verification_slip', 'NIN Verification Slip'
+    PASSPORT_PHOTOGRAPH = 'passport_photograph', 'Passport Photograph'
+    ROYAL_FATHERS_RECOGNITION_LETTER = 'royal_fathers_recognition_letter', 'Royal Fathers Recognition Letter'
+    SURVEY_PROPERTY_DOCUMENT = 'survey_property_document', 'Survey Property Document'
 
 
 def document_upload_path(instance, filename):

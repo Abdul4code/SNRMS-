@@ -177,7 +177,7 @@ const allApps = ref<Application[]>([])
 const loadingApps = ref(false)
 
 const ROLE_PENDING_STATUS: Record<string, string[]> = {
-  finance: ['awaiting_stage_a_payment', 'awaiting_stage_c_payment', 'awaiting_renewal_payment'],
+  finance: ['awaiting_stage_a_payment_confirmation', 'awaiting_stage_c_payment', 'awaiting_renewal_payment'],
   naming_committee: ['under_naming_committee_review'],
   committee_chairman: ['awaiting_chairman_approval', 'stage_c_confirmed'],
 }

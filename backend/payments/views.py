@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import Role
-from applications.models import Application
+from applications.models import Application, ApplicationStatus
 from config.models import FeeConfiguration
 
 from .models import Payment, PaymentStage, PaymentStatus
@@ -163,6 +163,15 @@ class SubmitPaymentView(APIView):
             'submitted_at',
             'updated_at',
         ])
+
+        # Transition application status to awaiting confirmation
+        application = payment.application
+        if application.status == ApplicationStatus.AWAITING_STAGE_A_PAYMENT:
+            application.transition_to(
+                ApplicationStatus.AWAITING_STAGE_A_PAYMENT_CONFIRMATION,
+                actor=request.user,
+                remarks='Payment evidence submitted by applicant.',
+            )
 
         return Response(
             PaymentSerializer(payment).data,

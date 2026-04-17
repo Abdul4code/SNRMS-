@@ -118,6 +118,8 @@ export const applicationApi = {
     api.patch(`/applications/${id}/`, data),
   submit: (id: number | string) =>
     api.post(`/applications/${id}/submit/`),
+  requestPayment: (id: number | string) =>
+    api.post(`/applications/${id}/request-payment/`),
   withdraw: (id: number | string) =>
     api.post(`/applications/${id}/withdraw/`),
   committeeReview: (id: number | string, data: Record<string, unknown>) =>
@@ -126,6 +128,8 @@ export const applicationApi = {
     api.post(`/applications/${id}/chairman_approval/`, data),
   issueCertificate: (id: number | string) =>
     api.post(`/applications/${id}/issue_certificate/`),
+  renew: (id: number | string) =>
+    api.post(`/applications/${id}/renew/`),
   getHistory: (id: number | string) =>
     api.get(`/applications/${id}/history/`),
 }
@@ -133,9 +137,9 @@ export const applicationApi = {
 // ─── Document API ────────────────────────────────────────────────────────────
 export const documentApi = {
   list: (applicationId: number | string) =>
-    api.get(`/applications/${applicationId}/documents/`),
+    api.get('/documents/', { params: { application: applicationId } }),
   upload: (formData: FormData) =>
-    api.post('/documents/', formData, {
+    api.post('/documents/upload/', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
   delete: (id: number | string) =>
@@ -147,9 +151,9 @@ export const documentApi = {
 // ─── Payment API ─────────────────────────────────────────────────────────────
 export const paymentApi = {
   listForApplication: (appId: number | string) =>
-    api.get(`/applications/${appId}/payments/`),
+    api.get(`/payments/applications/${appId}/payments/`),
   getBreakdown: (stage: string, streetTypeId?: number | string) =>
-    api.get('/payments/breakdown/', { params: { stage, street_type: streetTypeId } }),
+    api.get('/payments/fees/breakdown/', { params: { stage, street_type: streetTypeId } }),
   submitPayment: (paymentId: number | string, data: FormData | Record<string, unknown>) =>
     api.post(`/payments/${paymentId}/submit/`, data, {
       headers:
@@ -158,9 +162,9 @@ export const paymentApi = {
   confirmPayment: (paymentId: number | string, data: Record<string, unknown>) =>
     api.post(`/payments/${paymentId}/confirm/`, data),
   listFeeConfig: () =>
-    api.get('/payments/fee-config/'),
+    api.get('/payments/fees/config/'),
   updateFeeConfig: (id: number | string, data: Record<string, unknown>) =>
-    api.patch(`/payments/fee-config/${id}/`, data),
+    api.patch(`/payments/fees/config/${id}/`, data),
 }
 
 // ─── Notification API ────────────────────────────────────────────────────────
