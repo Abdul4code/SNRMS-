@@ -109,19 +109,21 @@ const router = createRouter({
       path: '/admin/fees',
       name: 'fee-config',
       component: () => import('@/views/admin/FeeConfigView.vue'),
-      meta: { requiresAuth: true, roles: ['finance', 'committee_chairman'] },
+      meta: { requiresAuth: true, roles: ['finance'] },
     },
     {
       path: '/admin/street-types',
       name: 'street-type-config',
       component: () => import('@/views/admin/StreetTypeConfigView.vue'),
-      meta: { requiresAuth: true, roles: ['committee_chairman'] },
+      meta: { requiresAuth: true, roles: ['naming_committee'] },
     },
 
     // ── 404 fallback ─────────────────────────────────────────────────────────
     {
       path: '/:pathMatch(.*)*',
-      redirect: '/dashboard',
+      name: 'not-found',
+      component: () => import('@/views/NotFoundView.vue'),
+      meta: { public: true },
     },
   ],
 })

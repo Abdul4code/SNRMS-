@@ -28,6 +28,7 @@ class DocumentSerializer(serializers.ModelSerializer):
             'mime_type',
             'uploaded_by',
             'is_verified',
+            'is_rejected',
             'verification_note',
             'is_deleted',
             'created_at',

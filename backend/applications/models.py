@@ -16,6 +16,7 @@ class ApplicationStatus(models.TextChoices):
     APPROVED_BY_CHAIRMAN = 'approved_by_chairman', 'Approved by Chairman'
     REJECTED_BY_CHAIRMAN = 'rejected_by_chairman', 'Rejected by Chairman'
     AWAITING_STAGE_C_PAYMENT = 'awaiting_stage_c_payment', 'Awaiting Stage C Payment'
+    AWAITING_STAGE_C_PAYMENT_CONFIRMATION = 'awaiting_stage_c_payment_confirmation', 'Awaiting Stage C Payment Confirmation'
     STAGE_C_CONFIRMED = 'stage_c_confirmed', 'Stage C Confirmed'
     CERTIFICATE_ISSUED = 'certificate_issued', 'Certificate Issued'
     EXPIRED = 'expired', 'Expired'
@@ -23,6 +24,7 @@ class ApplicationStatus(models.TextChoices):
     AWAITING_RENEWAL_PAYMENT = 'awaiting_renewal_payment', 'Awaiting Renewal Payment'
     RENEWAL_PAYMENT_CONFIRMED = 'renewal_payment_confirmed', 'Renewal Payment Confirmed'
     RENEWED = 'renewed', 'Renewed'
+    AWAITING_DOCUMENT_RESUBMISSION = 'awaiting_document_resubmission', 'Awaiting Document Resubmission'
     WITHDRAWN = 'withdrawn', 'Withdrawn'
 
 
@@ -38,14 +40,20 @@ VALID_TRANSITIONS = {
     ApplicationStatus.UNDER_NAMING_COMMITTEE_REVIEW: [
         ApplicationStatus.APPROVED_BY_COMMITTEE,
         ApplicationStatus.REJECTED_BY_COMMITTEE,
+        ApplicationStatus.AWAITING_DOCUMENT_RESUBMISSION,
     ],
+    ApplicationStatus.AWAITING_DOCUMENT_RESUBMISSION: [ApplicationStatus.UNDER_NAMING_COMMITTEE_REVIEW],
     ApplicationStatus.APPROVED_BY_COMMITTEE: [ApplicationStatus.AWAITING_CHAIRMAN_APPROVAL],
     ApplicationStatus.AWAITING_CHAIRMAN_APPROVAL: [
         ApplicationStatus.APPROVED_BY_CHAIRMAN,
         ApplicationStatus.REJECTED_BY_CHAIRMAN,
     ],
     ApplicationStatus.APPROVED_BY_CHAIRMAN: [ApplicationStatus.AWAITING_STAGE_C_PAYMENT],
-    ApplicationStatus.AWAITING_STAGE_C_PAYMENT: [ApplicationStatus.STAGE_C_CONFIRMED],
+    ApplicationStatus.AWAITING_STAGE_C_PAYMENT: [ApplicationStatus.AWAITING_STAGE_C_PAYMENT_CONFIRMATION],
+    ApplicationStatus.AWAITING_STAGE_C_PAYMENT_CONFIRMATION: [
+        ApplicationStatus.STAGE_C_CONFIRMED,
+        ApplicationStatus.AWAITING_STAGE_C_PAYMENT,
+    ],
     ApplicationStatus.STAGE_C_CONFIRMED: [ApplicationStatus.CERTIFICATE_ISSUED],
     ApplicationStatus.CERTIFICATE_ISSUED: [
         ApplicationStatus.EXPIRED,

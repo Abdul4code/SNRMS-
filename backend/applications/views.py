@@ -315,6 +315,20 @@ class CommitteeReviewView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        if decision == 'approved':
+            # All documents must be verified before the committee can approve
+            from documents.models import Document
+            unverified = Document.objects.filter(
+                application=application,
+                is_deleted=False,
+                is_verified=False,
+            ).exists()
+            if unverified:
+                return Response(
+                    {'detail': 'All documents must be verified before approving the application.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
         try:
             if decision == 'approved':
                 # Record committee approval
@@ -423,6 +437,20 @@ class ChairmanApprovalView(APIView):
                     actor=request.user,
                     remarks='Auto-forwarded to Stage C payment after chairman approval.',
                 )
+
+                # Create a pending Stage C Payment record so the applicant can submit evidence
+                from decimal import Decimal as _Decimal
+                from payments.models import Payment as _Payment, PaymentStage as _PS, PaymentStatus as _PStatus
+                from payments.services import get_stage_c_fee_breakdown, get_total_fee
+                _breakdown = get_stage_c_fee_breakdown(application.street_type_id)
+                _amount = get_total_fee(_breakdown) if _breakdown else _Decimal('0.00')
+                _Payment.objects.create(
+                    application=application,
+                    stage=_PS.STAGE_C,
+                    status=_PStatus.PENDING,
+                    amount_expected=_amount,
+                )
+
                 notify_applicant(
                     application,
                     notification_type=NotificationType.APPLICATION_APPROVED,
@@ -535,6 +563,63 @@ class RequestPaymentView(APIView):
             submit_payment_reference(application, actor=request.user)
         except ValueError as exc:
             return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            ApplicationDetailSerializer(application, context={'request': request}).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+# ---------------------------------------------------------------------------
+# DocumentResubmitView
+# ---------------------------------------------------------------------------
+
+class DocumentResubmitView(APIView):
+    """
+    POST /api/applications/<pk>/resubmit-documents/
+    Applicant signals they have re-uploaded rejected documents.
+    Transitions: awaiting_document_resubmission → under_naming_committee_review.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        if request.user.role != Role.APPLICANT:
+            return Response(
+                {'detail': 'Only applicants can resubmit documents.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        application = _get_application_or_404(pk, request.user)
+        if application is None:
+            return Response({'detail': 'Application not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if application.applicant != request.user:
+            return Response({'detail': 'You do not own this application.'}, status=status.HTTP_403_FORBIDDEN)
+
+        if application.status != ApplicationStatus.AWAITING_DOCUMENT_RESUBMISSION:
+            return Response(
+                {'detail': 'Application is not awaiting document resubmission.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            application.transition_to(
+                ApplicationStatus.UNDER_NAMING_COMMITTEE_REVIEW,
+                actor=request.user,
+                remarks='Applicant resubmitted documents for review.',
+            )
+        except ValueError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        notify_applicant(
+            application,
+            notification_type=NotificationType.APPLICATION_STATUS_CHANGE,
+            title='Documents Resubmitted',
+            message=(
+                f'Your documents for application {application.reference_number} '
+                'have been resubmitted. The naming committee will review them shortly.'
+            ),
+        )
 
         return Response(
             ApplicationDetailSerializer(application, context={'request': request}).data,

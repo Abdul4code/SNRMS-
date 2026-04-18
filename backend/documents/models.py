@@ -31,6 +31,7 @@ class Document(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True
     )
     is_verified = models.BooleanField(default=False)
+    is_rejected = models.BooleanField(default=False)
     verification_note = models.TextField(blank=True)
     is_deleted = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)

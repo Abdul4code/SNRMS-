@@ -35,6 +35,12 @@
                           style="background: linear-gradient(135deg, #059669, #047857); box-shadow: 0 4px 14px rgba(5,150,105,0.35)">
                 Upload Documents
               </RouterLink>
+              <RouterLink v-if="application.status === 'awaiting_document_resubmission'"
+                          :to="`/applications/${application.id}/documents`"
+                          class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all"
+                          style="background: linear-gradient(135deg, #dc2626, #b91c1c); box-shadow: 0 4px 14px rgba(220,38,38,0.35)">
+                Re-upload Documents
+              </RouterLink>
               <button v-if="application.status === 'draft' && allDocsUploaded"
                       :disabled="actionLoading"
                       class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-60"

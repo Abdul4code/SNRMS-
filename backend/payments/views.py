@@ -173,6 +173,12 @@ class SubmitPaymentView(APIView):
                 actor=request.user,
                 remarks='Payment evidence submitted by applicant.',
             )
+        elif application.status == ApplicationStatus.AWAITING_STAGE_C_PAYMENT:
+            application.transition_to(
+                ApplicationStatus.AWAITING_STAGE_C_PAYMENT_CONFIRMATION,
+                actor=request.user,
+                remarks='Stage C payment evidence submitted by applicant.',
+            )
 
         return Response(
             PaymentSerializer(payment).data,

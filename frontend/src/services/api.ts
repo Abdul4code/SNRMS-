@@ -123,13 +123,15 @@ export const applicationApi = {
   withdraw: (id: number | string) =>
     api.post(`/applications/${id}/withdraw/`),
   committeeReview: (id: number | string, data: Record<string, unknown>) =>
-    api.post(`/applications/${id}/committee_review/`, data),
+    api.post(`/applications/${id}/committee-review/`, data),
   chairmanApproval: (id: number | string, data: Record<string, unknown>) =>
-    api.post(`/applications/${id}/chairman_approval/`, data),
+    api.post(`/applications/${id}/chairman-approval/`, data),
   issueCertificate: (id: number | string) =>
-    api.post(`/applications/${id}/issue_certificate/`),
+    api.post(`/applications/${id}/issue-certificate/`),
   renew: (id: number | string) =>
     api.post(`/applications/${id}/renew/`),
+  resubmitDocuments: (id: number | string) =>
+    api.post(`/applications/${id}/resubmit-documents/`),
   getHistory: (id: number | string) =>
     api.get(`/applications/${id}/history/`),
 }
@@ -146,6 +148,8 @@ export const documentApi = {
     api.delete(`/documents/${id}/`),
   verify: (id: number | string, data: Record<string, unknown>) =>
     api.post(`/documents/${id}/verify/`, data),
+  reject: (id: number | string, data: Record<string, unknown>) =>
+    api.post(`/documents/${id}/reject/`, data),
 }
 
 // ─── Payment API ─────────────────────────────────────────────────────────────
@@ -189,6 +193,8 @@ export const configApi = {
     api.post('/config/street-types/', data),
   updateStreetType: (id: number | string, data: Record<string, unknown>) =>
     api.patch(`/config/street-types/${id}/`, data),
+  getBuildingSurveys: () =>
+    api.get('/config/building-surveys/'),
 }
 
 export default api

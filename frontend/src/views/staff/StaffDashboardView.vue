@@ -155,7 +155,7 @@
       </div>
 
       <!-- Quick links for chairman -->
-      <div v-if="auth.isChairman" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div v-if="auth.isChairman" class="grid grid-cols-1 sm:grid-cols-1 gap-3">
         <RouterLink to="/admin/staff"
                     class="flex items-center gap-3 p-4 rounded-2xl transition-all hover:shadow-sm"
                     style="background: #fff; border: 1px solid #e2e8f0">
@@ -166,32 +166,6 @@
           <div>
             <p class="text-sm font-semibold text-slate-900">Staff Management</p>
             <p class="text-xs text-slate-500">Manage staff accounts</p>
-          </div>
-          <ChevronRightIcon class="w-4 h-4 text-slate-300 ml-auto" />
-        </RouterLink>
-        <RouterLink to="/admin/fees"
-                    class="flex items-center gap-3 p-4 rounded-2xl transition-all hover:shadow-sm"
-                    style="background: #fff; border: 1px solid #e2e8f0">
-          <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-               style="background: rgba(217,119,6,0.08); border: 1px solid rgba(217,119,6,0.15)">
-            <CurrencyDollarIcon class="w-5 h-5" style="color: #d97706" />
-          </div>
-          <div>
-            <p class="text-sm font-semibold text-slate-900">Fee Configuration</p>
-            <p class="text-xs text-slate-500">Set application fees</p>
-          </div>
-          <ChevronRightIcon class="w-4 h-4 text-slate-300 ml-auto" />
-        </RouterLink>
-        <RouterLink to="/admin/street-types"
-                    class="flex items-center gap-3 p-4 rounded-2xl transition-all hover:shadow-sm"
-                    style="background: #fff; border: 1px solid #e2e8f0">
-          <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-               style="background: rgba(2,132,199,0.08); border: 1px solid rgba(2,132,199,0.15)">
-            <MapIcon class="w-5 h-5" style="color: #0284c7" />
-          </div>
-          <div>
-            <p class="text-sm font-semibold text-slate-900">Street Types</p>
-            <p class="text-xs text-slate-500">Configure street categories</p>
           </div>
           <ChevronRightIcon class="w-4 h-4 text-slate-300 ml-auto" />
         </RouterLink>
@@ -232,7 +206,7 @@ const paymentAmounts = reactive({
 
 const FINANCE_PENDING_STATUSES = [
   'awaiting_stage_a_payment_confirmation',
-  'awaiting_stage_c_payment',
+  'awaiting_stage_c_payment_confirmation',
   'awaiting_renewal_payment',
 ]
 const FINANCE_CONFIRMED_STATUSES = [
@@ -261,23 +235,54 @@ const roleLabel = computed(() => {
 const pendingStatuses = computed(() => ROLE_PENDING_STATUS[auth.user?.role ?? ''] ?? [])
 const pendingApps = computed(() => allApps.value.filter(a => pendingStatuses.value.includes(a.status)))
 
+// Statuses that represent a successful committee approval (apps forwarded to chairman or beyond)
+const COMMITTEE_APPROVED_STATUSES = [
+  'awaiting_chairman_approval', 'approved_by_chairman', 'rejected_by_chairman',
+  'awaiting_stage_c_payment', 'stage_c_confirmed', 'certificate_issued',
+  'expired', 'renewal_submitted', 'awaiting_renewal_payment',
+  'renewal_payment_confirmed', 'renewed',
+]
+
+// Statuses that represent a successful chairman approval
+const CHAIRMAN_APPROVED_STATUSES = [
+  'approved_by_chairman', 'awaiting_stage_c_payment', 'stage_c_confirmed',
+  'certificate_issued', 'expired', 'renewal_submitted', 'awaiting_renewal_payment',
+  'renewal_payment_confirmed', 'renewed',
+]
+
 const stats = computed(() => {
   if (auth.isFinance) {
     return [
       { label: 'Awaiting Confirmation', value: financeStats.pending, color: financeStats.pending > 0 ? '#d97706' : '#0f172a', urgent: financeStats.pending > 0 },
-      { label: 'Pending Action', value: financeStats.pending, color: financeStats.pending > 0 ? '#d97706' : '#0f172a', urgent: financeStats.pending > 0 },
       { label: 'Payments Confirmed', value: financeStats.confirmed, color: '#059669', urgent: false },
       { label: 'Payments Rejected', value: financeStats.rejected, color: '#dc2626', urgent: false },
-    ].filter((_, i) => i !== 1) // remove duplicate — show 3 meaningful cards
+    ]
   }
   const counts: Record<string, number> = {}
   allApps.value.forEach(a => { counts[a.status] = (counts[a.status] ?? 0) + 1 })
   const pending = pendingApps.value.length
+
+  let approvedCount = 0
+  let rejectedCount = 0
+  let approvedLabel = 'Approved'
+  let rejectedLabel = 'Rejected'
+
+  if (auth.isNamingCommittee) {
+    approvedCount = COMMITTEE_APPROVED_STATUSES.reduce((sum, s) => sum + (counts[s] ?? 0), 0)
+    rejectedCount = counts['rejected_by_committee'] ?? 0
+    approvedLabel = 'Forwarded to Chairman'
+    rejectedLabel = 'Rejected by Committee'
+  } else {
+    // Chairman
+    approvedCount = CHAIRMAN_APPROVED_STATUSES.reduce((sum, s) => sum + (counts[s] ?? 0), 0)
+    rejectedCount = (counts['rejected_by_chairman'] ?? 0) + (counts['rejected_by_committee'] ?? 0)
+  }
+
   return [
     { label: 'Total Applications', value: allApps.value.length, color: '#0f172a', urgent: false },
     { label: 'Pending Action', value: pending, color: pending > 0 ? '#d97706' : '#0f172a', urgent: pending > 0 },
-    { label: 'Approved', value: (counts['approved_by_chairman'] ?? 0) + (counts['certificate_issued'] ?? 0), color: '#059669', urgent: false },
-    { label: 'Rejected', value: (counts['rejected_by_committee'] ?? 0) + (counts['rejected_by_chairman'] ?? 0), color: '#dc2626', urgent: false },
+    { label: approvedLabel, value: approvedCount, color: '#059669', urgent: false },
+    { label: rejectedLabel, value: rejectedCount, color: '#dc2626', urgent: false },
   ]
 })
 

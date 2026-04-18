@@ -86,8 +86,8 @@
               </dl>
             </div>
 
-            <!-- Street Location Map -->
-            <div class="rounded-2xl overflow-hidden" style="background: #fff; border: 1px solid #e2e8f0">
+            <!-- Street Location Map — hidden for finance -->
+            <div v-if="!auth.isFinance" class="rounded-2xl overflow-hidden" style="background: #fff; border: 1px solid #e2e8f0">
               <div class="px-5 py-4 flex items-center gap-2.5" style="border-bottom: 1px solid #f1f5f9">
                 <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
                      style="background: rgba(5,150,105,0.08); border: 1px solid rgba(5,150,105,0.15)">
@@ -99,12 +99,13 @@
                 <ApplicationMap
                   :location-description="application.location_description"
                   :street-name="application.proposed_street_name"
+                  :proposed-street-name="application.proposed_street_name"
                 />
               </div>
             </div>
 
-            <!-- Payment Evidence — shown prominently for finance when payment is submitted -->
-            <div v-if="submittedPayment" class="rounded-2xl overflow-hidden" style="background: #fff; border: 1px solid #e2e8f0">
+            <!-- Payment Evidence — shown for finance and chairman only -->
+            <div v-if="submittedPayment && !auth.isNamingCommittee" class="rounded-2xl overflow-hidden" style="background: #fff; border: 1px solid #e2e8f0">
               <div class="px-5 py-4 flex items-center gap-2.5" style="border-bottom: 1px solid #f1f5f9">
                 <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
                      style="background: rgba(2,132,199,0.08); border: 1px solid rgba(2,132,199,0.18)">
@@ -153,8 +154,8 @@
               </dl>
             </div>
 
-            <!-- All Payment Records -->
-            <div class="rounded-2xl overflow-hidden" style="background: #fff; border: 1px solid #e2e8f0">
+            <!-- All Payment Records — hidden from naming committee -->
+            <div v-if="!auth.isNamingCommittee" class="rounded-2xl overflow-hidden" style="background: #fff; border: 1px solid #e2e8f0">
               <div class="px-5 py-4" style="border-bottom: 1px solid #f1f5f9">
                 <h2 class="text-sm font-bold text-slate-900">Payment Records</h2>
               </div>
@@ -195,24 +196,38 @@
                 <p class="text-sm text-slate-500">No documents uploaded.</p>
               </div>
               <ul v-else class="divide-y divide-slate-50">
-                <li v-for="doc in documents" :key="doc.id" class="flex items-center gap-4 px-5 py-3.5">
-                  <div class="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-                       :style="doc.is_verified ? 'background: rgba(5,150,105,0.08); border: 1px solid rgba(5,150,105,0.18)' : 'background: #f8fafc; border: 1px solid #e2e8f0'">
-                    <DocumentIcon class="w-4 h-4" :style="doc.is_verified ? 'color: #059669' : 'color: #94a3b8'" />
+                <li v-for="doc in documents" :key="doc.id" class="flex items-start gap-4 px-5 py-3.5">
+                  <div class="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
+                       :style="doc.is_verified
+                         ? 'background: rgba(5,150,105,0.08); border: 1px solid rgba(5,150,105,0.18)'
+                         : doc.is_rejected
+                           ? 'background: rgba(220,38,38,0.06); border: 1px solid rgba(220,38,38,0.18)'
+                           : 'background: #f8fafc; border: 1px solid #e2e8f0'">
+                    <DocumentIcon class="w-4 h-4"
+                      :style="doc.is_verified ? 'color: #059669' : doc.is_rejected ? 'color: #dc2626' : 'color: #94a3b8'" />
                   </div>
                   <div class="flex-1 min-w-0">
                     <p class="text-sm font-semibold text-slate-900 truncate">{{ doc.document_type_display || doc.document_type }}</p>
-                    <p class="text-xs mt-0.5" :class="doc.is_verified ? 'text-emerald-600' : 'text-slate-400'">
-                      {{ doc.is_verified ? '✓ Verified' : 'Pending verification' }}
+                    <p class="text-xs mt-0.5"
+                       :class="doc.is_verified ? 'text-emerald-600' : doc.is_rejected ? 'text-red-500' : 'text-slate-400'">
+                      {{ doc.is_verified ? '✓ Verified' : doc.is_rejected ? '✗ Rejected' : 'Pending verification' }}
+                    </p>
+                    <p v-if="doc.is_rejected && doc.verification_note" class="text-xs text-red-400 mt-0.5 italic leading-snug">
+                      "{{ doc.verification_note }}"
                     </p>
                   </div>
-                  <div class="flex items-center gap-3 flex-shrink-0">
-                    <a v-if="doc.file" :href="doc.file" target="_blank"
+                  <div class="flex items-center gap-3 flex-shrink-0 mt-0.5">
+                    <a v-if="doc.file_url || doc.file" :href="doc.file_url || doc.file" target="_blank"
                        class="text-xs font-semibold text-emerald-600 hover:text-emerald-700">View</a>
-                    <button v-if="!doc.is_verified && (auth.isFinance || auth.isNamingCommittee || auth.isChairman)"
+                    <button v-if="!doc.is_verified && !doc.is_rejected && auth.isNamingCommittee"
                             class="text-xs font-semibold text-blue-600 hover:text-blue-700"
                             @click="verifyDoc(doc.id)">
                       Verify
+                    </button>
+                    <button v-if="!doc.is_rejected && auth.isNamingCommittee"
+                            class="text-xs font-semibold text-red-500 hover:text-red-600"
+                            @click="openRejectModal(doc)">
+                      Reject
                     </button>
                   </div>
                 </li>
@@ -288,6 +303,15 @@
                 <h2 class="text-sm font-bold text-slate-900">Committee Review</h2>
               </div>
               <form @submit.prevent="handleCommitteeReview" class="p-5 space-y-4" novalidate>
+                <!-- Warning when trying to approve with unverified docs -->
+                <div v-if="committeeForm.decision === 'approved' && !allDocsVerified"
+                     class="flex items-start gap-2.5 rounded-xl px-3.5 py-3"
+                     style="background: rgba(234,179,8,0.06); border: 1px solid rgba(234,179,8,0.3)">
+                  <svg class="w-4 h-4 mt-0.5 flex-shrink-0" style="color: #b45309" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+                  </svg>
+                  <p class="text-xs text-amber-700">All documents must be verified before approving. Verify or reject each document above first.</p>
+                </div>
                 <div>
                   <label class="block text-sm font-semibold text-slate-700 mb-1.5">Decision <span class="text-red-500">*</span></label>
                   <select v-model="committeeForm.decision" required
@@ -302,7 +326,8 @@
                   <textarea v-model="committeeForm.remarks" rows="4" required placeholder="Provide your review remarks…"
                             class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"/>
                 </div>
-                <button type="submit" :disabled="actionLoading || !committeeForm.decision || !committeeForm.remarks"
+                <button type="submit"
+                        :disabled="actionLoading || !committeeForm.decision || !committeeForm.remarks || (committeeForm.decision === 'approved' && !allDocsVerified)"
                         class="w-full py-2.5 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-60"
                         style="background: linear-gradient(135deg, #059669, #047857)">
                   {{ actionLoading ? 'Submitting…' : 'Submit Review' }}
@@ -378,6 +403,53 @@
       <RouterLink to="/staff/applications" class="text-xs font-semibold text-emerald-600">← Back to applications</RouterLink>
     </div>
   </div>
+
+  <!-- Rejection modal -->
+  <Teleport to="body">
+    <div v-if="rejectModal.show"
+         class="fixed inset-0 z-50 flex items-center justify-center px-4"
+         style="background: rgba(0,0,0,0.5)">
+      <div class="w-full max-w-md rounded-2xl overflow-hidden" style="background: #fff">
+        <div class="px-6 py-5" style="border-bottom: 1px solid #f1f5f9">
+          <h2 class="text-base font-bold text-slate-900">Reject Document</h2>
+          <p class="text-sm text-slate-500 mt-1">
+            Rejecting <span class="font-semibold text-slate-700">{{ rejectModal.docTypeName }}</span>
+            will ask the applicant to re-upload this document.
+          </p>
+        </div>
+        <div class="p-6 space-y-4">
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-1.5">
+              Reason for rejection <span class="text-red-500">*</span>
+            </label>
+            <textarea
+              v-model="rejectModal.note"
+              rows="4"
+              :placeholder="`Explain why the ${rejectModal.docTypeName} was rejected…`"
+              class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent"
+            />
+          </div>
+          <div class="flex gap-3">
+            <button
+              class="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all"
+              style="background: #f1f5f9; color: #475569"
+              @click="rejectModal.show = false"
+            >
+              Cancel
+            </button>
+            <button
+              :disabled="actionLoading || !rejectModal.note.trim()"
+              class="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-60"
+              style="background: linear-gradient(135deg, #dc2626, #b91c1c)"
+              @click="submitRejectDoc"
+            >
+              {{ actionLoading ? 'Rejecting…' : 'Reject Document' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -405,7 +477,7 @@ interface Application {
   applicant?: Applicant
 }
 
-interface Doc { id: string; document_type: string; document_type_display?: string; file?: string; is_verified?: boolean }
+interface Doc { id: string; document_type: string; document_type_display?: string; file?: string; file_url?: string; is_verified?: boolean; is_rejected?: boolean; verification_note?: string }
 interface Payment {
   id: string
   payment_reference?: string
@@ -424,7 +496,7 @@ interface HistoryEntry { new_status?: string; status?: string; created_at?: stri
 // Finance sees action panel for these application statuses
 const FINANCE_CONFIRM_STATUSES = [
   'awaiting_stage_a_payment_confirmation',
-  'awaiting_stage_c_payment',
+  'awaiting_stage_c_payment_confirmation',
   'awaiting_renewal_payment',
 ]
 
@@ -443,9 +515,17 @@ const financeForm = ref({ decision: '', finance_remarks: '' })
 const committeeForm = ref({ decision: '', remarks: '' })
 const chairmanForm = ref({ decision: '', remarks: '' })
 
+const rejectModal = ref<{ show: boolean; docId: string; docTypeName: string; note: string }>({
+  show: false, docId: '', docTypeName: '', note: '',
+})
+
 // The payment the applicant has submitted evidence for (status = 'submitted')
 const submittedPayment = computed(() =>
   payments.value.find(p => p.status === 'submitted') ?? null
+)
+
+const allDocsVerified = computed(() =>
+  documents.value.length > 0 && documents.value.every(d => d.is_verified)
 )
 
 function formatDate(d: string) {
@@ -573,6 +653,34 @@ async function verifyDoc(docId: string) {
     await load()
   } catch {
     actionError.value = 'Failed to verify document.'
+  }
+}
+
+function openRejectModal(doc: Doc) {
+  rejectModal.value = {
+    show: true,
+    docId: doc.id,
+    docTypeName: doc.document_type_display || doc.document_type,
+    note: '',
+  }
+}
+
+async function submitRejectDoc() {
+  if (!rejectModal.value.note.trim()) return
+  actionError.value = ''
+  actionLoading.value = true
+  try {
+    await documentApi.reject(rejectModal.value.docId, {
+      rejection_note: rejectModal.value.note,
+    })
+    rejectModal.value = { show: false, docId: '', docTypeName: '', note: '' }
+    actionSuccess.value = 'Document rejected. Applicant has been asked to re-upload.'
+    await load()
+  } catch (err: unknown) {
+    const e = err as { response?: { data?: { detail?: string; rejection_note?: string[] } } }
+    actionError.value = e.response?.data?.detail || e.response?.data?.rejection_note?.[0] || 'Failed to reject document.'
+  } finally {
+    actionLoading.value = false
   }
 }
 

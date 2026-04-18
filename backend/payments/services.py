@@ -282,8 +282,12 @@ def reject_payment(payment: Payment, actor, remarks: str = '') -> Payment:
                 remarks=rejection_remark,
             )
         elif (payment.stage == PaymentStage.STAGE_C and
-                application.status == ApplicationStatus.AWAITING_STAGE_C_PAYMENT):
-            pass  # Stage C has no confirmation intermediate; status already correct
+                application.status == ApplicationStatus.AWAITING_STAGE_C_PAYMENT_CONFIRMATION):
+            application.transition_to(
+                ApplicationStatus.AWAITING_STAGE_C_PAYMENT,
+                actor=actor,
+                remarks=rejection_remark,
+            )
         elif (payment.stage == PaymentStage.RENEWAL and
                 application.status == ApplicationStatus.AWAITING_RENEWAL_PAYMENT):
             pass  # Renewal has no confirmation intermediate; status already correct

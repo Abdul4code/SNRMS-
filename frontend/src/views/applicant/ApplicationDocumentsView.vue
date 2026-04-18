@@ -65,8 +65,13 @@
               <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
                    :style="uploadedFor(req.type)
                      ? 'background: rgba(5,150,105,0.08); border: 1px solid rgba(5,150,105,0.18)'
-                     : 'background: #f8fafc; border: 1px solid #e2e8f0'">
+                     : rejectedFor(req.type) && !uploadedFor(req.type)
+                       ? 'background: rgba(220,38,38,0.06); border: 1px solid rgba(220,38,38,0.18)'
+                       : 'background: #f8fafc; border: 1px solid #e2e8f0'">
                 <CheckCircleIcon v-if="uploadedFor(req.type)" class="w-5 h-5" style="color: #059669" />
+                <svg v-else-if="rejectedFor(req.type) && !uploadedFor(req.type)" class="w-5 h-5" style="color: #dc2626" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
                 <DocumentArrowUpIcon v-else class="w-5 h-5 text-slate-400" />
               </div>
 
@@ -78,11 +83,24 @@
                         style="background: rgba(5,150,105,0.1); color: #047857">
                     Uploaded
                   </span>
+                  <span v-else-if="rejectedFor(req.type) && !uploadedFor(req.type)"
+                        class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                        style="background: rgba(220,38,38,0.08); color: #b91c1c">
+                    Rejected — Re-upload Required
+                  </span>
                   <span v-else
                         class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
                         style="background: rgba(245,158,11,0.1); color: #b45309">
                     Required
                   </span>
+                </div>
+
+                <!-- Rejected notice — hidden once a replacement has been uploaded -->
+                <div v-if="rejectedFor(req.type) && !uploadedFor(req.type)" class="mt-2 rounded-xl px-3 py-2.5"
+                     style="background: rgba(220,38,38,0.04); border: 1px solid rgba(220,38,38,0.18)">
+                  <p class="text-xs font-semibold text-red-600">Document rejected — please re-upload</p>
+                  <p v-if="rejectedFor(req.type)!.verification_note"
+                     class="text-xs text-red-400 mt-0.5 italic">"{{ rejectedFor(req.type)!.verification_note }}"</p>
                 </div>
 
                 <!-- Uploaded file info -->
@@ -96,7 +114,8 @@
                           style="color: #059669">Verified</span>
                     <span v-else class="ml-auto text-[10px] text-slate-400 flex-shrink-0">Pending</span>
                   </div>
-                  <a v-if="uploadedFor(req.type)!.file" :href="uploadedFor(req.type)!.file" target="_blank"
+                  <a v-if="uploadedFor(req.type)!.file_url || uploadedFor(req.type)!.file"
+                     :href="uploadedFor(req.type)!.file_url || uploadedFor(req.type)!.file" target="_blank"
                      class="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex-shrink-0">View</a>
                   <button class="text-xs font-semibold text-red-500 hover:text-red-700 flex-shrink-0"
                           @click="handleDelete(uploadedFor(req.type)!.id)">Remove</button>
@@ -175,6 +194,41 @@
         </div>
       </transition>
 
+      <!-- Resubmit CTA — shown when all rejected docs have been re-uploaded and status is awaiting_document_resubmission -->
+      <transition enter-active-class="transition duration-300 ease-out"
+                  enter-from-class="opacity-0 translate-y-2" enter-to-class="opacity-100 translate-y-0">
+        <div v-if="uploadedCount === REQUIRED_DOCS.length && appStatus === 'awaiting_document_resubmission'"
+             class="rounded-2xl overflow-hidden"
+             style="background: linear-gradient(135deg, #1e1b4b, #312e81); border: 1px solid rgba(129,140,248,0.25)">
+          <div class="px-5 py-5 flex flex-col sm:flex-row sm:items-center gap-4">
+            <div class="flex items-center gap-3 flex-1 min-w-0">
+              <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                   style="background: rgba(129,140,248,0.15); border: 1px solid rgba(129,140,248,0.25)">
+                <CheckCircleIcon class="w-5 h-5" style="color: #818cf8" />
+              </div>
+              <div>
+                <p class="text-white text-sm font-bold">Documents re-uploaded</p>
+                <p class="text-indigo-300 text-xs mt-0.5">Click to resubmit for committee review</p>
+              </div>
+            </div>
+            <button :disabled="resubmitting"
+                    class="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white flex-shrink-0 transition-all disabled:opacity-60"
+                    style="background: linear-gradient(135deg, #4f46e5, #4338ca); box-shadow: 0 4px 14px rgba(79,70,229,0.4)"
+                    @click="handleResubmit">
+              <svg v-if="resubmitting" class="animate-spin w-4 h-4 opacity-80" viewBox="0 0 24 24" fill="none">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+              <span>{{ resubmitting ? 'Submitting…' : 'Resubmit for Review' }}</span>
+              <ChevronRightIcon v-if="!resubmitting" class="w-4 h-4" />
+            </button>
+          </div>
+          <div v-if="resubmitError" class="px-5 pb-4">
+            <p class="text-xs text-red-300">{{ resubmitError }}</p>
+          </div>
+        </div>
+      </transition>
+
       <!-- Back link -->
       <div class="pb-4">
         <RouterLink :to="`/applications/${route.params.id}`"
@@ -196,13 +250,17 @@ import {
 } from '@heroicons/vue/24/outline'
 import { documentApi, applicationApi } from '@/services/api'
 
+
 interface Doc {
   id: string
   document_type: string
   document_type_display?: string
   original_filename?: string
   file?: string
+  file_url?: string
   is_verified?: boolean
+  is_rejected?: boolean
+  verification_note?: string
 }
 
 const REQUIRED_DOCS = [
@@ -222,13 +280,19 @@ const globalError = ref('')
 const pendingFiles = ref<Record<string, File | null>>({})
 const requestingPayment = ref(false)
 const requestPaymentError = ref('')
+const resubmitting = ref(false)
+const resubmitError = ref('')
 
 const uploadedCount = computed(() =>
   REQUIRED_DOCS.filter(r => uploadedFor(r.type)).length
 )
 
 function uploadedFor(type: string): Doc | undefined {
-  return documents.value.find(d => d.document_type === type)
+  return documents.value.find(d => d.document_type === type && !d.is_rejected)
+}
+
+function rejectedFor(type: string): Doc | undefined {
+  return documents.value.find(d => d.document_type === type && d.is_rejected)
 }
 
 function onFileChange(e: Event, type: string) {
@@ -259,6 +323,7 @@ async function handleUpload(type: string) {
   const file = pendingFiles.value[type]
   if (!file) return
   globalError.value = ''
+  resubmitError.value = ''
   activeUpload.value = type
   try {
     const fd = new FormData()
@@ -297,6 +362,19 @@ async function handleRequestPayment() {
     const e = err as { response?: { data?: { detail?: string } } }
     requestPaymentError.value = e.response?.data?.detail || 'Failed to proceed. Please try again.'
     requestingPayment.value = false
+  }
+}
+
+async function handleResubmit() {
+  resubmitError.value = ''
+  resubmitting.value = true
+  try {
+    await applicationApi.resubmitDocuments(route.params.id as string)
+    router.push(`/applications/${route.params.id}`)
+  } catch (err: unknown) {
+    const e = err as { response?: { data?: { detail?: string } } }
+    resubmitError.value = e.response?.data?.detail || 'Failed to resubmit. Please try again.'
+    resubmitting.value = false
   }
 }
 

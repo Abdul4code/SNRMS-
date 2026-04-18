@@ -9,6 +9,7 @@ from .views import (
     CertificateIssueView,
     ChairmanApprovalView,
     CommitteeReviewView,
+    DocumentResubmitView,
     RequestPaymentView,
 )
 
@@ -32,6 +33,9 @@ urlpatterns = [
 
     # Applicant payment request (documents done → awaiting Stage A payment)
     path('<uuid:pk>/request-payment/', RequestPaymentView.as_view(), name='application-request-payment'),
+
+    # Applicant resubmits documents after rejection
+    path('<uuid:pk>/resubmit-documents/', DocumentResubmitView.as_view(), name='application-resubmit-documents'),
 
     # History
     path('<uuid:pk>/history/', ApplicationStatusHistoryView.as_view(), name='application-history'),

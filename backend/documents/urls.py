@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     DocumentDetailView,
     DocumentListView,
+    DocumentRejectView,
     DocumentUploadView,
     DocumentVerifyView,
 )
@@ -12,4 +13,5 @@ urlpatterns = [
     path('upload/', DocumentUploadView.as_view(), name='document-upload'),
     path('<uuid:pk>/', DocumentDetailView.as_view(), name='document-detail'),
     path('<uuid:pk>/verify/', DocumentVerifyView.as_view(), name='document-verify'),
+    path('<uuid:pk>/reject/', DocumentRejectView.as_view(), name='document-reject'),
 ]

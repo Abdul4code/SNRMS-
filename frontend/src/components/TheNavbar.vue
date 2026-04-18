@@ -29,9 +29,11 @@
             </template>
             <template v-if="auth.isChairman">
               <NavLink to="/admin/staff">Staff</NavLink>
+            </template>
+            <template v-if="auth.isNamingCommittee">
               <NavLink to="/admin/street-types">Street Types</NavLink>
             </template>
-            <template v-if="auth.isChairman || auth.isFinance">
+            <template v-if="auth.isFinance">
               <NavLink to="/admin/fees">Fee Config</NavLink>
             </template>
           </div>
@@ -162,9 +164,11 @@
           </template>
           <template v-if="auth.isChairman">
             <MobileLink to="/admin/staff" @click="mobileOpen = false">Staff Management</MobileLink>
+          </template>
+          <template v-if="auth.isNamingCommittee">
             <MobileLink to="/admin/street-types" @click="mobileOpen = false">Street Types</MobileLink>
           </template>
-          <template v-if="auth.isChairman || auth.isFinance">
+          <template v-if="auth.isFinance">
             <MobileLink to="/admin/fees" @click="mobileOpen = false">Fee Configuration</MobileLink>
           </template>
           <MobileLink to="/profile" @click="mobileOpen = false">My Profile</MobileLink>
