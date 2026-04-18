@@ -12,6 +12,7 @@ from config.models import FeeConfiguration
 
 from .models import Payment, PaymentStage, PaymentStatus
 from .serializers import (
+    FeeConfigurationCreateSerializer,
     FeeConfigurationSerializer,
     FeeConfigurationUpdateSerializer,
     PaymentConfirmSerializer,
@@ -178,6 +179,12 @@ class SubmitPaymentView(APIView):
                 ApplicationStatus.AWAITING_STAGE_C_PAYMENT_CONFIRMATION,
                 actor=request.user,
                 remarks='Stage C payment evidence submitted by applicant.',
+            )
+        elif application.status == ApplicationStatus.AWAITING_RENEWAL_PAYMENT:
+            application.transition_to(
+                ApplicationStatus.AWAITING_RENEWAL_PAYMENT_CONFIRMATION,
+                actor=request.user,
+                remarks='Renewal payment evidence submitted by applicant.',
             )
 
         return Response(
@@ -350,11 +357,10 @@ class FeeBreakdownView(APIView):
 # FeeConfigListView
 # ---------------------------------------------------------------------------
 
-class FeeConfigListView(generics.ListAPIView):
+class FeeConfigListView(generics.ListCreateAPIView):
     """
-    GET /api/fees/config/
-
-    Finance / Chairman only. Lists all fee configurations.
+    GET  /api/fees/config/ — list all fee configurations (finance/chairman)
+    POST /api/fees/config/ — create a new fee configuration (finance/chairman)
     """
     permission_classes = [IsAuthenticated]
     serializer_class = FeeConfigurationSerializer
@@ -365,18 +371,33 @@ class FeeConfigListView(generics.ListAPIView):
             raise PermissionDenied('Only finance staff can view fee configurations.')
         return FeeConfiguration.objects.select_related('street_type').order_by('component')
 
+    def create(self, request, *args, **kwargs):
+        if not _is_finance_or_chairman(request.user):
+            return Response(
+                {'detail': 'Only finance staff can create fee configurations.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        serializer = FeeConfigurationCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        instance = serializer.save(updated_by=request.user)
+        return Response(
+            FeeConfigurationSerializer(instance).data,
+            status=status.HTTP_201_CREATED,
+        )
+
 
 # ---------------------------------------------------------------------------
 # FeeConfigUpdateView
 # ---------------------------------------------------------------------------
 
-class FeeConfigUpdateView(generics.RetrieveUpdateAPIView):
+class FeeConfigUpdateView(generics.RetrieveUpdateDestroyAPIView):
     """
-    GET   /api/fees/config/<pk>/   — retrieve a single fee configuration
-    PATCH /api/fees/config/<pk>/   — update amount and/or is_active (Finance only)
+    GET    /api/fees/config/<pk>/ — retrieve a single fee configuration
+    PATCH  /api/fees/config/<pk>/ — update component, amount, street_type, is_active
+    DELETE /api/fees/config/<pk>/ — delete a fee configuration
     """
     permission_classes = [IsAuthenticated]
-    http_method_names = ['get', 'patch', 'head', 'options']
+    http_method_names = ['get', 'patch', 'delete', 'head', 'options']
 
     def get_queryset(self):
         return FeeConfiguration.objects.select_related('street_type').all()
@@ -398,15 +419,18 @@ class FeeConfigUpdateView(generics.RetrieveUpdateAPIView):
                 {'detail': 'Only finance staff can update fee configurations.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
-
         instance = self.get_object()
         serializer = FeeConfigurationUpdateSerializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-
-        # Set updated_by before saving
         instance = serializer.save(updated_by=request.user)
+        return Response(FeeConfigurationSerializer(instance).data, status=status.HTTP_200_OK)
 
-        return Response(
-            FeeConfigurationSerializer(instance).data,
-            status=status.HTTP_200_OK,
-        )
+    def destroy(self, request, *args, **kwargs):
+        if not _is_finance_or_chairman(request.user):
+            return Response(
+                {'detail': 'Only finance staff can delete fee configurations.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        instance = self.get_object()
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

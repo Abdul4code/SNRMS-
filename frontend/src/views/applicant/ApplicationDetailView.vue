@@ -192,6 +192,17 @@
                 <p class="text-sm font-medium" style="color: #047857">
                   Your certificate has been issued. You can download it below.
                 </p>
+                <div v-if="application.expires_at" class="flex items-center gap-2 text-sm">
+                  <span class="text-slate-500">Expires:</span>
+                  <span class="font-semibold"
+                        :class="isExpiredOrSoon(application.expires_at) ? 'text-red-600' : 'text-slate-800'">
+                    {{ formatDate(application.expires_at) }}
+                  </span>
+                  <span v-if="isExpiredOrSoon(application.expires_at)"
+                        class="text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                    {{ application.status === 'expired' ? 'Expired' : 'Expiring soon' }}
+                  </span>
+                </div>
                 <a v-if="application.certificate_file"
                    :href="application.certificate_file" target="_blank"
                    class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
@@ -299,6 +310,7 @@ interface Application {
   certificate_file?: string | null
   certificate_number?: string
   certificate_issued_at?: string
+  expires_at?: string | null
   google_map_uploaded?: boolean
   signpost_installed?: boolean
 }
@@ -403,6 +415,13 @@ async function handleRenewal() {
 function formatDate(d?: string) {
   if (!d) return ''
   return new Date(d).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function isExpiredOrSoon(dateStr: string): boolean {
+  const expiry = new Date(dateStr)
+  const thirtyDaysFromNow = new Date()
+  thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30)
+  return expiry <= thirtyDaysFromNow
 }
 
 onMounted(loadApplication)

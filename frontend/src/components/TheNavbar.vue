@@ -32,6 +32,7 @@
             </template>
             <template v-if="auth.isNamingCommittee">
               <NavLink to="/admin/street-types">Street Types</NavLink>
+              <NavLink to="/admin/renewal-settings">Renewal Settings</NavLink>
             </template>
             <template v-if="auth.isFinance">
               <NavLink to="/admin/fees">Fee Config</NavLink>
@@ -167,6 +168,7 @@
           </template>
           <template v-if="auth.isNamingCommittee">
             <MobileLink to="/admin/street-types" @click="mobileOpen = false">Street Types</MobileLink>
+            <MobileLink to="/admin/renewal-settings" @click="mobileOpen = false">Renewal Settings</MobileLink>
           </template>
           <template v-if="auth.isFinance">
             <MobileLink to="/admin/fees" @click="mobileOpen = false">Fee Configuration</MobileLink>

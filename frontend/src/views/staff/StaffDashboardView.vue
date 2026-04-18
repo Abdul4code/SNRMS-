@@ -31,7 +31,7 @@
       </div>
 
       <!-- Finance: confirmed payment amounts by stage -->
-      <div v-if="auth.isFinance" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div v-if="auth.isFinance || auth.isChairman" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div class="rounded-2xl p-5"
              style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04)">
           <div class="flex items-center gap-2 mb-3">
@@ -154,8 +154,8 @@
         </div>
       </div>
 
-      <!-- Naming committee: awaiting certificate & installation -->
-      <div v-if="auth.isNamingCommittee" class="rounded-2xl overflow-hidden"
+      <!-- Naming committee & chairman: certificate pipeline -->
+      <div v-if="auth.isNamingCommittee || auth.isChairman" class="rounded-2xl overflow-hidden"
            style="background: #fff; border: 1px solid #e2e8f0">
         <div class="px-5 py-4 flex items-center justify-between" style="border-bottom: 1px solid #f1f5f9">
           <div>
@@ -208,6 +208,7 @@
                 <th class="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Reference</th>
                 <th class="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Street Name</th>
                 <th class="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+                <th class="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Expires</th>
                 <th class="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Map</th>
                 <th class="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Post</th>
                 <th class="px-5 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Action</th>
@@ -216,10 +217,17 @@
             <tbody>
               <tr v-for="(app, i) in awaitingCertOrInstallApps" :key="app.id"
                   :style="i < awaitingCertOrInstallApps.length - 1 ? 'border-bottom: 1px solid #f8fafc' : ''"
+                  :class="app.status === 'expired' ? 'bg-red-50/40' : ''"
                   class="hover:bg-slate-50/50 transition-colors">
                 <td class="px-5 py-4 font-mono text-xs text-slate-400">{{ app.reference_number || `APP-${app.id}` }}</td>
                 <td class="px-5 py-4 font-semibold text-slate-900">{{ app.proposed_street_name }}</td>
                 <td class="px-5 py-4"><StatusBadge :status="app.status" /></td>
+                <td class="px-5 py-4 text-xs">
+                  <span v-if="app.expires_at" :class="app.status === 'expired' ? 'text-red-600 font-semibold' : 'text-slate-500'">
+                    {{ formatDate(app.expires_at) }}
+                  </span>
+                  <span v-else class="text-slate-300">—</span>
+                </td>
                 <td class="px-5 py-4">
                   <span v-if="app.status === 'stage_c_confirmed'" class="text-xs text-slate-400">—</span>
                   <span v-else class="text-sm font-bold" :class="app.google_map_uploaded ? 'text-emerald-600' : 'text-slate-300'">
@@ -234,8 +242,9 @@
                 </td>
                 <td class="px-5 py-4 text-right">
                   <RouterLink :to="`/staff/applications/${app.id}`"
-                              class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition-colors">
-                    {{ app.status === 'stage_c_confirmed' ? 'Issue Cert' : 'Update' }}
+                              class="inline-flex items-center gap-1 text-xs font-semibold transition-colors"
+                              :class="app.status === 'expired' ? 'text-red-600 hover:text-red-700' : 'text-emerald-600 hover:text-emerald-700'">
+                    {{ app.status === 'stage_c_confirmed' ? 'Issue Cert' : app.status === 'expired' ? 'View' : 'Update' }}
                     <ChevronRightIcon class="w-3.5 h-3.5" />
                   </RouterLink>
                 </td>
@@ -283,6 +292,7 @@ interface Application {
   updated_at?: string
   google_map_uploaded?: boolean
   signpost_installed?: boolean
+  expires_at?: string | null
 }
 
 const auth = useAuthStore()
@@ -301,7 +311,7 @@ const paymentAmounts = reactive({
 const FINANCE_PENDING_STATUSES = [
   'awaiting_stage_a_payment_confirmation',
   'awaiting_stage_c_payment_confirmation',
-  'awaiting_renewal_payment',
+  'awaiting_renewal_payment_confirmation',
 ]
 const FINANCE_CONFIRMED_STATUSES = [
   'stage_a_confirmed', 'under_naming_committee_review', 'approved_by_committee',
@@ -313,8 +323,8 @@ const FINANCE_CONFIRMED_STATUSES = [
 
 const ROLE_PENDING_STATUS: Record<string, string[]> = {
   finance: FINANCE_PENDING_STATUSES,
-  naming_committee: ['under_naming_committee_review'],
-  committee_chairman: ['awaiting_chairman_approval', 'stage_c_confirmed'],
+  naming_committee: ['under_naming_committee_review', 'awaiting_document_resubmission'],
+  committee_chairman: ['awaiting_chairman_approval'],
 }
 
 const roleLabel = computed(() => {
@@ -329,11 +339,12 @@ const roleLabel = computed(() => {
 const pendingStatuses = computed(() => ROLE_PENDING_STATUS[auth.user?.role ?? ''] ?? [])
 const pendingApps = computed(() => allApps.value.filter(a => pendingStatuses.value.includes(a.status)))
 
-// Applications awaiting certificate issuance, map upload, or signpost installation
+// Applications in the post-stage-C pipeline: pending cert, pending installation, or expired
 const awaitingCertOrInstallApps = computed(() =>
   certPipelineApps.value.filter(a => {
     if (a.status === 'stage_c_confirmed') return true
     if (a.status === 'certificate_issued') return !a.google_map_uploaded || !a.signpost_installed
+    if (a.status === 'expired') return true
     return false
   })
 )
@@ -442,9 +453,9 @@ onMounted(async () => {
         allApps.value = Array.isArray(data) ? data : data.results ?? []
       }),
     ]
-    if (auth.isNamingCommittee) {
+    if (auth.isNamingCommittee || auth.isChairman) {
       fetches.push(
-        applicationApi.list({ status: 'stage_c_confirmed,certificate_issued' }).then(({ data }) => {
+        applicationApi.list({ status: 'stage_c_confirmed,certificate_issued,expired' }).then(({ data }) => {
           certPipelineApps.value = Array.isArray(data) ? data : data.results ?? []
         }).catch(() => {})
       )
@@ -453,6 +464,6 @@ onMounted(async () => {
   } finally {
     loadingApps.value = false
   }
-  if (auth.isFinance) loadFinanceStats()
+  if (auth.isFinance || auth.isChairman) loadFinanceStats()
 })
 </script>

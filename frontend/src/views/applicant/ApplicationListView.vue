@@ -221,14 +221,15 @@ const STATUS_OPTIONS = [
   { value: 'certificate_issued', label: 'Certificate Issued' },
   { value: 'expired', label: 'Expired' },
   { value: 'awaiting_renewal_payment', label: 'Awaiting Renewal Payment' },
+  { value: 'awaiting_renewal_payment_confirmation', label: 'Awaiting Renewal Payment Confirmation' },
   { value: 'renewed', label: 'Renewed' },
   { value: 'withdrawn', label: 'Withdrawn' },
 ]
 
 // Statuses where the applicant needs to take action
 const PAYMENT_STATUSES = ['awaiting_stage_a_payment', 'awaiting_stage_c_payment', 'awaiting_renewal_payment']
-const RENEWAL_STATUSES = ['certificate_issued', 'expired']
-const ACTION_STATUSES = [...PAYMENT_STATUSES, ...RENEWAL_STATUSES, 'draft']
+const RENEWAL_STATUSES = ['expired']
+const ACTION_STATUSES = [...PAYMENT_STATUSES, ...RENEWAL_STATUSES, 'draft', 'awaiting_document_resubmission']
 
 const applications = ref<Application[]>([])
 // map of appId → uploaded document types (only loaded for draft apps)
@@ -272,6 +273,7 @@ function actionLabel(app: Application): string {
   if (app.status === 'awaiting_stage_c_payment') return 'Pay Confirmation Fee'
   if (app.status === 'awaiting_renewal_payment') return 'Pay Renewal Fee'
   if (RENEWAL_STATUSES.includes(app.status)) return 'Renew Certificate'
+  if (app.status === 'awaiting_document_resubmission') return 'Re-upload Documents'
   return 'View'
 }
 
@@ -284,7 +286,7 @@ function actionMessage(app: Application): string {
   if (app.status === 'awaiting_stage_a_payment') return 'Pay the Stage A processing fee to advance your application to committee review.'
   if (app.status === 'awaiting_stage_c_payment') return 'Your application is approved! Pay the confirmation fee to receive your certificate.'
   if (app.status === 'awaiting_renewal_payment') return 'Pay the renewal fee to extend your street name certificate.'
-  if (app.status === 'certificate_issued') return 'Your certificate has been issued. You can renew it to keep your registration active.'
+  if (app.status === 'awaiting_document_resubmission') return 'Some documents were rejected. Please re-upload the required documents.'
   if (app.status === 'expired') return 'Your certificate has expired. Renew now to reinstate your street name registration.'
   return ''
 }
@@ -296,7 +298,7 @@ function actionRoute(app: Application): string {
 }
 
 function actionCardStyle(status: string): string {
-  if (status === 'awaiting_stage_c_payment' || status === 'certificate_issued')
+  if (status === 'awaiting_stage_c_payment')
     return 'background: #fff; border: 1px solid rgba(5,150,105,0.25); box-shadow: 0 0 0 1px rgba(5,150,105,0.1), 0 2px 8px rgba(5,150,105,0.08)'
   if (status === 'expired')
     return 'background: #fff; border: 1px solid rgba(220,38,38,0.25); box-shadow: 0 0 0 1px rgba(220,38,38,0.08), 0 2px 8px rgba(220,38,38,0.05)'
@@ -308,8 +310,6 @@ function actionButtonStyle(app: Application): string {
     return 'background: linear-gradient(135deg, #0284c7, #0369a1); box-shadow: 0 3px 10px rgba(2,132,199,0.35)'
   if (app.status === 'awaiting_stage_c_payment')
     return 'background: linear-gradient(135deg, #059669, #047857); box-shadow: 0 3px 10px rgba(5,150,105,0.35)'
-  if (app.status === 'certificate_issued')
-    return 'background: linear-gradient(135deg, #0284c7, #0369a1); box-shadow: 0 3px 10px rgba(2,132,199,0.35)'
   if (app.status === 'expired')
     return 'background: linear-gradient(135deg, #dc2626, #b91c1c); box-shadow: 0 3px 10px rgba(220,38,38,0.3)'
   return 'background: linear-gradient(135deg, #d97706, #b45309); box-shadow: 0 3px 10px rgba(217,119,6,0.35)'

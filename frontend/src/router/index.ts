@@ -117,6 +117,12 @@ const router = createRouter({
       component: () => import('@/views/admin/StreetTypeConfigView.vue'),
       meta: { requiresAuth: true, roles: ['naming_committee'] },
     },
+    {
+      path: '/admin/renewal-settings',
+      name: 'renewal-settings',
+      component: () => import('@/views/admin/RenewalSettingsView.vue'),
+      meta: { requiresAuth: true, roles: ['naming_committee'] },
+    },
 
     // ── 404 fallback ─────────────────────────────────────────────────────────
     {

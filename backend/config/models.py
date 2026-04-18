@@ -98,6 +98,30 @@ class FeeConfiguration(models.Model):
         return f'{self.component}: {self.amount}'
 
 
+class RenewalSettings(models.Model):
+    """Singleton — always use RenewalSettings.get() to read/write."""
+    renewal_years = models.PositiveSmallIntegerField(
+        default=5,
+        help_text='Number of years added to the current expiry date when a renewal is confirmed.',
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        'accounts.User', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='renewal_settings_updates',
+    )
+
+    class Meta:
+        db_table = 'renewal_settings'
+
+    @classmethod
+    def get(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return f'Renewal: {self.renewal_years} year(s)'
+
+
 class BuildingSurvey(models.Model):
     kobo_id = models.IntegerField(unique=True)
     kobo_uuid = models.UUIDField(unique=True)

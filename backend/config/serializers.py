@@ -2,7 +2,7 @@ from urllib.parse import quote
 
 from rest_framework import serializers
 
-from config.models import BuildingSurvey, StreetType
+from config.models import BuildingSurvey, RenewalSettings, StreetType
 
 
 class StreetTypeSerializer(serializers.ModelSerializer):
@@ -38,6 +38,18 @@ class StreetTypeCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 'A street type with this code already exists.'
             )
+        return value
+
+
+class RenewalSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RenewalSettings
+        fields = ['renewal_years', 'updated_at']
+        read_only_fields = ['updated_at']
+
+    def validate_renewal_years(self, value):
+        if value < 1 or value > 99:
+            raise serializers.ValidationError('Renewal years must be between 1 and 99.')
         return value
 
 

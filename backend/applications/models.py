@@ -22,6 +22,7 @@ class ApplicationStatus(models.TextChoices):
     EXPIRED = 'expired', 'Expired'
     RENEWAL_SUBMITTED = 'renewal_submitted', 'Renewal Submitted'
     AWAITING_RENEWAL_PAYMENT = 'awaiting_renewal_payment', 'Awaiting Renewal Payment'
+    AWAITING_RENEWAL_PAYMENT_CONFIRMATION = 'awaiting_renewal_payment_confirmation', 'Awaiting Renewal Payment Confirmation'
     RENEWAL_PAYMENT_CONFIRMED = 'renewal_payment_confirmed', 'Renewal Payment Confirmed'
     RENEWED = 'renewed', 'Renewed'
     AWAITING_DOCUMENT_RESUBMISSION = 'awaiting_document_resubmission', 'Awaiting Document Resubmission'
@@ -61,7 +62,11 @@ VALID_TRANSITIONS = {
     ],
     ApplicationStatus.EXPIRED: [ApplicationStatus.RENEWAL_SUBMITTED],
     ApplicationStatus.RENEWAL_SUBMITTED: [ApplicationStatus.AWAITING_RENEWAL_PAYMENT],
-    ApplicationStatus.AWAITING_RENEWAL_PAYMENT: [ApplicationStatus.RENEWAL_PAYMENT_CONFIRMED],
+    ApplicationStatus.AWAITING_RENEWAL_PAYMENT: [ApplicationStatus.AWAITING_RENEWAL_PAYMENT_CONFIRMATION],
+    ApplicationStatus.AWAITING_RENEWAL_PAYMENT_CONFIRMATION: [
+        ApplicationStatus.RENEWAL_PAYMENT_CONFIRMED,
+        ApplicationStatus.AWAITING_RENEWAL_PAYMENT,
+    ],
     ApplicationStatus.RENEWAL_PAYMENT_CONFIRMED: [ApplicationStatus.RENEWED],
     ApplicationStatus.RENEWED: [ApplicationStatus.EXPIRED, ApplicationStatus.RENEWAL_SUBMITTED],
     ApplicationStatus.REJECTED_BY_COMMITTEE: [],

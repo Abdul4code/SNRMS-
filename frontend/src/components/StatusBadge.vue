@@ -17,6 +17,7 @@ const STATUS_COLORS: Record<string, string> = {
   awaiting_stage_c_payment: 'bg-yellow-100 text-yellow-700',
   awaiting_stage_c_payment_confirmation: 'bg-orange-100 text-orange-700',
   awaiting_renewal_payment: 'bg-yellow-100 text-yellow-700',
+  awaiting_renewal_payment_confirmation: 'bg-orange-100 text-orange-700',
   stage_a_confirmed: 'bg-green-100 text-green-700',
   stage_c_confirmed: 'bg-green-100 text-green-700',
   under_naming_committee_review: 'bg-purple-100 text-purple-700',

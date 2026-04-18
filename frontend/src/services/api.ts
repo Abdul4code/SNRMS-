@@ -171,8 +171,12 @@ export const paymentApi = {
     api.post(`/payments/${paymentId}/confirm/`, data),
   listFeeConfig: () =>
     api.get('/payments/fees/config/'),
+  createFeeConfig: (data: Record<string, unknown>) =>
+    api.post('/payments/fees/config/', data),
   updateFeeConfig: (id: number | string, data: Record<string, unknown>) =>
     api.patch(`/payments/fees/config/${id}/`, data),
+  deleteFeeConfig: (id: number | string) =>
+    api.delete(`/payments/fees/config/${id}/`),
   getStats: () =>
     api.get('/payments/stats/'),
 }
@@ -199,6 +203,10 @@ export const configApi = {
     api.patch(`/config/street-types/${id}/`, data),
   getBuildingSurveys: () =>
     api.get('/config/building-surveys/'),
+  getRenewalSettings: () =>
+    api.get('/config/renewal-settings/'),
+  updateRenewalSettings: (data: Record<string, unknown>) =>
+    api.patch('/config/renewal-settings/', data),
 }
 
 export default api

@@ -65,6 +65,7 @@ class ApplicationListSerializer(serializers.ModelSerializer):
             'status',
             'google_map_uploaded',
             'signpost_installed',
+            'expires_at',
             'created_at',
             'updated_at',
         ]

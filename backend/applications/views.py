@@ -59,6 +59,36 @@ def _get_application_or_404(pk, user):
 # ApplicationListCreateView
 # ---------------------------------------------------------------------------
 
+def _auto_expire_certificates():
+    """
+    Transition any certificate_issued applications whose expiry date has passed.
+    Called on every list request — cheap because it only writes when rows are due.
+    """
+    import datetime as _dt
+    from notifications.models import NotificationType as _NT
+    today = _dt.date.today()
+    due = Application.objects.filter(
+        status=ApplicationStatus.CERTIFICATE_ISSUED,
+        expires_at__lte=today,
+        is_deleted=False,
+    )
+    for app in due:
+        try:
+            app.transition_to(ApplicationStatus.EXPIRED, actor=None, remarks='Certificate expired automatically.')
+            notify_applicant(
+                app,
+                notification_type=_NT.APPLICATION_STATUS_CHANGE,
+                title='Certificate Expired',
+                message=(
+                    f'Your street naming certificate for application {app.reference_number} '
+                    f'expired on {app.expires_at.strftime("%d %B %Y")}. '
+                    'Please renew to keep your registration active.'
+                ),
+            )
+        except ValueError:
+            pass
+
+
 class ApplicationListCreateView(generics.ListCreateAPIView):
     """
     GET  /api/applications/        — list applications
@@ -90,6 +120,11 @@ class ApplicationListCreateView(generics.ListCreateAPIView):
                 qs = qs.filter(status__in=statuses)
 
         return qs
+
+    def list(self, request, *args, **kwargs):
+        if request.method == 'GET':
+            _auto_expire_certificates()
+        return super().list(request, *args, **kwargs)
 
     def get_serializer_class(self):
         if self.request.method == 'POST':
@@ -515,8 +550,20 @@ class CertificateIssueView(APIView):
 
         certificate_file = request.FILES.get('certificate_file')
 
+        expires_at = None
+        expires_at_str = request.data.get('expires_at')
+        if expires_at_str:
+            import datetime as _dt
+            try:
+                expires_at = _dt.date.fromisoformat(expires_at_str)
+            except ValueError:
+                return Response(
+                    {'detail': 'Invalid expires_at format. Use YYYY-MM-DD.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
         try:
-            issue_certificate(application, actor=request.user)
+            issue_certificate(application, actor=request.user, expires_at=expires_at)
         except ValueError as exc:
             return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -695,6 +742,85 @@ class DocumentResubmitView(APIView):
             message=(
                 f'Your documents for application {application.reference_number} '
                 'have been resubmitted. The naming committee will review them shortly.'
+            ),
+        )
+
+        return Response(
+            ApplicationDetailSerializer(application, context={'request': request}).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+# ---------------------------------------------------------------------------
+# ApplicationRenewView
+# ---------------------------------------------------------------------------
+
+class ApplicationRenewView(APIView):
+    """
+    POST /api/applications/<pk>/renew/
+    Applicant initiates renewal for a certificate_issued, expired, or renewed application.
+    Transitions: → renewal_submitted → awaiting_renewal_payment + creates Payment record.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        if request.user.role != Role.APPLICANT:
+            return Response(
+                {'detail': 'Only applicants can renew applications.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        application = _get_application_or_404(pk, request.user)
+        if application is None:
+            return Response({'detail': 'Application not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if application.applicant != request.user:
+            return Response({'detail': 'You do not own this application.'}, status=status.HTTP_403_FORBIDDEN)
+
+        renewable_statuses = [
+            ApplicationStatus.CERTIFICATE_ISSUED,
+            ApplicationStatus.EXPIRED,
+            ApplicationStatus.RENEWED,
+        ]
+        if application.status not in renewable_statuses:
+            return Response(
+                {'detail': f'Cannot renew an application with status "{application.status}".'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            application.transition_to(
+                ApplicationStatus.RENEWAL_SUBMITTED,
+                actor=request.user,
+                remarks='Renewal submitted by applicant.',
+            )
+            application.transition_to(
+                ApplicationStatus.AWAITING_RENEWAL_PAYMENT,
+                actor=request.user,
+                remarks='Auto-forwarded to awaiting renewal payment.',
+            )
+        except ValueError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        from decimal import Decimal as _Decimal
+        from payments.models import Payment as _Payment, PaymentStage as _PS, PaymentStatus as _PStatus
+        from payments.services import calculate_renewal_fee
+        renewal_fee = calculate_renewal_fee()
+        amount = renewal_fee['amount'] if renewal_fee else _Decimal('0.00')
+        _Payment.objects.create(
+            application=application,
+            stage=_PS.RENEWAL,
+            status=_PStatus.PENDING,
+            amount_expected=amount,
+        )
+
+        notify_applicant(
+            application,
+            notification_type=NotificationType.APPLICATION_STATUS_CHANGE,
+            title='Renewal Initiated',
+            message=(
+                f'Your renewal for application {application.reference_number} has been initiated. '
+                'Please proceed to pay the renewal fee.'
             ),
         )
 

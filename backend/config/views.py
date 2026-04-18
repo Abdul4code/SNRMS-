@@ -5,10 +5,11 @@ from django.conf import settings
 from django.http import Http404, HttpResponse
 from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.permissions import AllowAny, BasePermission, IsAuthenticated
+from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from config.models import BuildingSurvey, StreetType
-from config.serializers import BuildingSurveyMapSerializer, StreetTypeCreateSerializer, StreetTypeSerializer
+from config.models import BuildingSurvey, RenewalSettings, StreetType
+from config.serializers import BuildingSurveyMapSerializer, RenewalSettingsSerializer, StreetTypeCreateSerializer, StreetTypeSerializer
 
 ALLOWED_PHOTO_HOSTS = {'kf.kobotoolbox.org', 'kobofiles.org', 'kobocat.org'}
 
@@ -77,6 +78,30 @@ class StreetTypeDetailView(RetrieveUpdateDestroyAPIView):
         """Soft delete — set is_active=False instead of removing the record."""
         instance.is_active = False
         instance.save(update_fields=['is_active'])
+
+
+class RenewalSettingsView(APIView):
+    """
+    GET   /config/renewal-settings/  — any authenticated staff
+    PATCH /config/renewal-settings/  — naming committee only
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        instance = RenewalSettings.get()
+        return Response(RenewalSettingsSerializer(instance).data)
+
+    def patch(self, request):
+        if request.user.role != 'naming_committee':
+            return Response(
+                {'detail': 'Only naming committee members can update renewal settings.'},
+                status=403,
+            )
+        instance = RenewalSettings.get()
+        serializer = RenewalSettingsSerializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        instance = serializer.save(updated_by=request.user)
+        return Response(RenewalSettingsSerializer(instance).data)
 
 
 class BuildingPhotoProxyView(APIView):

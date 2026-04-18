@@ -219,12 +219,12 @@
                   <div class="flex items-center gap-3 flex-shrink-0 mt-0.5">
                     <a v-if="doc.file_url || doc.file" :href="doc.file_url || doc.file" target="_blank"
                        class="text-xs font-semibold text-emerald-600 hover:text-emerald-700">View</a>
-                    <button v-if="!doc.is_verified && !doc.is_rejected && auth.isNamingCommittee"
+                    <button v-if="!doc.is_verified && !doc.is_rejected && auth.isNamingCommittee && isDocReviewStage"
                             class="text-xs font-semibold text-blue-600 hover:text-blue-700"
                             @click="verifyDoc(doc.id)">
                       Verify
                     </button>
-                    <button v-if="!doc.is_rejected && auth.isNamingCommittee"
+                    <button v-if="!doc.is_rejected && auth.isNamingCommittee && isDocReviewStage"
                             class="text-xs font-semibold text-red-500 hover:text-red-600"
                             @click="openRejectModal(doc)">
                       Reject
@@ -285,14 +285,19 @@
                 <h2 class="text-sm font-bold text-slate-900">Issue Certificate</h2>
               </div>
               <div class="p-5 space-y-4">
-                <p class="text-sm text-slate-600">Stage C payment confirmed. Upload the certificate and issue it to the applicant.</p>
+                <p class="text-sm text-slate-600">Stage C payment confirmed. Upload the certificate and set its expiry date.</p>
                 <div>
                   <label class="block text-sm font-semibold text-slate-700 mb-1.5">Certificate File <span class="text-red-500">*</span></label>
                   <input type="file" accept=".pdf,.jpg,.jpeg,.png"
                          @change="onCertFileChange"
                          class="block w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" />
                 </div>
-                <button :disabled="actionLoading || !certFile"
+                <div>
+                  <label class="block text-sm font-semibold text-slate-700 mb-1.5">Expiry Date <span class="text-red-500">*</span></label>
+                  <input type="date" v-model="certExpiresAt" :min="minExpiryDate"
+                         class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent" />
+                </div>
+                <button :disabled="actionLoading || !certFile || !certExpiresAt"
                         class="w-full py-2.5 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-60"
                         style="background: linear-gradient(135deg, #059669, #047857)"
                         @click="handleIssueCertificate">
@@ -530,7 +535,7 @@ interface HistoryEntry { new_status?: string; status?: string; created_at?: stri
 const FINANCE_CONFIRM_STATUSES = [
   'awaiting_stage_a_payment_confirmation',
   'awaiting_stage_c_payment_confirmation',
-  'awaiting_renewal_payment',
+  'awaiting_renewal_payment_confirmation',
 ]
 
 const route = useRoute()
@@ -548,6 +553,13 @@ const financeForm = ref({ decision: '', finance_remarks: '' })
 const committeeForm = ref({ decision: '', remarks: '' })
 const chairmanForm = ref({ decision: '', remarks: '' })
 const certFile = ref<File | null>(null)
+const certExpiresAt = ref('')
+
+const minExpiryDate = computed(() => {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  return d.toISOString().slice(0, 10)
+})
 
 function onCertFileChange(e: Event) {
   const input = e.target as HTMLInputElement
@@ -565,6 +577,11 @@ const submittedPayment = computed(() =>
 
 const allDocsVerified = computed(() =>
   documents.value.length > 0 && documents.value.every(d => d.is_verified)
+)
+
+const isDocReviewStage = computed(() =>
+  application.value?.status === 'under_naming_committee_review' ||
+  application.value?.status === 'awaiting_document_resubmission'
 )
 
 function formatDate(d: string) {
@@ -631,15 +648,17 @@ async function handleConfirmPayment() {
 }
 
 async function handleIssueCertificate() {
-  if (!certFile.value) return
+  if (!certFile.value || !certExpiresAt.value) return
   actionError.value = ''
   actionLoading.value = true
   try {
     const formData = new FormData()
     formData.append('certificate_file', certFile.value)
+    formData.append('expires_at', certExpiresAt.value)
     await applicationApi.issueCertificate(application.value!.id, formData)
     actionSuccess.value = 'Certificate issued and applicant notified.'
     certFile.value = null
+    certExpiresAt.value = ''
     await load()
   } catch (err: unknown) {
     const e = err as { response?: { data?: { detail?: string } } }

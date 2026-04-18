@@ -225,7 +225,16 @@ def confirm_renewal_payment(payment: Payment, actor) -> Payment:
 
     application = payment.application
 
-    # renewal_payment_confirmed
+    # Calculate new expiry: extend from current expiry (or today if already past)
+    from config.models import RenewalSettings
+    import datetime as _dt
+    renewal_years = RenewalSettings.get().renewal_years
+    base_date = application.expires_at if (application.expires_at and application.expires_at > _dt.date.today()) else _dt.date.today()
+    new_expiry = base_date.replace(year=base_date.year + renewal_years)
+    application.expires_at = new_expiry
+    application.save(update_fields=['expires_at', 'updated_at'])
+
+    # awaiting_renewal_payment_confirmation → renewal_payment_confirmed
     application.transition_to(
         ApplicationStatus.RENEWAL_PAYMENT_CONFIRMED,
         actor=actor,
@@ -246,7 +255,7 @@ def confirm_renewal_payment(payment: Payment, actor) -> Payment:
         message=(
             f'Your renewal payment for application '
             f'{application.reference_number} has been confirmed. '
-            'Your registration has been successfully renewed.'
+            f'Your registration has been successfully renewed until {new_expiry.strftime("%d %B %Y")}.'
         ),
     )
 
@@ -289,8 +298,12 @@ def reject_payment(payment: Payment, actor, remarks: str = '') -> Payment:
                 remarks=rejection_remark,
             )
         elif (payment.stage == PaymentStage.RENEWAL and
-                application.status == ApplicationStatus.AWAITING_RENEWAL_PAYMENT):
-            pass  # Renewal has no confirmation intermediate; status already correct
+                application.status == ApplicationStatus.AWAITING_RENEWAL_PAYMENT_CONFIRMATION):
+            application.transition_to(
+                ApplicationStatus.AWAITING_RENEWAL_PAYMENT,
+                actor=actor,
+                remarks=rejection_remark,
+            )
     except ValueError:
         pass  # transition not valid — leave status as-is
 

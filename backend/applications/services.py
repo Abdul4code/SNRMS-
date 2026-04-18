@@ -190,17 +190,20 @@ def advance_to_committee_review(application: Application, actor) -> Application:
     return application
 
 
-def issue_certificate(application: Application, actor) -> Application:
+def issue_certificate(application: Application, actor, expires_at=None) -> Application:
     """
     Generate a certificate number, set issue/expiry dates, and transition
     stage_c_confirmed → certificate_issued.
+
+    Args:
+        expires_at: explicit expiry date (datetime.date). Defaults to 5 years from today.
 
     Raises:
         ValueError: if the transition is not valid.
     """
     cert_number = _next_certificate_number()
     now = timezone.now()
-    expires = (now + datetime.timedelta(days=5 * 365)).date()
+    expires = expires_at if expires_at else (now + datetime.timedelta(days=5 * 365)).date()
 
     application.certificate_number = cert_number
     application.certificate_issued_at = now

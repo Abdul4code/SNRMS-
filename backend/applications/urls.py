@@ -4,6 +4,7 @@ from .views import (
     ApplicationCompletionView,
     ApplicationDetailView,
     ApplicationListCreateView,
+    ApplicationRenewView,
     ApplicationStatusHistoryView,
     ApplicationSubmitView,
     ApplicationWithdrawView,
@@ -37,6 +38,9 @@ urlpatterns = [
 
     # Applicant resubmits documents after rejection
     path('<uuid:pk>/resubmit-documents/', DocumentResubmitView.as_view(), name='application-resubmit-documents'),
+
+    # Applicant renews a certificate
+    path('<uuid:pk>/renew/', ApplicationRenewView.as_view(), name='application-renew'),
 
     # Naming committee completion status (map uploaded / signpost installed)
     path('<uuid:pk>/completion/', ApplicationCompletionView.as_view(), name='application-completion'),
