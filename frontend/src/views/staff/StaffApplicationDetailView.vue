@@ -277,21 +277,51 @@
               </form>
             </div>
 
-            <!-- Finance: issue certificate -->
-            <div v-if="auth.isFinance && application.status === 'stage_c_confirmed'"
+            <!-- Naming committee: issue certificate -->
+            <div v-if="auth.isNamingCommittee && application.status === 'stage_c_confirmed'"
                  class="rounded-2xl overflow-hidden"
                  style="background: #fff; border: 1px solid #e2e8f0">
               <div class="px-5 py-4" style="border-bottom: 1px solid #f1f5f9">
                 <h2 class="text-sm font-bold text-slate-900">Issue Certificate</h2>
               </div>
-              <div class="p-5">
-                <p class="text-sm text-slate-600 mb-4">Stage C payment confirmed. Issue the official street name certificate.</p>
-                <button :disabled="actionLoading"
+              <div class="p-5 space-y-4">
+                <p class="text-sm text-slate-600">Stage C payment confirmed. Upload the certificate and issue it to the applicant.</p>
+                <div>
+                  <label class="block text-sm font-semibold text-slate-700 mb-1.5">Certificate File <span class="text-red-500">*</span></label>
+                  <input type="file" accept=".pdf,.jpg,.jpeg,.png"
+                         @change="onCertFileChange"
+                         class="block w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" />
+                </div>
+                <button :disabled="actionLoading || !certFile"
                         class="w-full py-2.5 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-60"
                         style="background: linear-gradient(135deg, #059669, #047857)"
                         @click="handleIssueCertificate">
                   {{ actionLoading ? 'Processing…' : 'Issue Certificate' }}
                 </button>
+              </div>
+            </div>
+
+            <!-- Naming committee: completion status after certificate issued -->
+            <div v-if="auth.isNamingCommittee && application.status === 'certificate_issued'"
+                 class="rounded-2xl overflow-hidden"
+                 style="background: #fff; border: 1px solid #e2e8f0">
+              <div class="px-5 py-4" style="border-bottom: 1px solid #f1f5f9">
+                <h2 class="text-sm font-bold text-slate-900">Completion Status</h2>
+                <p class="text-xs text-slate-500 mt-0.5">Checking these notifies the applicant.</p>
+              </div>
+              <div class="p-5 space-y-3">
+                <label class="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" :checked="application.google_map_uploaded"
+                         @change="handleCompletionToggle('google_map_uploaded', ($event.target as HTMLInputElement).checked)"
+                         class="w-4 h-4 rounded accent-emerald-600" />
+                  <span class="text-sm text-slate-700 font-medium">Google Map Uploaded</span>
+                </label>
+                <label class="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" :checked="application.signpost_installed"
+                         @change="handleCompletionToggle('signpost_installed', ($event.target as HTMLInputElement).checked)"
+                         class="w-4 h-4 rounded accent-emerald-600" />
+                  <span class="text-sm text-slate-700 font-medium">Sign Post Installed</span>
+                </label>
               </div>
             </div>
 
@@ -475,6 +505,9 @@ interface Application {
   created_at: string
   updated_at?: string
   applicant?: Applicant
+  certificate_file?: string | null
+  google_map_uploaded?: boolean
+  signpost_installed?: boolean
 }
 
 interface Doc { id: string; document_type: string; document_type_display?: string; file?: string; file_url?: string; is_verified?: boolean; is_rejected?: boolean; verification_note?: string }
@@ -514,6 +547,12 @@ const actionSuccess = ref('')
 const financeForm = ref({ decision: '', finance_remarks: '' })
 const committeeForm = ref({ decision: '', remarks: '' })
 const chairmanForm = ref({ decision: '', remarks: '' })
+const certFile = ref<File | null>(null)
+
+function onCertFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  certFile.value = input.files?.[0] ?? null
+}
 
 const rejectModal = ref<{ show: boolean; docId: string; docTypeName: string; note: string }>({
   show: false, docId: '', docTypeName: '', note: '',
@@ -592,17 +631,35 @@ async function handleConfirmPayment() {
 }
 
 async function handleIssueCertificate() {
+  if (!certFile.value) return
   actionError.value = ''
   actionLoading.value = true
   try {
-    await applicationApi.issueCertificate(application.value!.id)
-    actionSuccess.value = 'Certificate issued successfully.'
+    const formData = new FormData()
+    formData.append('certificate_file', certFile.value)
+    await applicationApi.issueCertificate(application.value!.id, formData)
+    actionSuccess.value = 'Certificate issued and applicant notified.'
+    certFile.value = null
     await load()
   } catch (err: unknown) {
     const e = err as { response?: { data?: { detail?: string } } }
     actionError.value = e.response?.data?.detail || 'Failed to issue certificate.'
   } finally {
     actionLoading.value = false
+  }
+}
+
+async function handleCompletionToggle(field: 'google_map_uploaded' | 'signpost_installed', value: boolean) {
+  actionError.value = ''
+  try {
+    await applicationApi.updateCompletion(application.value!.id, { [field]: value })
+    actionSuccess.value = value
+      ? (field === 'google_map_uploaded' ? 'Google Map marked as uploaded.' : 'Sign Post marked as installed.')
+      : 'Status updated.'
+    await load()
+  } catch (err: unknown) {
+    const e = err as { response?: { data?: { detail?: string } } }
+    actionError.value = e.response?.data?.detail || 'Failed to update completion status.'
   }
 }
 

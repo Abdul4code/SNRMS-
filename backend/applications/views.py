@@ -489,13 +489,14 @@ class ChairmanApprovalView(APIView):
 # ---------------------------------------------------------------------------
 
 class CertificateIssueView(APIView):
-    """POST /api/applications/<pk>/issue-certificate/ — finance only."""
+    """POST /api/applications/<pk>/issue-certificate/ — naming committee only."""
     permission_classes = [IsAuthenticated]
+    parser_classes_override = None  # accept multipart
 
     def post(self, request, pk):
-        if request.user.role != Role.FINANCE:
+        if request.user.role != Role.NAMING_COMMITTEE:
             return Response(
-                {'detail': 'Only finance staff can issue certificates.'},
+                {'detail': 'Only naming committee members can issue certificates.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -512,10 +513,86 @@ class CertificateIssueView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        certificate_file = request.FILES.get('certificate_file')
+
         try:
             issue_certificate(application, actor=request.user)
         except ValueError as exc:
             return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        if certificate_file:
+            application.certificate_file = certificate_file
+            application.save(update_fields=['certificate_file', 'updated_at'])
+
+        notify_applicant(
+            application,
+            notification_type=NotificationType.CERTIFICATE_ISSUED,
+            title='Certificate Issued',
+            message=(
+                f'Your street naming certificate for application {application.reference_number} '
+                'has been issued. You can now download it from your application page.'
+            ),
+        )
+
+        return Response(
+            ApplicationDetailSerializer(application, context={'request': request}).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+# ---------------------------------------------------------------------------
+# ApplicationCompletionView
+# ---------------------------------------------------------------------------
+
+class ApplicationCompletionView(APIView):
+    """
+    PATCH /api/applications/<pk>/completion/
+    Naming committee toggles google_map_uploaded and/or signpost_installed.
+    Body: { "google_map_uploaded": true, "signpost_installed": true }
+    """
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        if request.user.role != Role.NAMING_COMMITTEE:
+            return Response(
+                {'detail': 'Only naming committee members can update completion status.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        application = get_object_or_404(Application, pk=pk, is_deleted=False)
+
+        if application.status != ApplicationStatus.CERTIFICATE_ISSUED:
+            return Response(
+                {'detail': 'Completion status can only be updated after certificate is issued.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        update_fields = ['updated_at']
+        notifications = []
+
+        google_map = request.data.get('google_map_uploaded')
+        if google_map is not None and bool(google_map) != application.google_map_uploaded:
+            application.google_map_uploaded = bool(google_map)
+            update_fields.append('google_map_uploaded')
+            if application.google_map_uploaded:
+                notifications.append(('Google Map Uploaded', 'The Google Map for your street has been uploaded.'))
+
+        signpost = request.data.get('signpost_installed')
+        if signpost is not None and bool(signpost) != application.signpost_installed:
+            application.signpost_installed = bool(signpost)
+            update_fields.append('signpost_installed')
+            if application.signpost_installed:
+                notifications.append(('Sign Post Installed', 'The sign post for your street has been installed.'))
+
+        application.save(update_fields=update_fields)
+
+        for title, message in notifications:
+            notify_applicant(
+                application,
+                notification_type=NotificationType.APPLICATION_STATUS_CHANGE,
+                title=title,
+                message=f'Application {application.reference_number}: {message}',
+            )
 
         return Response(
             ApplicationDetailSerializer(application, context={'request': request}).data,

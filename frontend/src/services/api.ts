@@ -126,8 +126,12 @@ export const applicationApi = {
     api.post(`/applications/${id}/committee-review/`, data),
   chairmanApproval: (id: number | string, data: Record<string, unknown>) =>
     api.post(`/applications/${id}/chairman-approval/`, data),
-  issueCertificate: (id: number | string) =>
-    api.post(`/applications/${id}/issue-certificate/`),
+  issueCertificate: (id: number | string, formData: FormData) =>
+    api.post(`/applications/${id}/issue-certificate/`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  updateCompletion: (id: number | string, data: Record<string, unknown>) =>
+    api.patch(`/applications/${id}/completion/`, data),
   renew: (id: number | string) =>
     api.post(`/applications/${id}/renew/`),
   resubmitDocuments: (id: number | string) =>

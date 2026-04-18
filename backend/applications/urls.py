@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    ApplicationCompletionView,
     ApplicationDetailView,
     ApplicationListCreateView,
     ApplicationStatusHistoryView,
@@ -36,6 +37,9 @@ urlpatterns = [
 
     # Applicant resubmits documents after rejection
     path('<uuid:pk>/resubmit-documents/', DocumentResubmitView.as_view(), name='application-resubmit-documents'),
+
+    # Naming committee completion status (map uploaded / signpost installed)
+    path('<uuid:pk>/completion/', ApplicationCompletionView.as_view(), name='application-completion'),
 
     # History
     path('<uuid:pk>/history/', ApplicationStatusHistoryView.as_view(), name='application-history'),

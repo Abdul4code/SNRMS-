@@ -17,16 +17,16 @@ ALLOWED_PHOTO_HOSTS = {'kf.kobotoolbox.org', 'kobofiles.org', 'kobocat.org'}
 # Inline permission — avoids circular import with accounts app
 # ---------------------------------------------------------------------------
 
-class IsCommitteeChairman(BasePermission):
-    """Allow access only to users whose role is committee_chairman."""
+class IsNamingCommittee(BasePermission):
+    """Allow access only to users whose role is naming_committee."""
 
-    message = 'Only the committee chairman can perform this action.'
+    message = 'Only naming committee members can perform this action.'
 
     def has_permission(self, request, view):
         return (
             request.user
             and request.user.is_authenticated
-            and request.user.role == 'committee_chairman'
+            and request.user.role == 'naming_committee'
         )
 
 
@@ -45,7 +45,7 @@ class StreetTypeListView(ListCreateAPIView):
     def get_permissions(self):
         if self.request.method == 'GET':
             return [AllowAny()]
-        return [IsCommitteeChairman()]
+        return [IsNamingCommittee()]
 
     def get_serializer_class(self):
         if self.request.method == 'POST':
@@ -66,7 +66,7 @@ class StreetTypeDetailView(RetrieveUpdateDestroyAPIView):
     def get_permissions(self):
         if self.request.method == 'GET':
             return [IsAuthenticated()]
-        return [IsCommitteeChairman()]
+        return [IsNamingCommittee()]
 
     def get_serializer_class(self):
         if self.request.method == 'PATCH':

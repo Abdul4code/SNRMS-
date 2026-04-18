@@ -175,6 +175,59 @@
               </ul>
             </div>
 
+            <!-- Certificate card — shown after certificate is issued -->
+            <div v-if="application.status === 'certificate_issued' || application.certificate_file"
+                 class="rounded-2xl overflow-hidden"
+                 style="background: linear-gradient(135deg, #f0fdf4, #dcfce7); border: 1px solid rgba(5,150,105,0.2)">
+              <div class="px-5 py-4 flex items-center gap-3" style="border-bottom: 1px solid rgba(5,150,105,0.12)">
+                <div class="w-8 h-8 rounded-xl flex items-center justify-center"
+                     style="background: rgba(5,150,105,0.12); border: 1px solid rgba(5,150,105,0.2)">
+                  <svg class="w-4 h-4" style="color: #059669" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"/>
+                  </svg>
+                </div>
+                <h2 class="text-sm font-bold" style="color: #065f46">Street Naming Certificate</h2>
+              </div>
+              <div class="p-5 space-y-4">
+                <p class="text-sm font-medium" style="color: #047857">
+                  Your certificate has been issued. You can download it below.
+                </p>
+                <a v-if="application.certificate_file"
+                   :href="application.certificate_file" target="_blank"
+                   class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
+                   style="background: linear-gradient(135deg, #059669, #047857)">
+                  <DocumentIcon class="w-4 h-4" />
+                  Download Certificate
+                </a>
+                <!-- Completion status -->
+                <div class="space-y-2 pt-1">
+                  <p class="text-xs font-semibold uppercase tracking-wider" style="color: #6b7280">Completion Status</p>
+                  <div class="flex items-center gap-2">
+                    <span class="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-xs"
+                          :style="application.google_map_uploaded
+                            ? 'background: rgba(5,150,105,0.15); color: #059669'
+                            : 'background: #f1f5f9; color: #94a3b8'">
+                      {{ application.google_map_uploaded ? '✓' : '○' }}
+                    </span>
+                    <span class="text-sm" :class="application.google_map_uploaded ? 'text-emerald-700 font-medium' : 'text-slate-500'">
+                      Google Map Uploaded
+                    </span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-xs"
+                          :style="application.signpost_installed
+                            ? 'background: rgba(5,150,105,0.15); color: #059669'
+                            : 'background: #f1f5f9; color: #94a3b8'">
+                      {{ application.signpost_installed ? '✓' : '○' }}
+                    </span>
+                    <span class="text-sm" :class="application.signpost_installed ? 'text-emerald-700 font-medium' : 'text-slate-500'">
+                      Sign Post Installed
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
           </div>
 
           <!-- Right: timeline -->
@@ -243,6 +296,11 @@ interface Application {
   created_at: string
   committee_remarks?: string
   chairman_remarks?: string
+  certificate_file?: string | null
+  certificate_number?: string
+  certificate_issued_at?: string
+  google_map_uploaded?: boolean
+  signpost_installed?: boolean
 }
 interface Document { id: number; document_type: string; document_type_display?: string; file?: string; is_verified?: boolean }
 interface HistoryEntry { new_status?: string; status?: string; created_at?: string; timestamp?: string; remarks?: string; comment?: string }

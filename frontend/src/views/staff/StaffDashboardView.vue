@@ -154,6 +154,97 @@
         </div>
       </div>
 
+      <!-- Naming committee: awaiting certificate & installation -->
+      <div v-if="auth.isNamingCommittee" class="rounded-2xl overflow-hidden"
+           style="background: #fff; border: 1px solid #e2e8f0">
+        <div class="px-5 py-4 flex items-center justify-between" style="border-bottom: 1px solid #f1f5f9">
+          <div>
+            <h2 class="text-sm font-bold text-slate-900">Awaiting Certificate &amp; Installation</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Applications pending certificate issuance, map upload, or signpost installation</p>
+          </div>
+          <span v-if="awaitingCertOrInstallApps.length"
+                class="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">
+            {{ awaitingCertOrInstallApps.length }}
+          </span>
+        </div>
+
+        <div v-if="loadingApps" class="flex items-center justify-center py-12">
+          <div class="w-8 h-8 rounded-full border-2 border-slate-200 border-t-emerald-500 animate-spin"></div>
+        </div>
+
+        <div v-else-if="!awaitingCertOrInstallApps.length" class="flex flex-col items-center py-12 gap-2">
+          <div class="w-12 h-12 rounded-2xl flex items-center justify-center"
+               style="background: rgba(5,150,105,0.06); border: 1px solid rgba(5,150,105,0.12)">
+            <CheckCircleIcon class="w-6 h-6" style="color: #059669" />
+          </div>
+          <p class="text-sm font-semibold text-slate-700 mt-1">All complete!</p>
+          <p class="text-xs text-slate-500">No applications pending post-certificate actions.</p>
+        </div>
+
+        <div v-else>
+          <!-- Mobile -->
+          <div class="sm:hidden divide-y divide-slate-50">
+            <RouterLink v-for="app in awaitingCertOrInstallApps" :key="app.id"
+                        :to="`/staff/applications/${app.id}`"
+                        class="flex items-start gap-3 p-4 hover:bg-slate-50/70 transition-colors">
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-semibold text-slate-900 truncate">{{ app.proposed_street_name }}</p>
+                <div class="flex items-center gap-2 mt-1 flex-wrap">
+                  <StatusBadge :status="app.status" />
+                  <span v-if="app.status === 'certificate_issued'" class="flex items-center gap-1.5 text-xs text-slate-500">
+                    <span :class="app.google_map_uploaded ? 'text-emerald-600' : 'text-slate-400'">Map {{ app.google_map_uploaded ? '✓' : '○' }}</span>
+                    <span :class="app.signpost_installed ? 'text-emerald-600' : 'text-slate-400'">Post {{ app.signpost_installed ? '✓' : '○' }}</span>
+                  </span>
+                </div>
+              </div>
+              <ChevronRightIcon class="w-4 h-4 text-slate-300 flex-shrink-0 mt-0.5" />
+            </RouterLink>
+          </div>
+
+          <!-- Desktop -->
+          <table class="hidden sm:table w-full text-sm">
+            <thead>
+              <tr style="background: #f8fafc; border-bottom: 1px solid #f1f5f9">
+                <th class="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Reference</th>
+                <th class="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Street Name</th>
+                <th class="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+                <th class="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Map</th>
+                <th class="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Post</th>
+                <th class="px-5 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(app, i) in awaitingCertOrInstallApps" :key="app.id"
+                  :style="i < awaitingCertOrInstallApps.length - 1 ? 'border-bottom: 1px solid #f8fafc' : ''"
+                  class="hover:bg-slate-50/50 transition-colors">
+                <td class="px-5 py-4 font-mono text-xs text-slate-400">{{ app.reference_number || `APP-${app.id}` }}</td>
+                <td class="px-5 py-4 font-semibold text-slate-900">{{ app.proposed_street_name }}</td>
+                <td class="px-5 py-4"><StatusBadge :status="app.status" /></td>
+                <td class="px-5 py-4">
+                  <span v-if="app.status === 'stage_c_confirmed'" class="text-xs text-slate-400">—</span>
+                  <span v-else class="text-sm font-bold" :class="app.google_map_uploaded ? 'text-emerald-600' : 'text-slate-300'">
+                    {{ app.google_map_uploaded ? '✓' : '○' }}
+                  </span>
+                </td>
+                <td class="px-5 py-4">
+                  <span v-if="app.status === 'stage_c_confirmed'" class="text-xs text-slate-400">—</span>
+                  <span v-else class="text-sm font-bold" :class="app.signpost_installed ? 'text-emerald-600' : 'text-slate-300'">
+                    {{ app.signpost_installed ? '✓' : '○' }}
+                  </span>
+                </td>
+                <td class="px-5 py-4 text-right">
+                  <RouterLink :to="`/staff/applications/${app.id}`"
+                              class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition-colors">
+                    {{ app.status === 'stage_c_confirmed' ? 'Issue Cert' : 'Update' }}
+                    <ChevronRightIcon class="w-3.5 h-3.5" />
+                  </RouterLink>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- Quick links for chairman -->
       <div v-if="auth.isChairman" class="grid grid-cols-1 sm:grid-cols-1 gap-3">
         <RouterLink to="/admin/staff"
@@ -190,10 +281,13 @@ interface Application {
   status: string
   created_at: string
   updated_at?: string
+  google_map_uploaded?: boolean
+  signpost_installed?: boolean
 }
 
 const auth = useAuthStore()
 const allApps = ref<Application[]>([])
+const certPipelineApps = ref<Application[]>([])
 const loadingApps = ref(false)
 
 // Finance-specific stat counts loaded separately
@@ -234,6 +328,15 @@ const roleLabel = computed(() => {
 
 const pendingStatuses = computed(() => ROLE_PENDING_STATUS[auth.user?.role ?? ''] ?? [])
 const pendingApps = computed(() => allApps.value.filter(a => pendingStatuses.value.includes(a.status)))
+
+// Applications awaiting certificate issuance, map upload, or signpost installation
+const awaitingCertOrInstallApps = computed(() =>
+  certPipelineApps.value.filter(a => {
+    if (a.status === 'stage_c_confirmed') return true
+    if (a.status === 'certificate_issued') return !a.google_map_uploaded || !a.signpost_installed
+    return false
+  })
+)
 
 // Statuses that represent a successful committee approval (apps forwarded to chairman or beyond)
 const COMMITTEE_APPROVED_STATUSES = [
@@ -334,8 +437,19 @@ async function loadFinanceStats() {
 onMounted(async () => {
   loadingApps.value = true
   try {
-    const { data } = await applicationApi.list()
-    allApps.value = Array.isArray(data) ? data : data.results ?? []
+    const fetches: Promise<unknown>[] = [
+      applicationApi.list().then(({ data }) => {
+        allApps.value = Array.isArray(data) ? data : data.results ?? []
+      }),
+    ]
+    if (auth.isNamingCommittee) {
+      fetches.push(
+        applicationApi.list({ status: 'stage_c_confirmed,certificate_issued' }).then(({ data }) => {
+          certPipelineApps.value = Array.isArray(data) ? data : data.results ?? []
+        }).catch(() => {})
+      )
+    }
+    await Promise.all(fetches)
   } finally {
     loadingApps.value = false
   }

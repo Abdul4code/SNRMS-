@@ -63,6 +63,8 @@ class ApplicationListSerializer(serializers.ModelSerializer):
             'street_type_name',
             'applicant_name',
             'status',
+            'google_map_uploaded',
+            'signpost_installed',
             'created_at',
             'updated_at',
         ]
@@ -76,6 +78,7 @@ class ApplicationDetailSerializer(serializers.ModelSerializer):
     status_history = StatusHistorySerializer(many=True, read_only=True)
     documents = serializers.SerializerMethodField()
     payments = serializers.SerializerMethodField()
+    certificate_file = serializers.SerializerMethodField()
 
     class Meta:
         model = Application
@@ -94,8 +97,11 @@ class ApplicationDetailSerializer(serializers.ModelSerializer):
             'committee_remarks',
             'chairman_remarks',
             'certificate_number',
+            'certificate_file',
             'certificate_issued_at',
             'expires_at',
+            'google_map_uploaded',
+            'signpost_installed',
             'is_deleted',
             'created_at',
             'updated_at',
@@ -112,6 +118,14 @@ class ApplicationDetailSerializer(serializers.ModelSerializer):
     def get_payments(self, obj):
         payments = obj.payments.all()
         return PaymentSummarySerializer(payments, many=True).data
+
+    def get_certificate_file(self, obj):
+        if not obj.certificate_file:
+            return None
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(obj.certificate_file.url)
+        return obj.certificate_file.url
 
 
 class ApplicationCreateSerializer(serializers.ModelSerializer):
