@@ -42,6 +42,7 @@ class StreetTypeListView(ListCreateAPIView):
     """
 
     queryset = StreetType.objects.all()
+    pagination_class = None  # small config list, always return all
 
     def get_permissions(self):
         if self.request.method == 'GET':

@@ -2,14 +2,14 @@
   <div class="min-h-screen" style="background: #f1f5f9">
 
     <div style="background: #0a1628; border-bottom: 1px solid rgba(255,255,255,0.06)">
-      <div class="max-w-3xl mx-auto px-4 sm:px-6 py-6">
-        <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1">Settings</p>
-        <h1 class="text-white text-xl font-bold tracking-tight">Renewal Settings</h1>
-        <p class="text-slate-400 text-sm mt-0.5">Configure how long a renewal extends a certificate's validity</p>
+      <div class="max-w-3xl mx-auto px-4 sm:px-6 py-8">
+        <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1.5">Settings</p>
+        <h1 class="text-white text-2xl font-bold tracking-tight">Renewal Settings</h1>
+        <p class="text-slate-400 text-sm mt-1">Configure how long a renewal extends a certificate's validity</p>
       </div>
     </div>
 
-    <div class="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-4">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-5">
 
       <transition enter-active-class="transition duration-200 ease-out"
                   enter-from-class="opacity-0 -translate-y-1" enter-to-class="opacity-100 translate-y-0">
@@ -30,8 +30,8 @@
         </div>
       </transition>
 
-      <div class="rounded-2xl overflow-hidden" style="background: #fff; border: 1px solid #e2e8f0">
-        <div class="px-5 py-4" style="border-bottom: 1px solid #f1f5f9">
+      <div class="rounded-2xl overflow-hidden" style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06)">
+        <div class="px-6 py-5" style="border-bottom: 1px solid #f1f5f9">
           <h2 class="text-sm font-bold text-slate-900">Renewal Duration</h2>
           <p class="text-xs text-slate-500 mt-0.5">
             When finance confirms a renewal payment, this many years are added to the certificate's current expiry date.

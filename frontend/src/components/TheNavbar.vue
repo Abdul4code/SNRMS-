@@ -3,18 +3,18 @@
   <div class="h-[3px] w-full" style="background: linear-gradient(90deg, #059669, #10b981 50%, #fbbf24)"></div>
 
   <nav style="background: #0a1628; border-bottom: 1px solid rgba(255,255,255,0.07)">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex items-center justify-between h-14">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+      <div class="flex items-center justify-between">
 
         <!-- Logo + wordmark -->
         <div class="flex items-center gap-7">
-          <RouterLink to="/" class="flex items-center gap-2.5 flex-shrink-0">
+          <RouterLink to="/" class="flex items-center gap-1 flex-shrink-0">
             <img src="@/assets/logo.png" alt="Ibeju-Lekki LGA"
-                 class="w-8 h-8 object-contain"
-                 style="filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5))"/>
+                 class="w-20 h-20 object-contain"
+                 style="filter: drop-shadow(0 2px 8px rgba(0,0,0,0.6))"/>
             <div class="leading-tight">
-              <span class="text-white font-bold text-sm tracking-wide block">SNRMS</span>
-              <span class="text-emerald-400 text-[10px] tracking-widest uppercase block" style="margin-top:-1px">Ibeju-Lekki LGA</span>
+              <span class="text-white font-bold text-base tracking-wide block">SNRMS</span>
+              <span class="text-emerald-400 text-[11px] tracking-widest uppercase block" style="margin-top:-2px">Ibeju-Lekki LGA</span>
             </div>
           </RouterLink>
 

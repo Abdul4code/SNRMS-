@@ -16,13 +16,40 @@ export const useNotificationStore = defineStore('notifications', () => {
   const notifications = ref<Notification[]>([])
   const unreadCount = ref(0)
   const loading = ref(false)
+  const hasMore = ref(false)
+  const currentPage = ref(1)
 
   async function fetchNotifications(unreadOnly = false) {
     loading.value = true
+    currentPage.value = 1
     try {
-      const params = unreadOnly ? { unread: true } : {}
+      const params: Record<string, unknown> = unreadOnly ? { unread: true } : {}
       const { data } = await notificationApi.list(params)
-      notifications.value = Array.isArray(data) ? data : data.results ?? []
+      if (Array.isArray(data)) {
+        notifications.value = data
+        hasMore.value = false
+      } else {
+        notifications.value = data.results ?? []
+        hasMore.value = !!data.next
+      }
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function loadMore() {
+    if (!hasMore.value || loading.value) return
+    loading.value = true
+    currentPage.value++
+    try {
+      const { data } = await notificationApi.list({ page: currentPage.value })
+      if (Array.isArray(data)) {
+        notifications.value = [...notifications.value, ...data]
+        hasMore.value = false
+      } else {
+        notifications.value = [...notifications.value, ...(data.results ?? [])]
+        hasMore.value = !!data.next
+      }
     } finally {
       loading.value = false
     }
@@ -56,7 +83,9 @@ export const useNotificationStore = defineStore('notifications', () => {
     notifications,
     unreadCount,
     loading,
+    hasMore,
     fetchNotifications,
+    loadMore,
     markRead,
     markAllRead,
     fetchUnreadCount,

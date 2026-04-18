@@ -86,7 +86,7 @@ def submit_application(application: Application, actor) -> Application:
         ValueError: if the street name is already taken.
         ValueError: if the transition is not valid.
     """
-    if not application.documents.filter(is_deleted=False).exists():
+    if not application.is_legacy and not application.documents.filter(is_deleted=False).exists():
         raise ValueError(
             'At least one supporting document must be uploaded before submitting.'
         )

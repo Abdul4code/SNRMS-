@@ -3,12 +3,12 @@
 
     <!-- Header band -->
     <div style="background: #0a1628; border-bottom: 1px solid rgba(255,255,255,0.06)">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1">Staff Portal</p>
-        <h1 class="text-white text-xl font-bold tracking-tight">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1.5">Staff Portal</p>
+        <h1 class="text-white text-2xl font-bold tracking-tight">
           {{ auth.isFinance ? 'Payment Confirmations' : 'All Applications' }}
         </h1>
-        <p class="text-slate-400 text-sm mt-0.5">
+        <p class="text-slate-400 text-sm mt-1">
           {{ auth.isFinance
             ? 'Review and confirm payment evidence submitted by applicants'
             : 'Review and manage street name registration requests' }}
@@ -16,31 +16,31 @@
       </div>
     </div>
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-4">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-5">
 
       <!-- Finance stats -->
-      <div v-if="auth.isFinance" class="grid grid-cols-3 gap-3">
-        <div class="rounded-2xl p-4" style="background: #fff; border: 1px solid #e2e8f0">
-          <p class="text-2xl font-bold" style="color: #d97706">{{ stats.pending }}</p>
-          <p class="text-xs text-slate-500 mt-0.5 font-medium">Awaiting Confirmation</p>
-          <div v-if="stats.pending > 0" class="mt-1.5 flex items-center gap-1">
+      <div v-if="auth.isFinance" class="grid grid-cols-3 gap-4">
+        <div class="rounded-2xl p-5" style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06)">
+          <p class="text-3xl font-bold tracking-tight" style="color: #d97706">{{ stats.pending }}</p>
+          <p class="text-xs text-slate-500 mt-1 font-semibold uppercase tracking-wide">Awaiting Confirmation</p>
+          <div v-if="stats.pending > 0" class="mt-2 flex items-center gap-1">
             <div class="w-1.5 h-1.5 rounded-full animate-pulse bg-amber-400"></div>
             <span class="text-[10px] font-semibold text-amber-600">Needs action</span>
           </div>
         </div>
-        <div class="rounded-2xl p-4" style="background: #fff; border: 1px solid #e2e8f0">
-          <p class="text-2xl font-bold" style="color: #059669">{{ stats.confirmed }}</p>
-          <p class="text-xs text-slate-500 mt-0.5 font-medium">Payments Confirmed</p>
+        <div class="rounded-2xl p-5" style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06)">
+          <p class="text-3xl font-bold tracking-tight" style="color: #059669">{{ stats.confirmed }}</p>
+          <p class="text-xs text-slate-500 mt-1 font-semibold uppercase tracking-wide">Payments Confirmed</p>
         </div>
-        <div class="rounded-2xl p-4" style="background: #fff; border: 1px solid #e2e8f0">
-          <p class="text-2xl font-bold" style="color: #dc2626">{{ stats.rejected }}</p>
-          <p class="text-xs text-slate-500 mt-0.5 font-medium">Payments Rejected</p>
+        <div class="rounded-2xl p-5" style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06)">
+          <p class="text-3xl font-bold tracking-tight" style="color: #dc2626">{{ stats.rejected }}</p>
+          <p class="text-xs text-slate-500 mt-1 font-semibold uppercase tracking-wide">Payments Rejected</p>
         </div>
       </div>
 
       <!-- Filter bar -->
-      <div class="flex flex-wrap gap-3 items-end rounded-2xl p-4"
-           style="background: #fff; border: 1px solid #e2e8f0">
+      <div class="flex flex-wrap gap-3 items-end rounded-2xl p-5"
+           style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 1px 4px rgba(0,0,0,0.05)">
         <div v-if="!auth.isFinance" class="flex-1 min-w-40">
           <label class="block text-xs font-semibold text-slate-600 mb-1.5">Status</label>
           <select v-model="filters.status"
@@ -75,7 +75,7 @@
 
       <!-- Table card -->
       <div class="rounded-2xl overflow-hidden"
-           style="background: #fff; border: 1px solid #e2e8f0">
+           style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06)">
 
         <div v-if="loading" class="flex items-center justify-center py-16">
           <div class="w-9 h-9 rounded-full border-2 border-slate-200 border-t-emerald-500 animate-spin"></div>

@@ -3,12 +3,12 @@
 
     <!-- Page header band -->
     <div style="background: #0a1628; border-bottom: 1px solid rgba(255,255,255,0.06)">
-      <div class="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+      <div class="max-w-5xl mx-auto px-4 sm:px-6 py-8">
         <div class="flex items-center justify-between gap-4">
           <div>
-            <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1">My Portal</p>
-            <h1 class="text-white text-xl font-bold tracking-tight">Street Name Applications</h1>
-            <p class="text-slate-400 text-sm mt-0.5">Track and manage your registration requests</p>
+            <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1.5">My Portal</p>
+            <h1 class="text-white text-2xl font-bold tracking-tight">Street Name Applications</h1>
+            <p class="text-slate-400 text-sm mt-1">Track and manage your registration requests</p>
           </div>
           <RouterLink to="/applications/new"
                       class="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all active:scale-[0.97]"
@@ -21,7 +21,7 @@
       </div>
     </div>
 
-    <div class="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
 
       <!-- Loading -->
       <div v-if="loading" class="flex flex-col items-center justify-center py-20 gap-3">
@@ -64,19 +64,19 @@
         </div>
 
         <!-- Stats row -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div v-for="stat in stats" :key="stat.label"
-               class="rounded-xl p-4"
-               style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04)">
-            <p class="text-2xl font-bold" :style="`color: ${stat.color}`">{{ stat.value }}</p>
-            <p class="text-xs text-slate-500 mt-0.5 font-medium">{{ stat.label }}</p>
+               class="rounded-2xl p-5"
+               style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06)">
+            <p class="text-3xl font-bold tracking-tight" :style="`color: ${stat.color}`">{{ stat.value }}</p>
+            <p class="text-xs text-slate-500 mt-1 font-semibold uppercase tracking-wide">{{ stat.label }}</p>
           </div>
         </div>
 
         <!-- Filter bar -->
-        <div class="flex flex-wrap gap-2.5 items-center rounded-xl p-3"
-             style="background: #fff; border: 1px solid #e2e8f0">
-          <select v-model="filters.status" @change="applyFilter"
+        <div class="flex flex-wrap gap-2.5 items-center rounded-2xl p-4"
+             style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 1px 4px rgba(0,0,0,0.05)">
+          <select v-model="filters.status" @change="onFilterChange"
                   class="flex-1 min-w-36 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
             <option value="">All Statuses</option>
             <option v-for="s in STATUS_OPTIONS" :key="s.value" :value="s.value">{{ s.label }}</option>
@@ -87,7 +87,7 @@
             Clear
           </button>
           <span class="ml-auto text-xs text-slate-400 font-medium hidden sm:block">
-            {{ filteredApplications.length }} result{{ filteredApplications.length === 1 ? '' : 's' }}
+            {{ totalCount }} result{{ totalCount === 1 ? '' : 's' }}
           </span>
         </div>
 
@@ -117,10 +117,10 @@
         <div v-else>
           <!-- Mobile cards -->
           <div class="sm:hidden space-y-3">
-            <RouterLink v-for="app in filteredApplications" :key="app.id"
+            <RouterLink v-for="app in pagedApplications" :key="app.id"
                         :to="`/applications/${app.id}`"
-                        class="block rounded-2xl p-4 transition-all active:scale-[0.99]"
-                        style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04)">
+                        class="block rounded-2xl p-5 transition-all active:scale-[0.99]"
+                        style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06)">
               <div class="flex items-start justify-between gap-3 mb-2.5">
                 <div class="min-w-0">
                   <p class="font-semibold text-slate-900 text-sm truncate">{{ app.proposed_street_name }}</p>
@@ -137,7 +137,7 @@
 
           <!-- Desktop table -->
           <div class="hidden sm:block rounded-2xl overflow-hidden"
-               style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04)">
+               style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06)">
             <table class="w-full text-sm">
               <thead>
                 <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0">
@@ -150,8 +150,8 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(app, i) in filteredApplications" :key="app.id"
-                    :style="i < filteredApplications.length - 1 ? 'border-bottom: 1px solid #f1f5f9' : ''"
+                <tr v-for="(app, i) in pagedApplications" :key="app.id"
+                    :style="i < pagedApplications.length - 1 ? 'border-bottom: 1px solid #f1f5f9' : ''"
                     class="hover:bg-slate-50/70 transition-colors">
                   <td class="px-5 py-4 font-mono text-xs text-slate-400 font-medium">
                     {{ app.reference_number || `APP-${app.id}` }}
@@ -171,6 +171,33 @@
                 </tr>
               </tbody>
             </table>
+
+            <!-- Pagination -->
+            <div v-if="totalPages > 1" class="flex items-center justify-between px-5 py-3.5"
+                 style="border-top: 1px solid #f1f5f9; background: #f8fafc">
+              <p class="text-xs text-slate-500">
+                Page {{ currentPage }} of {{ totalPages }} &nbsp;·&nbsp; {{ totalCount }} total
+              </p>
+              <div class="flex gap-2">
+                <button :disabled="currentPage <= 1"
+                        class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 border border-slate-200 hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        @click="changePage(currentPage - 1)">← Prev</button>
+                <button :disabled="currentPage >= totalPages"
+                        class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 border border-slate-200 hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        @click="changePage(currentPage + 1)">Next →</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mobile pagination -->
+          <div v-if="totalPages > 1" class="sm:hidden flex items-center justify-between">
+            <button :disabled="currentPage <= 1"
+                    class="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 bg-white hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    @click="changePage(currentPage - 1)">← Prev</button>
+            <span class="text-xs text-slate-500">{{ currentPage }} / {{ totalPages }}</span>
+            <button :disabled="currentPage >= totalPages"
+                    class="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 bg-white hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    @click="changePage(currentPage + 1)">Next →</button>
           </div>
         </div>
 
@@ -237,9 +264,19 @@ const appDocsMap = ref<Record<string, string[]>>({})
 const loading = ref(false)
 const filters = ref({ status: '' })
 
+const PAGE_SIZE = 15
+const currentPage = ref(1)
+const totalCount = ref(0)
+const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / PAGE_SIZE)))
+
 const filteredApplications = computed(() => {
   if (!filters.value.status) return applications.value
   return applications.value.filter(a => a.status === filters.value.status)
+})
+
+const pagedApplications = computed(() => {
+  const start = (currentPage.value - 1) * PAGE_SIZE
+  return filteredApplications.value.slice(start, start + PAGE_SIZE)
 })
 
 const actionNeededApps = computed(() =>
@@ -254,7 +291,7 @@ function allDocsUploaded(appId: string): boolean {
 const stats = computed(() => {
   const all = applications.value
   return [
-    { label: 'Total', value: all.length, color: '#0f172a' },
+    { label: 'Total', value: totalCount.value || all.length, color: '#0f172a' },
     { label: 'In Progress', value: all.filter(a => !['draft','certificate_issued','withdrawn','expired','renewed'].includes(a.status)).length, color: '#059669' },
     { label: 'Certified', value: all.filter(a => ['certificate_issued','renewed'].includes(a.status)).length, color: '#0284c7' },
     { label: 'Needs Action', value: actionNeededApps.value.length, color: actionNeededApps.value.length > 0 ? '#d97706' : '#0f172a' },
@@ -315,15 +352,22 @@ function actionButtonStyle(app: Application): string {
   return 'background: linear-gradient(135deg, #d97706, #b45309); box-shadow: 0 3px 10px rgba(217,119,6,0.35)'
 }
 
-function applyFilter() {
-  // reactive filtering handled by computed
+function onFilterChange() {
+  currentPage.value = 1
+}
+
+function changePage(p: number) {
+  currentPage.value = p
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 async function loadApplications() {
   loading.value = true
   try {
-    const { data } = await applicationApi.list()
+    // Load all user's own applications (applicants have few; page_size covers all)
+    const { data } = await applicationApi.list({ page_size: 200 })
     applications.value = Array.isArray(data) ? data : data.results ?? []
+    totalCount.value = Array.isArray(data) ? data.length : (data.count ?? data.results?.length ?? 0)
 
     // Load documents for draft apps so we can show the right action
     const draftApps = applications.value.filter(a => a.status === 'draft')
@@ -348,6 +392,7 @@ async function loadApplications() {
 
 function clearFilters() {
   filters.value.status = ''
+  currentPage.value = 1
 }
 
 function formatDate(d: string) {

@@ -3,8 +3,8 @@
 
     <!-- Page header band -->
     <div style="background: #0a1628; border-bottom: 1px solid rgba(255,255,255,0.06)">
-      <div class="max-w-2xl mx-auto px-4 sm:px-6 py-5">
-        <nav class="flex items-center gap-2 text-xs text-slate-400 mb-3">
+      <div class="max-w-2xl mx-auto px-4 sm:px-6 py-7">
+        <nav class="flex items-center gap-2 text-xs text-slate-400 mb-4">
           <RouterLink to="/applications" class="hover:text-emerald-400 transition-colors">My Applications</RouterLink>
           <ChevronRightIcon class="w-3.5 h-3.5 opacity-40" />
           <RouterLink :to="`/applications/${route.params.id}`" class="hover:text-emerald-400 transition-colors font-mono">
@@ -13,13 +13,13 @@
           <ChevronRightIcon class="w-3.5 h-3.5 opacity-40" />
           <span class="text-slate-300">Payment</span>
         </nav>
-        <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1">Payment</p>
-        <h1 class="text-white text-xl font-bold tracking-tight">Application Payment</h1>
-        <p class="text-slate-400 text-sm mt-0.5">Review the fees and submit your payment evidence</p>
+        <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1.5">Payment</p>
+        <h1 class="text-white text-2xl font-bold tracking-tight">Application Payment</h1>
+        <p class="text-slate-400 text-sm mt-1">Review the fees and submit your payment evidence</p>
       </div>
     </div>
 
-    <div class="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-4">
+    <div class="max-w-2xl mx-auto px-4 sm:px-6 py-8 space-y-5">
 
       <!-- Loading -->
       <div v-if="loading" class="flex flex-col items-center justify-center py-16 gap-3">
@@ -31,8 +31,8 @@
 
         <!-- Fee breakdown card -->
         <div v-if="feeItems.length" class="rounded-2xl overflow-hidden"
-             style="background: #fff; border: 1px solid #e2e8f0">
-          <div class="px-5 py-4 flex items-center gap-2.5" style="border-bottom: 1px solid #f1f5f9">
+             style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06)">
+          <div class="px-6 py-5 flex items-center gap-2.5" style="border-bottom: 1px solid #f1f5f9">
             <div class="w-7 h-7 rounded-lg flex items-center justify-center"
                  style="background: rgba(5,150,105,0.08); border: 1px solid rgba(5,150,105,0.15)">
               <BanknotesIcon class="w-4 h-4" style="color: #059669" />
@@ -97,8 +97,8 @@
 
         <!-- Existing payment records -->
         <div v-if="payments.length" class="rounded-2xl overflow-hidden"
-             style="background: #fff; border: 1px solid #e2e8f0">
-          <div class="px-5 py-4" style="border-bottom: 1px solid #f1f5f9">
+             style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06)">
+          <div class="px-6 py-5" style="border-bottom: 1px solid #f1f5f9">
             <h2 class="text-sm font-bold text-slate-900">Payment Records</h2>
           </div>
           <ul class="divide-y divide-slate-50">
@@ -137,8 +137,8 @@
 
         <!-- Payment submission form — only if there's a pending/rejected payment record -->
         <div v-if="pendingPayment" class="rounded-2xl overflow-hidden"
-             style="background: #fff; border: 1px solid #e2e8f0">
-          <div class="px-5 py-4" style="border-bottom: 1px solid #f1f5f9">
+             style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06)">
+          <div class="px-6 py-5" style="border-bottom: 1px solid #f1f5f9">
             <h2 class="text-sm font-bold text-slate-900">
               {{ rejectedPayment ? 'Re-submit Payment Evidence' : 'Submit Payment Evidence' }}
             </h2>
@@ -195,7 +195,9 @@
               </label>
               <div class="relative">
                 <span class="absolute inset-y-0 left-4 flex items-center text-slate-500 font-semibold text-sm pointer-events-none">₦</span>
-                <input v-model="form.amount_submitted" type="number" step="0.01" required placeholder="0.00"
+                <input v-model="form.amount_submitted" type="text" inputmode="decimal" required placeholder="0.00"
+                       @keydown="filterMoneyKey"
+                       @paste="(e) => pasteMoneyAmount(e, form, 'amount_submitted')"
                        class="block w-full rounded-xl border border-slate-200 bg-slate-50 pl-8 pr-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:bg-white transition-all"/>
               </div>
               <p v-if="feeTotal" class="mt-1.5 text-xs text-slate-500">
@@ -324,6 +326,28 @@ function onFileChange(e: Event) {
   receiptFile.value = t.files?.[0] ?? null
 }
 
+const MONEY_SAFE_KEYS = new Set([
+  'Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+  'Tab', 'Home', 'End', 'Enter', 'Escape',
+])
+
+function filterMoneyKey(e: KeyboardEvent) {
+  if (e.ctrlKey || e.metaKey) return
+  if (MONEY_SAFE_KEYS.has(e.key)) return
+  if (!/^[0-9.,]$/.test(e.key)) e.preventDefault()
+}
+
+function pasteMoneyAmount(e: ClipboardEvent, target: Record<string, unknown>, field: string) {
+  e.preventDefault()
+  const raw = e.clipboardData?.getData('text') ?? ''
+  const filtered = raw.replace(/[^0-9.,]/g, '')
+  const input = e.target as HTMLInputElement
+  const start = input.selectionStart ?? 0
+  const end = input.selectionEnd ?? 0
+  const current = String(target[field] ?? '')
+  target[field] = current.slice(0, start) + filtered + current.slice(end)
+}
+
 function formatAmount(n: number | string) {
   return new Intl.NumberFormat('en-NG', { minimumFractionDigits: 2 }).format(Number(n))
 }
@@ -363,7 +387,7 @@ async function handlePaymentSubmit() {
     fd.append('payment_reference', form.value.payment_reference)
     fd.append('bank_name', form.value.bank_name)
     fd.append('payment_date', form.value.payment_date)
-    fd.append('amount_submitted', form.value.amount_submitted)
+    fd.append('amount_submitted', String(form.value.amount_submitted).replace(/,/g, ''))
     if (receiptFile.value) fd.append('receipt_file', receiptFile.value)
     await paymentApi.submitPayment(pendingPayment.value.id, fd)
     tellerSubmitted.value = true

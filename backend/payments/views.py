@@ -364,6 +364,7 @@ class FeeConfigListView(generics.ListCreateAPIView):
     """
     permission_classes = [IsAuthenticated]
     serializer_class = FeeConfigurationSerializer
+    pagination_class = None  # fee types are a small bounded set
 
     def get_queryset(self):
         if not _is_finance_or_chairman(self.request.user):

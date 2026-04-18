@@ -13,43 +13,46 @@
       <div class="absolute -bottom-60 right-0 w-[700px] h-[700px] rounded-full pointer-events-none"
            style="background: radial-gradient(circle, rgba(217,119,6,0.18) 0%, transparent 65%)"></div>
 
-      <!-- Street grid SVG -->
+      <!-- Street grid SVG — kept very subtle so text is dominant -->
       <svg class="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg"
            preserveAspectRatio="xMidYMid slice" viewBox="0 0 900 700">
-        <line x1="0" y1="80"  x2="900" y2="80"  stroke="#34d399" stroke-width="1" opacity="0.18"/>
-        <line x1="0" y1="290" x2="900" y2="290" stroke="#34d399" stroke-width="1" opacity="0.18"/>
-        <line x1="0" y1="450" x2="900" y2="450" stroke="#34d399" stroke-width="1" opacity="0.18"/>
-        <line x1="0" y1="630" x2="900" y2="630" stroke="#34d399" stroke-width="1" opacity="0.18"/>
-        <line x1="70"  y1="0" x2="70"  y2="700" stroke="#34d399" stroke-width="1" opacity="0.18"/>
-        <line x1="300" y1="0" x2="300" y2="700" stroke="#34d399" stroke-width="1" opacity="0.18"/>
-        <line x1="570" y1="0" x2="570" y2="700" stroke="#34d399" stroke-width="1" opacity="0.18"/>
-        <line x1="820" y1="0" x2="820" y2="700" stroke="#34d399" stroke-width="1" opacity="0.18"/>
-        <line x1="0" y1="180" x2="900" y2="180" stroke="#10b981" stroke-width="2.5" opacity="0.35"/>
-        <line x1="0" y1="370" x2="900" y2="370" stroke="#10b981" stroke-width="3"   opacity="0.4"/>
-        <line x1="0" y1="540" x2="900" y2="540" stroke="#10b981" stroke-width="2"   opacity="0.3"/>
-        <line x1="180" y1="0" x2="180" y2="700" stroke="#10b981" stroke-width="2.5" opacity="0.35"/>
-        <line x1="420" y1="0" x2="420" y2="700" stroke="#10b981" stroke-width="3"   opacity="0.4"/>
-        <line x1="690" y1="0" x2="690" y2="700" stroke="#10b981" stroke-width="2"   opacity="0.3"/>
-        <rect x="72"  y="82"  width="106" height="96"  fill="#059669" opacity="0.22" rx="2"/>
-        <rect x="182" y="82"  width="116" height="96"  fill="#059669" opacity="0.12" rx="2"/>
-        <rect x="302" y="82"  width="116" height="96"  fill="#059669" opacity="0.18" rx="2"/>
-        <rect x="72"  y="182" width="106" height="106" fill="#059669" opacity="0.14" rx="2"/>
-        <rect x="302" y="182" width="116" height="106" fill="#059669" opacity="0.22" rx="2"/>
-        <rect x="572" y="182" width="116" height="106" fill="#059669" opacity="0.16" rx="2"/>
-        <rect x="72"  y="372" width="106" height="76"  fill="#059669" opacity="0.20" rx="2"/>
-        <rect x="182" y="292" width="116" height="76"  fill="#059669" opacity="0.10" rx="2"/>
-        <rect x="422" y="292" width="146" height="76"  fill="#059669" opacity="0.16" rx="2"/>
-        <rect x="182" y="372" width="116" height="76"  fill="#059669" opacity="0.22" rx="2"/>
-        <rect x="572" y="372" width="116" height="76"  fill="#059669" opacity="0.13" rx="2"/>
-        <rect x="302" y="452" width="116" height="86"  fill="#059669" opacity="0.18" rx="2"/>
-        <rect x="692" y="452" width="126" height="86"  fill="#059669" opacity="0.15" rx="2"/>
-        <rect x="422" y="82"  width="146" height="96"  fill="#fbbf24" opacity="0.09" rx="2"/>
-        <rect x="572" y="372" width="116" height="76"  fill="#fbbf24" opacity="0.10" rx="2"/>
-        <rect x="692" y="452" width="126" height="86"  fill="#fbbf24" opacity="0.08" rx="2"/>
-        <circle cx="420" cy="370" r="22" fill="none" stroke="#fbbf24" stroke-width="2.5" opacity="0.55"/>
-        <circle cx="420" cy="370" r="10" fill="#fbbf24" opacity="0.22"/>
-        <circle cx="180" cy="180" r="16" fill="none" stroke="#34d399" stroke-width="2" opacity="0.4"/>
+        <line x1="0" y1="80"  x2="900" y2="80"  stroke="#34d399" stroke-width="1" opacity="0.07"/>
+        <line x1="0" y1="290" x2="900" y2="290" stroke="#34d399" stroke-width="1" opacity="0.07"/>
+        <line x1="0" y1="450" x2="900" y2="450" stroke="#34d399" stroke-width="1" opacity="0.07"/>
+        <line x1="0" y1="630" x2="900" y2="630" stroke="#34d399" stroke-width="1" opacity="0.07"/>
+        <line x1="70"  y1="0" x2="70"  y2="700" stroke="#34d399" stroke-width="1" opacity="0.07"/>
+        <line x1="300" y1="0" x2="300" y2="700" stroke="#34d399" stroke-width="1" opacity="0.07"/>
+        <line x1="570" y1="0" x2="570" y2="700" stroke="#34d399" stroke-width="1" opacity="0.07"/>
+        <line x1="820" y1="0" x2="820" y2="700" stroke="#34d399" stroke-width="1" opacity="0.07"/>
+        <line x1="0" y1="180" x2="900" y2="180" stroke="#10b981" stroke-width="2.5" opacity="0.13"/>
+        <line x1="0" y1="370" x2="900" y2="370" stroke="#10b981" stroke-width="3"   opacity="0.15"/>
+        <line x1="0" y1="540" x2="900" y2="540" stroke="#10b981" stroke-width="2"   opacity="0.10"/>
+        <line x1="180" y1="0" x2="180" y2="700" stroke="#10b981" stroke-width="2.5" opacity="0.13"/>
+        <line x1="420" y1="0" x2="420" y2="700" stroke="#10b981" stroke-width="3"   opacity="0.15"/>
+        <line x1="690" y1="0" x2="690" y2="700" stroke="#10b981" stroke-width="2"   opacity="0.10"/>
+        <rect x="72"  y="82"  width="106" height="96"  fill="#059669" opacity="0.09" rx="2"/>
+        <rect x="182" y="82"  width="116" height="96"  fill="#059669" opacity="0.05" rx="2"/>
+        <rect x="302" y="82"  width="116" height="96"  fill="#059669" opacity="0.07" rx="2"/>
+        <rect x="72"  y="182" width="106" height="106" fill="#059669" opacity="0.06" rx="2"/>
+        <rect x="302" y="182" width="116" height="106" fill="#059669" opacity="0.09" rx="2"/>
+        <rect x="572" y="182" width="116" height="106" fill="#059669" opacity="0.06" rx="2"/>
+        <rect x="72"  y="372" width="106" height="76"  fill="#059669" opacity="0.08" rx="2"/>
+        <rect x="182" y="292" width="116" height="76"  fill="#059669" opacity="0.04" rx="2"/>
+        <rect x="422" y="292" width="146" height="76"  fill="#059669" opacity="0.06" rx="2"/>
+        <rect x="182" y="372" width="116" height="76"  fill="#059669" opacity="0.09" rx="2"/>
+        <rect x="572" y="372" width="116" height="76"  fill="#059669" opacity="0.05" rx="2"/>
+        <rect x="302" y="452" width="116" height="86"  fill="#059669" opacity="0.07" rx="2"/>
+        <rect x="692" y="452" width="126" height="86"  fill="#059669" opacity="0.06" rx="2"/>
+        <rect x="422" y="82"  width="146" height="96"  fill="#fbbf24" opacity="0.04" rx="2"/>
+        <rect x="572" y="372" width="116" height="76"  fill="#fbbf24" opacity="0.04" rx="2"/>
+        <rect x="692" y="452" width="126" height="86"  fill="#fbbf24" opacity="0.03" rx="2"/>
+        <circle cx="420" cy="370" r="22" fill="none" stroke="#fbbf24" stroke-width="2.5" opacity="0.20"/>
+        <circle cx="420" cy="370" r="10" fill="#fbbf24" opacity="0.08"/>
+        <circle cx="180" cy="180" r="16" fill="none" stroke="#34d399" stroke-width="2" opacity="0.15"/>
       </svg>
+
+      <!-- Dark scrim — lifts text contrast above the illustration -->
+      <div class="absolute inset-0 pointer-events-none" style="background: rgba(5,15,30,0.55)"></div>
 
       <!-- Gold left edge -->
       <div class="absolute top-0 left-0 w-1 h-full pointer-events-none"
@@ -61,7 +64,7 @@
           <!-- Logo + wordmark -->
           <div class="flex items-center gap-4 mb-12">
             <img src="@/assets/logo.png" alt="Ibeju-Lekki LGA Seal"
-                 class="w-16 h-16 object-contain drop-shadow-xl flex-shrink-0"/>
+                 class="w-24 h-24 object-contain drop-shadow-xl flex-shrink-0"/>
             <div>
               <h1 class="text-white font-bold text-2xl tracking-wide leading-none">SNRMS</h1>
               <p class="text-emerald-400 text-xs font-medium tracking-widest uppercase mt-1">Official Portal</p>
@@ -76,7 +79,7 @@
                 Officially Yours.
               </span>
             </h2>
-            <p class="text-slate-300 mt-5 text-base leading-relaxed">
+            <p class="text-slate-200 mt-5 text-base leading-relaxed">
               Register an account to begin your street naming
               application with the Ibeju-Lekki LGA authority.
             </p>
@@ -91,7 +94,7 @@
               </div>
               <div>
                 <p class="text-white text-sm font-semibold">{{ step.label }}</p>
-                <p class="text-slate-400 text-xs mt-0.5 leading-snug">{{ step.desc }}</p>
+                <p class="text-slate-300 text-xs mt-0.5 leading-snug">{{ step.desc }}</p>
               </div>
             </div>
           </div>

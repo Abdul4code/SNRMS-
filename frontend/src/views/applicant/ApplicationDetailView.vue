@@ -11,8 +11,8 @@
 
       <!-- Page header band -->
       <div style="background: #0a1628; border-bottom: 1px solid rgba(255,255,255,0.06)">
-        <div class="max-w-5xl mx-auto px-4 sm:px-6 py-5">
-          <nav class="flex items-center gap-2 text-xs text-slate-400 mb-3">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 py-7">
+          <nav class="flex items-center gap-2 text-xs text-slate-400 mb-4">
             <RouterLink to="/applications" class="hover:text-emerald-400 transition-colors">My Applications</RouterLink>
             <ChevronRightIcon class="w-3.5 h-3.5 opacity-40" />
             <span class="text-slate-300 font-mono">{{ application.reference_number || `APP-${application.id}` }}</span>
@@ -20,7 +20,7 @@
           <div class="flex flex-wrap items-start justify-between gap-4">
             <div>
               <div class="flex items-center gap-3 flex-wrap">
-                <h1 class="text-white text-xl font-bold tracking-tight">{{ application.proposed_street_name }}</h1>
+                <h1 class="text-white text-2xl font-bold tracking-tight">{{ application.proposed_street_name }}</h1>
                 <StatusBadge :status="application.status" />
               </div>
               <p class="text-slate-400 text-sm mt-1">
@@ -91,16 +91,16 @@
         </div>
       </div>
 
-      <div class="max-w-5xl mx-auto px-4 sm:px-6 py-6">
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div class="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
           <!-- Left: details + documents -->
-          <div class="lg:col-span-2 space-y-4">
+          <div class="lg:col-span-2 space-y-5">
 
             <!-- Application details card -->
             <div class="rounded-2xl overflow-hidden"
-                 style="background: #fff; border: 1px solid #e2e8f0">
-              <div class="px-5 py-4" style="border-bottom: 1px solid #f1f5f9">
+                 style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.05)">
+              <div class="px-6 py-4" style="border-bottom: 1px solid #f1f5f9">
                 <h2 class="text-sm font-bold text-slate-900">Application Details</h2>
               </div>
               <dl class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -163,7 +163,7 @@
             <!-- Documents card (not shown for legacy apps) -->
             <div v-if="!application.is_legacy"
                  class="rounded-2xl overflow-hidden"
-                 style="background: #fff; border: 1px solid #e2e8f0">
+                 style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.05)">
               <div class="px-5 py-4 flex items-center justify-between" style="border-bottom: 1px solid #f1f5f9">
                 <h2 class="text-sm font-bold text-slate-900">Documents</h2>
                 <RouterLink :to="`/applications/${application.id}/documents`"
@@ -272,8 +272,8 @@
           <!-- Right: timeline -->
           <div>
             <div class="rounded-2xl overflow-hidden sticky top-4"
-                 style="background: #fff; border: 1px solid #e2e8f0">
-              <div class="px-5 py-4" style="border-bottom: 1px solid #f1f5f9">
+                 style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.05)">
+              <div class="px-6 py-4" style="border-bottom: 1px solid #f1f5f9">
                 <h2 class="text-sm font-bold text-slate-900">Status History</h2>
               </div>
               <div v-if="!history.length" class="flex flex-col items-center py-10 gap-2">

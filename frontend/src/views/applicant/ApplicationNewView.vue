@@ -3,23 +3,23 @@
 
     <!-- Page header band -->
     <div style="background: #0a1628; border-bottom: 1px solid rgba(255,255,255,0.06)">
-      <div class="max-w-2xl mx-auto px-4 sm:px-6 py-5">
-        <nav class="flex items-center gap-2 text-xs text-slate-400 mb-3">
+      <div class="max-w-2xl mx-auto px-4 sm:px-6 py-7">
+        <nav class="flex items-center gap-2 text-xs text-slate-400 mb-4">
           <RouterLink to="/applications" class="hover:text-emerald-400 transition-colors">My Applications</RouterLink>
           <ChevronRightIcon class="w-3.5 h-3.5 opacity-40" />
           <span class="text-slate-300">New Application</span>
         </nav>
-        <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1">New Request</p>
-        <h1 class="text-white text-xl font-bold tracking-tight">Street Name Application</h1>
-        <p class="text-slate-400 text-sm mt-0.5">Submit a request to register a new street name in Ibeju-Lekki LGA</p>
+        <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1.5">New Request</p>
+        <h1 class="text-white text-2xl font-bold tracking-tight">Street Name Application</h1>
+        <p class="text-slate-400 text-sm mt-1">Submit a request to register a new street name in Ibeju-Lekki LGA</p>
       </div>
     </div>
 
-    <div class="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-4">
+    <div class="max-w-2xl mx-auto px-4 sm:px-6 py-8 space-y-5">
 
       <!-- Main form card -->
       <div class="rounded-2xl overflow-hidden"
-           style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04)">
+           style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06)">
         <div class="px-6 py-5" style="border-bottom: 1px solid #f1f5f9">
           <h2 class="text-base font-bold text-slate-900">Application Details</h2>
           <p class="text-xs text-slate-500 mt-0.5">All fields marked with * are required</p>

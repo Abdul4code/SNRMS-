@@ -3,26 +3,26 @@
 
     <!-- Header band -->
     <div style="background: #0a1628; border-bottom: 1px solid rgba(255,255,255,0.06)">
-      <div class="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-        <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1">Staff Portal</p>
-        <h1 class="text-white text-xl font-bold tracking-tight">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+        <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1.5">Staff Portal</p>
+        <h1 class="text-white text-2xl font-bold tracking-tight">
           Welcome back, {{ auth.user?.first_name || auth.user?.email }}
         </h1>
-        <p class="text-slate-400 text-sm mt-0.5">
+        <p class="text-slate-400 text-sm mt-1">
           {{ roleLabel }} · Ibeju-Lekki LGA Street Names Registry
         </p>
       </div>
     </div>
 
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6">
 
       <!-- Stats grid -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div v-for="stat in stats" :key="stat.label"
-             class="rounded-2xl p-5"
-             style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04)">
-          <p class="text-3xl font-bold tracking-tight" :style="`color: ${stat.color}`">{{ stat.value }}</p>
-          <p class="text-xs text-slate-500 mt-1 font-medium">{{ stat.label }}</p>
+             class="rounded-2xl p-6"
+             style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06)">
+          <p class="text-4xl font-bold tracking-tight" :style="`color: ${stat.color}`">{{ stat.value }}</p>
+          <p class="text-xs text-slate-500 mt-1.5 font-semibold uppercase tracking-wide">{{ stat.label }}</p>
           <div v-if="stat.value > 0 && stat.urgent" class="mt-2 flex items-center gap-1">
             <div class="w-1.5 h-1.5 rounded-full animate-pulse" style="background: #d97706"></div>
             <span class="text-[10px] font-semibold text-amber-600">Needs attention</span>
@@ -31,12 +31,12 @@
       </div>
 
       <!-- Finance: confirmed payment amounts by stage -->
-      <div v-if="auth.isFinance || auth.isChairman" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div class="rounded-2xl p-5"
-             style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04)">
-          <div class="flex items-center gap-2 mb-3">
-            <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                 style="background: rgba(5,150,105,0.08); border: 1px solid rgba(5,150,105,0.15)">
+      <div v-if="auth.isFinance || auth.isChairman" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="rounded-2xl p-6"
+             style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06)">
+          <div class="flex items-center gap-2.5 mb-4">
+            <div class="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                 style="background: rgba(5,150,105,0.1); border: 1px solid rgba(5,150,105,0.2)">
               <BanknotesIcon class="w-4 h-4" style="color: #059669" />
             </div>
             <p class="text-xs font-bold text-slate-600 uppercase tracking-wider">Stage A Confirmed</p>
@@ -44,13 +44,13 @@
           <p class="text-2xl font-bold tracking-tight" style="color: #059669">
             {{ formatAmount(paymentAmounts.stage_a.total) }}
           </p>
-          <p class="text-xs text-slate-400 mt-1">{{ paymentAmounts.stage_a.count }} payment{{ paymentAmounts.stage_a.count !== 1 ? 's' : '' }}</p>
+          <p class="text-xs text-slate-400 mt-1.5">{{ paymentAmounts.stage_a.count }} payment{{ paymentAmounts.stage_a.count !== 1 ? 's' : '' }}</p>
         </div>
-        <div class="rounded-2xl p-5"
-             style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04)">
-          <div class="flex items-center gap-2 mb-3">
-            <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                 style="background: rgba(2,132,199,0.08); border: 1px solid rgba(2,132,199,0.15)">
+        <div class="rounded-2xl p-6"
+             style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06)">
+          <div class="flex items-center gap-2.5 mb-4">
+            <div class="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                 style="background: rgba(2,132,199,0.1); border: 1px solid rgba(2,132,199,0.2)">
               <BanknotesIcon class="w-4 h-4" style="color: #0284c7" />
             </div>
             <p class="text-xs font-bold text-slate-600 uppercase tracking-wider">Stage C Confirmed</p>
@@ -58,13 +58,13 @@
           <p class="text-2xl font-bold tracking-tight" style="color: #0284c7">
             {{ formatAmount(paymentAmounts.stage_c.total) }}
           </p>
-          <p class="text-xs text-slate-400 mt-1">{{ paymentAmounts.stage_c.count }} payment{{ paymentAmounts.stage_c.count !== 1 ? 's' : '' }}</p>
+          <p class="text-xs text-slate-400 mt-1.5">{{ paymentAmounts.stage_c.count }} payment{{ paymentAmounts.stage_c.count !== 1 ? 's' : '' }}</p>
         </div>
-        <div class="rounded-2xl p-5"
-             style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04)">
-          <div class="flex items-center gap-2 mb-3">
-            <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                 style="background: rgba(124,58,237,0.08); border: 1px solid rgba(124,58,237,0.15)">
+        <div class="rounded-2xl p-6"
+             style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06)">
+          <div class="flex items-center gap-2.5 mb-4">
+            <div class="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                 style="background: rgba(124,58,237,0.1); border: 1px solid rgba(124,58,237,0.2)">
               <BanknotesIcon class="w-4 h-4" style="color: #7c3aed" />
             </div>
             <p class="text-xs font-bold text-slate-600 uppercase tracking-wider">Renewals Confirmed</p>
@@ -72,14 +72,15 @@
           <p class="text-2xl font-bold tracking-tight" style="color: #7c3aed">
             {{ formatAmount(paymentAmounts.renewal.total) }}
           </p>
-          <p class="text-xs text-slate-400 mt-1">{{ paymentAmounts.renewal.count }} payment{{ paymentAmounts.renewal.count !== 1 ? 's' : '' }}</p>
+          <p class="text-xs text-slate-400 mt-1.5">{{ paymentAmounts.renewal.count }} payment{{ paymentAmounts.renewal.count !== 1 ? 's' : '' }}</p>
         </div>
       </div>
 
       <!-- Pending actions card -->
       <div class="rounded-2xl overflow-hidden"
-           style="background: #fff; border: 1px solid #e2e8f0">
-        <div class="px-5 py-4 flex items-center justify-between" style="border-bottom: 1px solid #f1f5f9">
+           style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06)">
+        <div class="px-6 py-5 flex items-center justify-between" style="border-bottom: 1px solid #f1f5f9">
+
           <div>
             <h2 class="text-sm font-bold text-slate-900">Pending Actions</h2>
             <p class="text-xs text-slate-500 mt-0.5">Applications requiring your attention</p>
@@ -156,8 +157,8 @@
 
       <!-- Naming committee & chairman: certificate pipeline -->
       <div v-if="auth.isNamingCommittee || auth.isChairman" class="rounded-2xl overflow-hidden"
-           style="background: #fff; border: 1px solid #e2e8f0">
-        <div class="px-5 py-4 flex items-center justify-between" style="border-bottom: 1px solid #f1f5f9">
+           style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06)">
+        <div class="px-6 py-5 flex items-center justify-between" style="border-bottom: 1px solid #f1f5f9">
           <div>
             <h2 class="text-sm font-bold text-slate-900">Awaiting Certificate &amp; Installation</h2>
             <p class="text-xs text-slate-500 mt-0.5">Applications pending certificate issuance, map upload, or signpost installation</p>
@@ -278,7 +279,7 @@
 <script setup lang="ts">
 import { ref, computed, reactive, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import { ChevronRightIcon, CheckCircleIcon, UserGroupIcon, CurrencyDollarIcon, MapIcon, BanknotesIcon } from '@heroicons/vue/24/outline'
+import { ChevronRightIcon, CheckCircleIcon, UserGroupIcon, BanknotesIcon } from '@heroicons/vue/24/outline'
 import { applicationApi, paymentApi } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import StatusBadge from '@/components/StatusBadge.vue'
@@ -296,11 +297,18 @@ interface Application {
 }
 
 const auth = useAuthStore()
-const allApps = ref<Application[]>([])
+
+// Pending actions for this role (loaded with server-side status filter)
+const pendingApps = ref<Application[]>([])
 const certPipelineApps = ref<Application[]>([])
 const loadingApps = ref(false)
 
-// Finance-specific stat counts loaded separately
+// Server-side stat counts (accurate regardless of dataset size)
+const totalCount = ref(0)
+const pendingCount = ref(0)
+const approvedCount = ref(0)
+const rejectedCount = ref(0)
+
 const financeStats = reactive({ pending: 0, confirmed: 0, rejected: 0 })
 const paymentAmounts = reactive({
   stage_a: { count: 0, total: '0' },
@@ -321,7 +329,20 @@ const FINANCE_CONFIRMED_STATUSES = [
   'renewal_payment_confirmed', 'renewed',
 ]
 
-const ROLE_PENDING_STATUS: Record<string, string[]> = {
+const COMMITTEE_APPROVED_STATUSES = [
+  'awaiting_chairman_approval', 'approved_by_chairman', 'rejected_by_chairman',
+  'awaiting_stage_c_payment', 'stage_c_confirmed', 'certificate_issued',
+  'expired', 'renewal_submitted', 'awaiting_renewal_payment',
+  'renewal_payment_confirmed', 'renewed',
+]
+const CHAIRMAN_APPROVED_STATUSES = [
+  'approved_by_chairman', 'awaiting_stage_c_payment', 'stage_c_confirmed',
+  'certificate_issued', 'expired', 'renewal_submitted', 'awaiting_renewal_payment',
+  'renewal_payment_confirmed', 'renewed',
+]
+const CHAIRMAN_REJECTED_STATUSES = ['rejected_by_chairman', 'rejected_by_committee']
+
+const ROLE_PENDING_STATUSES: Record<string, string[]> = {
   finance: FINANCE_PENDING_STATUSES,
   naming_committee: ['under_naming_committee_review', 'awaiting_document_resubmission'],
   committee_chairman: ['awaiting_chairman_approval'],
@@ -336,10 +357,6 @@ const roleLabel = computed(() => {
   return map[auth.user?.role ?? ''] ?? auth.user?.role ?? ''
 })
 
-const pendingStatuses = computed(() => ROLE_PENDING_STATUS[auth.user?.role ?? ''] ?? [])
-const pendingApps = computed(() => allApps.value.filter(a => pendingStatuses.value.includes(a.status)))
-
-// Applications in the post-stage-C pipeline: pending cert, pending installation, or expired
 const awaitingCertOrInstallApps = computed(() =>
   certPipelineApps.value.filter(a => {
     if (a.status === 'stage_c_confirmed') return true
@@ -349,21 +366,6 @@ const awaitingCertOrInstallApps = computed(() =>
   })
 )
 
-// Statuses that represent a successful committee approval (apps forwarded to chairman or beyond)
-const COMMITTEE_APPROVED_STATUSES = [
-  'awaiting_chairman_approval', 'approved_by_chairman', 'rejected_by_chairman',
-  'awaiting_stage_c_payment', 'stage_c_confirmed', 'certificate_issued',
-  'expired', 'renewal_submitted', 'awaiting_renewal_payment',
-  'renewal_payment_confirmed', 'renewed',
-]
-
-// Statuses that represent a successful chairman approval
-const CHAIRMAN_APPROVED_STATUSES = [
-  'approved_by_chairman', 'awaiting_stage_c_payment', 'stage_c_confirmed',
-  'certificate_issued', 'expired', 'renewal_submitted', 'awaiting_renewal_payment',
-  'renewal_payment_confirmed', 'renewed',
-]
-
 const stats = computed(() => {
   if (auth.isFinance) {
     return [
@@ -372,33 +374,27 @@ const stats = computed(() => {
       { label: 'Payments Rejected', value: financeStats.rejected, color: '#dc2626', urgent: false },
     ]
   }
-  const counts: Record<string, number> = {}
-  allApps.value.forEach(a => { counts[a.status] = (counts[a.status] ?? 0) + 1 })
-  const pending = pendingApps.value.length
 
-  let approvedCount = 0
-  let rejectedCount = 0
   let approvedLabel = 'Approved'
   let rejectedLabel = 'Rejected'
-
   if (auth.isNamingCommittee) {
-    approvedCount = COMMITTEE_APPROVED_STATUSES.reduce((sum, s) => sum + (counts[s] ?? 0), 0)
-    rejectedCount = counts['rejected_by_committee'] ?? 0
     approvedLabel = 'Forwarded to Chairman'
     rejectedLabel = 'Rejected by Committee'
-  } else {
-    // Chairman
-    approvedCount = CHAIRMAN_APPROVED_STATUSES.reduce((sum, s) => sum + (counts[s] ?? 0), 0)
-    rejectedCount = (counts['rejected_by_chairman'] ?? 0) + (counts['rejected_by_committee'] ?? 0)
   }
 
   return [
-    { label: 'Total Applications', value: allApps.value.length, color: '#0f172a', urgent: false },
-    { label: 'Pending Action', value: pending, color: pending > 0 ? '#d97706' : '#0f172a', urgent: pending > 0 },
-    { label: approvedLabel, value: approvedCount, color: '#059669', urgent: false },
-    { label: rejectedLabel, value: rejectedCount, color: '#dc2626', urgent: false },
+    { label: 'Total Applications', value: totalCount.value, color: '#0f172a', urgent: false },
+    { label: 'Pending Action', value: pendingCount.value, color: pendingCount.value > 0 ? '#d97706' : '#0f172a', urgent: pendingCount.value > 0 },
+    { label: approvedLabel, value: approvedCount.value, color: '#059669', urgent: false },
+    { label: rejectedLabel, value: rejectedCount.value, color: '#dc2626', urgent: false },
   ]
 })
+
+function getCount(data: unknown): number {
+  if (!data) return 0
+  if (Array.isArray(data)) return data.length
+  return (data as { count?: number }).count ?? 0
+}
 
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -413,26 +409,19 @@ function formatAmount(value: string | number): string {
 async function loadFinanceStats() {
   try {
     const [pendingRes, confirmedRes, rejectedRes, amountsRes] = await Promise.all([
-      applicationApi.list({ status: FINANCE_PENDING_STATUSES.join(','), page_size: 1 }).catch(() => null),
+      applicationApi.list({ status: FINANCE_PENDING_STATUSES.join(',') }).catch(() => null),
       Promise.all(
         FINANCE_CONFIRMED_STATUSES.map(s =>
-          applicationApi.list({ status: s, page_size: 1 }).catch(() => ({ data: { count: 0 } }))
+          applicationApi.list({ status: s }).catch(() => ({ data: { count: 0 } }))
         )
       ),
-      applicationApi.list({ status: 'awaiting_stage_a_payment', page_size: 1 }).catch(() => null),
+      applicationApi.list({ status: 'awaiting_stage_a_payment' }).catch(() => null),
       paymentApi.getStats().catch(() => null),
     ])
 
-    const pendingData = pendingRes?.data
-    financeStats.pending = Array.isArray(pendingData) ? pendingData.length : (pendingData?.count ?? 0)
-
-    financeStats.confirmed = confirmedRes.reduce((sum, r) => {
-      const d = r?.data
-      return sum + (Array.isArray(d) ? d.length : (d?.count ?? 0))
-    }, 0)
-
-    const rejectedData = rejectedRes?.data
-    financeStats.rejected = Array.isArray(rejectedData) ? rejectedData.length : (rejectedData?.count ?? 0)
+    financeStats.pending = getCount(pendingRes?.data)
+    financeStats.confirmed = confirmedRes.reduce((sum, r) => sum + getCount(r?.data), 0)
+    financeStats.rejected = getCount(rejectedRes?.data)
 
     if (amountsRes?.data) {
       const d = amountsRes.data
@@ -445,14 +434,66 @@ async function loadFinanceStats() {
   }
 }
 
+async function loadRoleStats() {
+  const role = auth.user?.role ?? ''
+  const myPendingStatuses = ROLE_PENDING_STATUSES[role] ?? []
+
+  const queries: Promise<unknown>[] = [
+    // Total applications
+    applicationApi.list({}).then(({ data }) => {
+      totalCount.value = getCount(data)
+    }).catch(() => {}),
+  ]
+
+  if (myPendingStatuses.length) {
+    queries.push(
+      applicationApi.list({ status: myPendingStatuses.join(',') }).then(({ data }) => {
+        pendingCount.value = getCount(data)
+      }).catch(() => {})
+    )
+  }
+
+  if (auth.isNamingCommittee) {
+    queries.push(
+      applicationApi.list({ status: COMMITTEE_APPROVED_STATUSES.join(',') }).then(({ data }) => {
+        approvedCount.value = getCount(data)
+      }).catch(() => {}),
+      applicationApi.list({ status: 'rejected_by_committee' }).then(({ data }) => {
+        rejectedCount.value = getCount(data)
+      }).catch(() => {})
+    )
+  } else if (auth.isChairman) {
+    queries.push(
+      applicationApi.list({ status: CHAIRMAN_APPROVED_STATUSES.join(',') }).then(({ data }) => {
+        approvedCount.value = getCount(data)
+      }).catch(() => {}),
+      applicationApi.list({ status: CHAIRMAN_REJECTED_STATUSES.join(',') }).then(({ data }) => {
+        rejectedCount.value = getCount(data)
+      }).catch(() => {})
+    )
+  }
+
+  await Promise.all(queries)
+}
+
 onMounted(async () => {
   loadingApps.value = true
   try {
-    const fetches: Promise<unknown>[] = [
-      applicationApi.list().then(({ data }) => {
-        allApps.value = Array.isArray(data) ? data : data.results ?? []
-      }),
-    ]
+    const role = auth.user?.role ?? ''
+    const myPendingStatuses = ROLE_PENDING_STATUSES[role] ?? []
+
+    const fetches: Promise<unknown>[] = []
+
+    // Load pending apps for this role (capped at 20 for dashboard preview)
+    if (myPendingStatuses.length) {
+      fetches.push(
+        applicationApi.list({ status: myPendingStatuses.join(',') }).then(({ data }) => {
+          pendingApps.value = Array.isArray(data) ? data : data.results ?? []
+        }).catch(() => {})
+      )
+    }
+
+    // Load cert pipeline for naming committee / chairman
     if (auth.isNamingCommittee || auth.isChairman) {
       fetches.push(
         applicationApi.list({ status: 'stage_c_confirmed,certificate_issued,expired' }).then(({ data }) => {
@@ -460,10 +501,14 @@ onMounted(async () => {
         }).catch(() => {})
       )
     }
+
     await Promise.all(fetches)
   } finally {
     loadingApps.value = false
   }
+
+  // Load accurate stat counts in parallel (these are count-only queries)
   if (auth.isFinance || auth.isChairman) loadFinanceStats()
+  if (!auth.isFinance) loadRoleStats()
 })
 </script>

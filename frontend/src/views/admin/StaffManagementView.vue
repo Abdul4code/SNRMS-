@@ -2,12 +2,12 @@
   <div class="min-h-screen" style="background: #f1f5f9">
 
     <div style="background: #0a1628; border-bottom: 1px solid rgba(255,255,255,0.06)">
-      <div class="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+      <div class="max-w-5xl mx-auto px-4 sm:px-6 py-8">
         <div class="flex items-center justify-between gap-4">
           <div>
-            <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1">Admin</p>
-            <h1 class="text-white text-xl font-bold tracking-tight">Staff Management</h1>
-            <p class="text-slate-400 text-sm mt-0.5">Manage staff user accounts and roles</p>
+            <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1.5">Admin</p>
+            <h1 class="text-white text-2xl font-bold tracking-tight">Staff Management</h1>
+            <p class="text-slate-400 text-sm mt-1">Manage staff user accounts and roles</p>
           </div>
           <button class="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
                   style="background: linear-gradient(135deg, #059669, #047857); box-shadow: 0 4px 14px rgba(5,150,105,0.35)"
@@ -19,7 +19,7 @@
       </div>
     </div>
 
-    <div class="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-4">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-5">
 
       <!-- Alerts -->
       <transition enter-active-class="transition duration-200 ease-out"
@@ -41,19 +41,32 @@
         </div>
       </transition>
 
+      <!-- Search bar -->
+      <div class="flex items-center gap-3 rounded-2xl p-4" style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 1px 4px rgba(0,0,0,0.05)">
+        <svg class="w-4 h-4 text-slate-400 flex-shrink-0 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 105 11a6 6 0 0012 0z"/>
+        </svg>
+        <input v-model="searchQuery" type="text" placeholder="Search by name, email, or role…"
+               class="flex-1 text-sm text-slate-900 bg-transparent outline-none placeholder-slate-400"
+               @input="staffPage = 1" />
+        <button v-if="searchQuery" @click="searchQuery = ''; staffPage = 1"
+                class="text-xs text-slate-400 hover:text-slate-600 px-2 py-1 transition-colors">Clear</button>
+        <span class="text-xs text-slate-400 font-medium pr-1">{{ filteredStaff.length }} of {{ staffList.length }}</span>
+      </div>
+
       <!-- Table card -->
-      <div class="rounded-2xl overflow-hidden" style="background: #fff; border: 1px solid #e2e8f0">
-        <div class="px-5 py-4" style="border-bottom: 1px solid #f1f5f9">
+      <div class="rounded-2xl overflow-hidden" style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06)">
+        <div class="px-6 py-5" style="border-bottom: 1px solid #f1f5f9">
           <h2 class="text-sm font-bold text-slate-900">Staff Accounts</h2>
-          <p class="text-xs text-slate-500 mt-0.5">{{ staffList.length }} account{{ staffList.length === 1 ? '' : 's' }}</p>
+          <p class="text-xs text-slate-500 mt-0.5">{{ filteredStaff.length }} account{{ filteredStaff.length === 1 ? '' : 's' }}</p>
         </div>
 
         <div v-if="loading" class="flex items-center justify-center py-12">
           <div class="w-8 h-8 rounded-full border-2 border-slate-200 border-t-emerald-500 animate-spin"></div>
         </div>
-        <div v-else-if="!staffList.length" class="flex flex-col items-center py-12 gap-2">
+        <div v-else-if="!filteredStaff.length" class="flex flex-col items-center py-12 gap-2">
           <UserGroupIcon class="w-10 h-10 text-slate-300" />
-          <p class="text-sm text-slate-500">No staff accounts found.</p>
+          <p class="text-sm text-slate-500">{{ searchQuery ? 'No staff match your search.' : 'No staff accounts found.' }}</p>
         </div>
 
         <div v-else class="overflow-x-auto">
@@ -68,8 +81,8 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(s, i) in staffList" :key="s.id"
-                  :style="i < staffList.length - 1 ? 'border-bottom: 1px solid #f8fafc' : ''"
+              <tr v-for="(s, i) in pagedStaff" :key="s.id"
+                  :style="i < pagedStaff.length - 1 ? 'border-bottom: 1px solid #f8fafc' : ''"
                   class="hover:bg-slate-50/60 transition-colors">
                 <td class="px-5 py-4">
                   <div class="flex items-center gap-3">
@@ -108,6 +121,21 @@
               </tr>
             </tbody>
           </table>
+          <!-- Pagination -->
+          <div v-if="staffTotalPages > 1" class="flex items-center justify-between px-5 py-3.5"
+               style="border-top: 1px solid #f1f5f9; background: #f8fafc">
+            <p class="text-xs text-slate-500">
+              Page {{ staffPage }} of {{ staffTotalPages }} &nbsp;·&nbsp; {{ filteredStaff.length }} total
+            </p>
+            <div class="flex gap-2">
+              <button :disabled="staffPage <= 1"
+                      class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 border border-slate-200 hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      @click="staffPage--">← Prev</button>
+              <button :disabled="staffPage >= staffTotalPages"
+                      class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 border border-slate-200 hover:bg-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      @click="staffPage++">Next →</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -208,7 +236,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { PlusIcon, UserGroupIcon } from '@heroicons/vue/24/outline'
 import { Dialog, DialogPanel, DialogTitle, TransitionRoot, TransitionChild } from '@headlessui/vue'
 import { authApi } from '@/services/api'
@@ -231,6 +259,22 @@ const successMsg = ref('')
 const showModal = ref(false)
 const modalLoading = ref(false)
 const modalError = ref('')
+const searchQuery = ref('')
+const staffPage = ref(1)
+const STAFF_PAGE_SIZE = 15
+
+const filteredStaff = computed(() => {
+  const q = searchQuery.value.toLowerCase().trim()
+  if (!q) return staffList.value
+  return staffList.value.filter(s =>
+    `${s.first_name} ${s.last_name} ${s.full_name ?? ''} ${s.email} ${s.role}`.toLowerCase().includes(q)
+  )
+})
+const staffTotalPages = computed(() => Math.max(1, Math.ceil(filteredStaff.value.length / STAFF_PAGE_SIZE)))
+const pagedStaff = computed(() => {
+  const start = (staffPage.value - 1) * STAFF_PAGE_SIZE
+  return filteredStaff.value.slice(start, start + STAFF_PAGE_SIZE)
+})
 
 const newStaff = ref({ first_name: '', last_name: '', email: '', phone: '', role: '', password: '' })
 

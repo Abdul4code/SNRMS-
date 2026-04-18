@@ -2,12 +2,12 @@
   <div class="min-h-screen" style="background: #f1f5f9">
 
     <div style="background: #0a1628; border-bottom: 1px solid rgba(255,255,255,0.06)">
-      <div class="max-w-4xl mx-auto px-4 sm:px-6 py-6">
+      <div class="max-w-4xl mx-auto px-4 sm:px-6 py-8">
         <div class="flex items-start justify-between gap-4">
           <div>
-            <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1">Admin</p>
-            <h1 class="text-white text-xl font-bold tracking-tight">Fee Configuration</h1>
-            <p class="text-slate-400 text-sm mt-0.5">Manage application processing fees for each stage</p>
+            <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1.5">Admin</p>
+            <h1 class="text-white text-2xl font-bold tracking-tight">Fee Configuration</h1>
+            <p class="text-slate-400 text-sm mt-1">Manage application processing fees for each stage</p>
           </div>
           <button @click="openAdd"
                   class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all flex-shrink-0 mt-1"
@@ -21,7 +21,7 @@
       </div>
     </div>
 
-    <div class="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-4">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-5">
 
       <transition enter-active-class="transition duration-200 ease-out"
                   enter-from-class="opacity-0 -translate-y-1" enter-to-class="opacity-100 translate-y-0">
@@ -42,8 +42,8 @@
         </div>
       </transition>
 
-      <div class="rounded-2xl overflow-hidden" style="background: #fff; border: 1px solid #e2e8f0">
-        <div class="px-5 py-4" style="border-bottom: 1px solid #f1f5f9">
+      <div class="rounded-2xl overflow-hidden" style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06)">
+        <div class="px-6 py-5" style="border-bottom: 1px solid #f1f5f9">
           <h2 class="text-sm font-bold text-slate-900">Fee Schedule</h2>
           <p class="text-xs text-slate-500 mt-0.5">Click Edit to modify any fee, or Add Fee to create a new one</p>
         </div>
@@ -195,8 +195,10 @@
               <label class="block text-sm font-semibold text-slate-700 mb-1.5">
                 Amount (₦) <span class="text-red-500">*</span>
               </label>
-              <input v-model="modalForm.amount" type="number" step="0.01" min="0.01" required
+              <input v-model="modalForm.amount" type="text" inputmode="decimal" required
                      placeholder="0.00"
+                     @keydown="filterMoneyKey"
+                     @paste="(e) => pasteMoneyAmount(e, modalForm, 'amount')"
                      class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:bg-white transition-all" />
             </div>
 
@@ -325,13 +327,35 @@ function openEdit(cfg: FeeConfig) {
   showModal.value = true
 }
 
+const MONEY_SAFE_KEYS = new Set([
+  'Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+  'Tab', 'Home', 'End', 'Enter', 'Escape',
+])
+
+function filterMoneyKey(e: KeyboardEvent) {
+  if (e.ctrlKey || e.metaKey) return
+  if (MONEY_SAFE_KEYS.has(e.key)) return
+  if (!/^[0-9.,]$/.test(e.key)) e.preventDefault()
+}
+
+function pasteMoneyAmount(e: ClipboardEvent, target: Record<string, unknown>, field: string) {
+  e.preventDefault()
+  const raw = e.clipboardData?.getData('text') ?? ''
+  const filtered = raw.replace(/[^0-9.,]/g, '')
+  const input = e.target as HTMLInputElement
+  const start = input.selectionStart ?? 0
+  const end = input.selectionEnd ?? 0
+  const current = String(target[field] ?? '')
+  target[field] = current.slice(0, start) + filtered + current.slice(end)
+}
+
 function closeModal() {
   showModal.value = false
 }
 
 async function handleSave() {
   if (!modalForm.value.component) { modalError.value = 'Please select a fee type.'; return }
-  const amount = parseFloat(modalForm.value.amount)
+  const amount = parseFloat(String(modalForm.value.amount).replace(/,/g, ''))
   if (isNaN(amount) || amount <= 0) { modalError.value = 'Enter a valid amount greater than 0.'; return }
   if (modalForm.value.component === 'street_name_fee' && !modalForm.value.street_type_id) {
     modalError.value = 'Please select a street type for Street Name Fee.'
@@ -340,7 +364,7 @@ async function handleSave() {
 
   const payload: Record<string, unknown> = {
     component: modalForm.value.component,
-    amount,
+    amount: amount,
     is_active: modalForm.value.is_active,
     street_type: modalForm.value.component === 'street_name_fee' ? modalForm.value.street_type_id : null,
   }

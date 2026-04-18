@@ -3,12 +3,12 @@
 
     <!-- Header band -->
     <div style="background: #0a1628; border-bottom: 1px solid rgba(255,255,255,0.06)">
-      <div class="max-w-3xl mx-auto px-4 sm:px-6 py-6">
+      <div class="max-w-3xl mx-auto px-4 sm:px-6 py-8">
         <div class="flex items-center justify-between gap-4">
           <div>
-            <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1">Inbox</p>
-            <h1 class="text-white text-xl font-bold tracking-tight">Notifications</h1>
-            <p class="text-slate-400 text-sm mt-0.5">
+            <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1.5">Inbox</p>
+            <h1 class="text-white text-2xl font-bold tracking-tight">Notifications</h1>
+            <p class="text-slate-400 text-sm mt-1">
               {{ store.unreadCount > 0 ? `${store.unreadCount} unread` : 'All caught up' }}
             </p>
           </div>
@@ -22,7 +22,7 @@
       </div>
     </div>
 
-    <div class="max-w-3xl mx-auto px-4 sm:px-6 py-6">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 py-8">
 
       <!-- Loading -->
       <div v-if="store.loading" class="flex items-center justify-center py-16">
@@ -47,7 +47,7 @@
           <div>
             <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 px-1">{{ date }}</p>
             <div class="rounded-2xl overflow-hidden"
-                 style="background: #fff; border: 1px solid #e2e8f0">
+                 style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.05)">
               <button v-for="(n, i) in group" :key="n.id"
                       class="w-full text-left flex items-start gap-4 px-5 py-4 transition-colors"
                       :class="n.is_read ? 'hover:bg-slate-50/70' : 'hover:bg-emerald-50/50'"
@@ -79,6 +79,16 @@
             </div>
           </div>
         </template>
+
+        <!-- Load more -->
+        <div v-if="store.hasMore" class="flex justify-center pt-1">
+          <button :disabled="store.loading"
+                  class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 bg-white hover:bg-slate-50 transition-all disabled:opacity-50"
+                  @click="store.loadMore()">
+            <span v-if="store.loading" class="w-4 h-4 rounded-full border-2 border-slate-200 border-t-emerald-500 animate-spin"></span>
+            {{ store.loading ? 'Loading…' : 'Load more' }}
+          </button>
+        </div>
       </div>
     </div>
   </div>

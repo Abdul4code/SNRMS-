@@ -10,8 +10,8 @@
 
       <!-- Header band -->
       <div style="background: #0a1628; border-bottom: 1px solid rgba(255,255,255,0.06)">
-        <div class="max-w-6xl mx-auto px-4 sm:px-6 py-5">
-          <nav class="flex items-center gap-2 text-xs text-slate-400 mb-3">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 py-7">
+          <nav class="flex items-center gap-2 text-xs text-slate-400 mb-4">
             <RouterLink to="/staff/applications" class="hover:text-emerald-400 transition-colors">Applications</RouterLink>
             <ChevronRightIcon class="w-3.5 h-3.5 opacity-40" />
             <span class="text-slate-300 font-mono">{{ application.reference_number || `APP-${application.id}` }}</span>
@@ -19,7 +19,7 @@
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div class="flex items-center gap-3 flex-wrap">
-                <h1 class="text-white text-xl font-bold tracking-tight">{{ application.proposed_street_name }}</h1>
+                <h1 class="text-white text-2xl font-bold tracking-tight">{{ application.proposed_street_name }}</h1>
                 <StatusBadge :status="application.status" />
                 <span v-if="application.is_legacy"
                       class="text-xs font-bold px-2.5 py-0.5 rounded-full"
@@ -48,18 +48,18 @@
         </div>
       </div>
 
-      <div class="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
           <!-- Left: applicant info + payment evidence + documents -->
           <div class="lg:col-span-2 space-y-4">
 
             <!-- Applicant info -->
-            <div class="rounded-2xl overflow-hidden" style="background: #fff; border: 1px solid #e2e8f0">
-              <div class="px-5 py-4" style="border-bottom: 1px solid #f1f5f9">
+            <div class="rounded-2xl overflow-hidden" style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.05)">
+              <div class="px-6 py-4" style="border-bottom: 1px solid #f1f5f9">
                 <h2 class="text-sm font-bold text-slate-900">Applicant Information</h2>
               </div>
-              <dl class="p-5 grid grid-cols-2 gap-5 text-sm">
+              <dl class="p-6 grid grid-cols-2 gap-5 text-sm">
                 <div>
                   <dt class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Full Name</dt>
                   <dd class="text-slate-900 font-semibold">{{ application.applicant?.full_name || '—' }}</dd>
@@ -122,7 +122,7 @@
                 </div>
                 <span class="ml-auto text-xs font-bold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">Under Review</span>
               </div>
-              <dl class="p-5 grid grid-cols-2 gap-5 text-sm">
+              <dl class="p-6 grid grid-cols-2 gap-5 text-sm">
                 <div>
                   <dt class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Payment Reference</dt>
                   <dd class="text-slate-900 font-mono font-semibold">{{ submittedPayment.payment_reference || '—' }}</dd>
@@ -271,13 +271,13 @@
           </div>
 
           <!-- Right: action panels + history -->
-          <div class="space-y-4">
+          <div class="space-y-5">
 
             <!-- Finance: confirm payment evidence -->
             <div v-if="auth.isFinance && FINANCE_CONFIRM_STATUSES.includes(application.status)"
                  class="rounded-2xl overflow-hidden"
-                 style="background: #fff; border: 1px solid #e2e8f0">
-              <div class="px-5 py-4" style="border-bottom: 1px solid #f1f5f9">
+                 style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.05)">
+              <div class="px-6 py-4" style="border-bottom: 1px solid #f1f5f9">
                 <h2 class="text-sm font-bold text-slate-900">Confirm Payment</h2>
                 <p class="text-xs text-slate-500 mt-0.5">Confirming will forward the application to the naming committee</p>
               </div>
@@ -436,8 +436,8 @@
 
             <!-- Status timeline -->
             <div class="rounded-2xl overflow-hidden sticky top-4"
-                 style="background: #fff; border: 1px solid #e2e8f0">
-              <div class="px-5 py-4" style="border-bottom: 1px solid #f1f5f9">
+                 style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.05)">
+              <div class="px-6 py-4" style="border-bottom: 1px solid #f1f5f9">
                 <h2 class="text-sm font-bold text-slate-900">Status History</h2>
               </div>
               <div v-if="!history.length" class="flex flex-col items-center py-10 gap-2">

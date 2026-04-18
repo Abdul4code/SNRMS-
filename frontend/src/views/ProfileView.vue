@@ -3,16 +3,16 @@
 
     <!-- Header band -->
     <div style="background: #0a1628; border-bottom: 1px solid rgba(255,255,255,0.06)">
-      <div class="max-w-2xl mx-auto px-4 sm:px-6 py-6">
-        <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1">Account</p>
+      <div class="max-w-2xl mx-auto px-4 sm:px-6 py-8">
+        <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1.5">Account</p>
         <div class="flex items-center gap-4">
-          <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-bold text-white flex-shrink-0"
-               style="background: linear-gradient(135deg, #059669, #047857)">
+          <div class="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-bold text-white flex-shrink-0"
+               style="background: linear-gradient(135deg, #059669, #047857); box-shadow: 0 4px 14px rgba(5,150,105,0.4)">
             {{ initials }}
           </div>
           <div>
-            <h1 class="text-white text-xl font-bold tracking-tight">{{ auth.user?.full_name }}</h1>
-            <div class="flex items-center gap-2 mt-1">
+            <h1 class="text-white text-2xl font-bold tracking-tight">{{ auth.user?.full_name }}</h1>
+            <div class="flex items-center gap-2 mt-1.5">
               <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
                     style="background: rgba(5,150,105,0.2); color: #34d399; border: 1px solid rgba(52,211,153,0.25)">
                 {{ roleLabel }}
@@ -25,11 +25,11 @@
       </div>
     </div>
 
-    <div class="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-4">
+    <div class="max-w-2xl mx-auto px-4 sm:px-6 py-8 space-y-5">
 
       <!-- Personal info card -->
-      <div class="rounded-2xl overflow-hidden" style="background: #fff; border: 1px solid #e2e8f0">
-        <div class="px-5 py-4 flex items-center justify-between" style="border-bottom: 1px solid #f1f5f9">
+      <div class="rounded-2xl overflow-hidden" style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06)">
+        <div class="px-6 py-5 flex items-center justify-between" style="border-bottom: 1px solid #f1f5f9">
           <h2 class="text-sm font-bold text-slate-900">Personal Information</h2>
           <button v-if="!editingProfile" class="text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition-colors"
                   @click="startEditProfile">
@@ -120,7 +120,7 @@
       </div>
 
       <!-- Change password card -->
-      <div class="rounded-2xl overflow-hidden" style="background: #fff; border: 1px solid #e2e8f0">
+      <div class="rounded-2xl overflow-hidden" style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06)">
         <div class="px-5 py-4" style="border-bottom: 1px solid #f1f5f9">
           <h2 class="text-sm font-bold text-slate-900">Change Password</h2>
         </div>

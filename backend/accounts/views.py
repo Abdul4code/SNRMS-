@@ -151,6 +151,7 @@ class StaffListView(ListCreateAPIView):
     """
 
     permission_classes = [IsAuthenticated, IsCommitteeChairman]
+    pagination_class = None  # staff count is small; client handles search/pagination
 
     def get_queryset(self):
         return User.objects.exclude(role=Role.APPLICANT).order_by('last_name', 'first_name')
