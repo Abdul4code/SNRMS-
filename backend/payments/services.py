@@ -232,7 +232,12 @@ def confirm_renewal_payment(payment: Payment, actor) -> Payment:
     base_date = application.expires_at if (application.expires_at and application.expires_at > _dt.date.today()) else _dt.date.today()
     new_expiry = base_date.replace(year=base_date.year + renewal_years)
     application.expires_at = new_expiry
-    application.save(update_fields=['expires_at', 'updated_at'])
+    update_fields = ['expires_at', 'updated_at']
+    # For legacy apps, promote the uploaded legacy certificate as the active certificate
+    if application.is_legacy and application.legacy_certificate and not application.certificate_file:
+        application.certificate_file = application.legacy_certificate
+        update_fields.append('certificate_file')
+    application.save(update_fields=update_fields)
 
     # awaiting_renewal_payment_confirmation → renewal_payment_confirmed
     application.transition_to(

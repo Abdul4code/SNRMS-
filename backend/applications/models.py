@@ -49,7 +49,10 @@ VALID_TRANSITIONS = {
         ApplicationStatus.APPROVED_BY_CHAIRMAN,
         ApplicationStatus.REJECTED_BY_CHAIRMAN,
     ],
-    ApplicationStatus.APPROVED_BY_CHAIRMAN: [ApplicationStatus.AWAITING_STAGE_C_PAYMENT],
+    ApplicationStatus.APPROVED_BY_CHAIRMAN: [
+        ApplicationStatus.AWAITING_STAGE_C_PAYMENT,
+        ApplicationStatus.AWAITING_RENEWAL_PAYMENT,  # legacy applications skip Stage C
+    ],
     ApplicationStatus.AWAITING_STAGE_C_PAYMENT: [ApplicationStatus.AWAITING_STAGE_C_PAYMENT_CONFIRMATION],
     ApplicationStatus.AWAITING_STAGE_C_PAYMENT_CONFIRMATION: [
         ApplicationStatus.STAGE_C_CONFIRMED,
@@ -106,6 +109,8 @@ class Application(models.Model):
     certificate_file = models.FileField(upload_to='certificates/', null=True, blank=True)
     certificate_issued_at = models.DateTimeField(null=True, blank=True)
     expires_at = models.DateField(null=True, blank=True)
+    is_legacy = models.BooleanField(default=False, help_text='Applicant had a manual certificate before digital registration')
+    legacy_certificate = models.FileField(upload_to='legacy_certificates/', null=True, blank=True)
     google_map_uploaded = models.BooleanField(default=False)
     signpost_installed = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=False)

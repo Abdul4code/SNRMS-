@@ -466,35 +466,60 @@ class ChairmanApprovalView(APIView):
                     actor=request.user,
                     remarks=remarks,
                 )
-                # Auto-advance: chairman approval → awaiting Stage C payment
-                application.transition_to(
-                    ApplicationStatus.AWAITING_STAGE_C_PAYMENT,
-                    actor=request.user,
-                    remarks='Auto-forwarded to Stage C payment after chairman approval.',
-                )
 
-                # Create a pending Stage C Payment record so the applicant can submit evidence
                 from decimal import Decimal as _Decimal
                 from payments.models import Payment as _Payment, PaymentStage as _PS, PaymentStatus as _PStatus
-                from payments.services import get_stage_c_fee_breakdown, get_total_fee
-                _breakdown = get_stage_c_fee_breakdown(application.street_type_id)
-                _amount = get_total_fee(_breakdown) if _breakdown else _Decimal('0.00')
-                _Payment.objects.create(
-                    application=application,
-                    stage=_PS.STAGE_C,
-                    status=_PStatus.PENDING,
-                    amount_expected=_amount,
-                )
 
-                notify_applicant(
-                    application,
-                    notification_type=NotificationType.APPLICATION_APPROVED,
-                    title='Application Approved by Chairman',
-                    message=(
-                        f'Your application {application.reference_number} has been approved '
-                        'by the chairman. Please proceed with Stage C payment.'
-                    ),
-                )
+                if application.is_legacy:
+                    # Legacy: skip Stage C entirely, go straight to renewal payment
+                    application.transition_to(
+                        ApplicationStatus.AWAITING_RENEWAL_PAYMENT,
+                        actor=request.user,
+                        remarks='Legacy application — auto-forwarded to renewal payment after chairman approval.',
+                    )
+                    from payments.services import calculate_renewal_fee
+                    _renewal_fee = calculate_renewal_fee()
+                    _Payment.objects.create(
+                        application=application,
+                        stage=_PS.RENEWAL,
+                        status=_PStatus.PENDING,
+                        amount_expected=_renewal_fee['amount'] if _renewal_fee else _Decimal('0.00'),
+                    )
+                    notify_applicant(
+                        application,
+                        notification_type=NotificationType.APPLICATION_APPROVED,
+                        title='Application Approved by Chairman',
+                        message=(
+                            f'Your application {application.reference_number} has been approved '
+                            'by the chairman. As a legacy registration, please proceed with the '
+                            'renewal payment to complete your digital registration.'
+                        ),
+                    )
+                else:
+                    # Standard flow: advance to Stage C payment
+                    application.transition_to(
+                        ApplicationStatus.AWAITING_STAGE_C_PAYMENT,
+                        actor=request.user,
+                        remarks='Auto-forwarded to Stage C payment after chairman approval.',
+                    )
+                    from payments.services import get_stage_c_fee_breakdown, get_total_fee
+                    _breakdown = get_stage_c_fee_breakdown(application.street_type_id)
+                    _amount = get_total_fee(_breakdown) if _breakdown else _Decimal('0.00')
+                    _Payment.objects.create(
+                        application=application,
+                        stage=_PS.STAGE_C,
+                        status=_PStatus.PENDING,
+                        amount_expected=_amount,
+                    )
+                    notify_applicant(
+                        application,
+                        notification_type=NotificationType.APPLICATION_APPROVED,
+                        title='Application Approved by Chairman',
+                        message=(
+                            f'Your application {application.reference_number} has been approved '
+                            'by the chairman. Please proceed with Stage C payment.'
+                        ),
+                    )
             else:
                 application.transition_to(
                     ApplicationStatus.REJECTED_BY_CHAIRMAN,

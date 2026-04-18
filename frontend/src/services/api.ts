@@ -112,8 +112,10 @@ export const applicationApi = {
     api.get('/applications/', { params }),
   get: (id: number | string) =>
     api.get(`/applications/${id}/`),
-  create: (data: Record<string, unknown>) =>
-    api.post('/applications/', data),
+  create: (data: FormData | Record<string, unknown>) =>
+    api.post('/applications/', data, {
+      headers: data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {},
+    }),
   update: (id: number | string, data: Record<string, unknown>) =>
     api.patch(`/applications/${id}/`, data),
   submit: (id: number | string) =>

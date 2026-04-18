@@ -80,6 +80,7 @@ class ApplicationDetailSerializer(serializers.ModelSerializer):
     documents = serializers.SerializerMethodField()
     payments = serializers.SerializerMethodField()
     certificate_file = serializers.SerializerMethodField()
+    legacy_certificate_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Application
@@ -95,10 +96,12 @@ class ApplicationDetailSerializer(serializers.ModelSerializer):
             'ward_display',
             'lga_area',
             'status',
+            'is_legacy',
             'committee_remarks',
             'chairman_remarks',
             'certificate_number',
             'certificate_file',
+            'legacy_certificate_url',
             'certificate_issued_at',
             'expires_at',
             'google_map_uploaded',
@@ -128,8 +131,18 @@ class ApplicationDetailSerializer(serializers.ModelSerializer):
             return request.build_absolute_uri(obj.certificate_file.url)
         return obj.certificate_file.url
 
+    def get_legacy_certificate_url(self, obj):
+        if not obj.legacy_certificate:
+            return None
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(obj.legacy_certificate.url)
+        return obj.legacy_certificate.url
+
 
 class ApplicationCreateSerializer(serializers.ModelSerializer):
+    legacy_certificate = serializers.FileField(required=False, allow_null=True)
+
     class Meta:
         model = Application
         fields = [
@@ -139,8 +152,17 @@ class ApplicationCreateSerializer(serializers.ModelSerializer):
             'location_description',
             'ward',
             'lga_area',
+            'is_legacy',
+            'legacy_certificate',
         ]
         read_only_fields = ['id']
+
+    def validate(self, attrs):
+        if attrs.get('is_legacy') and not attrs.get('legacy_certificate'):
+            raise serializers.ValidationError(
+                {'legacy_certificate': 'Please upload your existing certificate for legacy registration.'}
+            )
+        return attrs
 
     def create(self, validated_data):
         request = self.context.get('request')

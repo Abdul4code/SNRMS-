@@ -47,7 +47,7 @@
             <input v-model="form.proposed_street_name" type="text" required
                    placeholder="e.g. Chief Bola Tinubu Boulevard"
                    class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:bg-white transition-all"/>
-            <p class="mt-1.5 text-xs text-slate-500">Enter the full proposed name including the street designation (Street, Avenue, etc.)</p>
+            <p class="mt-1.5 text-xs text-slate-500">Enter the proposed name of the street </p>
           </div>
 
           <!-- Street type -->
@@ -68,6 +68,44 @@
                 <ChevronDownIcon class="w-4 h-4 text-slate-400" />
               </div>
             </div>
+
+            <!-- Fee preview -->
+            <transition enter-active-class="transition ease-out duration-200"
+                        enter-from-class="opacity-0 -translate-y-1" enter-to-class="opacity-100 translate-y-0"
+                        leave-active-class="transition ease-in duration-100"
+                        leave-from-class="opacity-100 translate-y-0" leave-to-class="opacity-0 -translate-y-1">
+              <div v-if="form.street_type"
+                   class="mt-2 rounded-xl px-4 py-3"
+                   style="background: rgba(5,150,105,0.06); border: 1px solid rgba(5,150,105,0.15)">
+                <div v-if="feePreview.loading" class="flex items-center gap-2">
+                  <div class="w-3.5 h-3.5 rounded-full border-2 border-emerald-300 border-t-emerald-600 animate-spin flex-shrink-0"></div>
+                  <span class="text-xs text-emerald-700">Loading fee estimate…</span>
+                </div>
+                <div v-else-if="feePreview.error" class="text-xs text-red-500">{{ feePreview.error }}</div>
+                <div v-else>
+                  <p class="text-xs font-bold text-emerald-800 mb-2 flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                    </svg>
+                    Estimated Fees
+                  </p>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div class="rounded-lg px-3 py-2" style="background: rgba(255,255,255,0.7)">
+                      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Stage A · Due now</p>
+                      <p class="text-sm font-bold text-slate-900">₦{{ formatAmount(feePreview.stageATotal) }}</p>
+                      <p class="text-[10px] text-slate-400 mt-0.5">Application processing</p>
+                    </div>
+                    <div class="rounded-lg px-3 py-2" style="background: rgba(255,255,255,0.7)">
+                      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                        {{ isLegacy ? 'Renewal · After approval' : 'Stage C · After approval' }}
+                      </p>
+                      <p class="text-sm font-bold text-slate-900">₦{{ formatAmount(isLegacy ? feePreview.renewalTotal : feePreview.stageCTotal) }}</p>
+                      <p class="text-[10px] text-slate-400 mt-0.5">{{ isLegacy ? 'Legacy renewal fee' : 'Certificate issuance' }}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </transition>
           </div>
 
           <!-- Ward -->
@@ -167,10 +205,64 @@
             </div>
           </div>
 
+          <!-- Legacy registration checkbox (shown after geo is captured) -->
+          <transition enter-active-class="transition ease-out duration-200"
+                      enter-from-class="opacity-0 -translate-y-1" enter-to-class="opacity-100 translate-y-0"
+                      leave-active-class="transition ease-in duration-100"
+                      leave-from-class="opacity-100 translate-y-0" leave-to-class="opacity-0 -translate-y-1">
+            <div v-if="geoState === 'success'"
+                 class="rounded-xl p-4"
+                 style="background: rgba(251,191,36,0.06); border: 1px solid rgba(251,191,36,0.25)">
+              <label class="flex items-start gap-3 cursor-pointer select-none">
+                <div class="flex-shrink-0 mt-0.5">
+                  <input type="checkbox" v-model="isLegacy"
+                         class="w-4 h-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400 focus:ring-offset-0 cursor-pointer" />
+                </div>
+                <div>
+                  <p class="text-sm font-semibold text-slate-800">Have you registered this street and have a certificate before?</p>
+                  <p class="text-xs text-slate-500 mt-0.5">
+                    Check this if you previously obtained a manual street naming certificate and want to bring your registration into the digital system.
+                  </p>
+                </div>
+              </label>
+
+              <!-- Legacy certificate upload -->
+              <transition enter-active-class="transition ease-out duration-200"
+                          enter-from-class="opacity-0 -translate-y-1" enter-to-class="opacity-100 translate-y-0">
+                <div v-if="isLegacy" class="mt-4 pt-4" style="border-top: 1px solid rgba(251,191,36,0.2)">
+                  <label class="block text-sm font-semibold text-slate-700 mb-1.5">
+                    Existing Certificate <span class="text-red-500">*</span>
+                  </label>
+                  <div class="relative">
+                    <input type="file" ref="legacyCertInput" accept=".pdf,.jpg,.jpeg,.png"
+                           class="hidden" @change="onLegacyCertChange" />
+                    <button type="button"
+                            class="w-full flex items-center gap-3 rounded-xl border-2 border-dashed px-4 py-3 text-sm transition-colors"
+                            :class="legacyCertFile ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-slate-50 hover:border-slate-300'"
+                            @click="legacyCertInput?.click()">
+                      <svg class="w-4 h-4 flex-shrink-0" :class="legacyCertFile ? 'text-amber-500' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                      </svg>
+                      <span :class="legacyCertFile ? 'text-amber-700 font-medium' : 'text-slate-500'">
+                        {{ legacyCertFile ? legacyCertFile.name : 'Upload your existing certificate (PDF, JPG, PNG)' }}
+                      </span>
+                      <span v-if="legacyCertFile"
+                            class="ml-auto text-xs text-amber-600 underline hover:text-amber-700"
+                            @click.stop="legacyCertFile = null">Remove</span>
+                    </button>
+                  </div>
+                  <p class="text-xs text-slate-400 mt-1.5">
+                    After approval, you will pay the <strong>renewal fee</strong> instead of Stage C. Your certificate will be updated with a new expiry date.
+                  </p>
+                </div>
+              </transition>
+            </div>
+          </transition>
+
           <!-- Actions -->
           <div class="flex items-center gap-3 pt-1">
             <button type="submit"
-                    :disabled="submitting || !form.proposed_street_name || !form.street_type || !form.ward || geoState !== 'success'"
+                    :disabled="submitting || !form.proposed_street_name || !form.street_type || !form.ward || geoState !== 'success' || (isLegacy && !legacyCertFile)"
                     class="flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold text-white transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
                     style="background: linear-gradient(135deg, #059669, #047857); box-shadow: 0 4px 16px rgba(5,150,105,0.3)">
               <svg v-if="submitting" class="animate-spin w-4 h-4 opacity-80" viewBox="0 0 24 24" fill="none">
@@ -213,13 +305,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
 import {
   ChevronRightIcon, ChevronDownIcon, InformationCircleIcon,
   MapPinIcon, CheckCircleIcon, ArrowPathIcon, ExclamationCircleIcon,
 } from '@heroicons/vue/24/outline'
-import { applicationApi, configApi } from '@/services/api'
+import { applicationApi, configApi, paymentApi } from '@/services/api'
 
 interface StreetType { id: number; name: string }
 
@@ -229,6 +321,42 @@ const streetTypes = ref<StreetType[]>([])
 const streetTypesLoading = ref(false)
 const submitting = ref(false)
 const errorMessage = ref('')
+
+const isLegacy = ref(false)
+const legacyCertFile = ref<File | null>(null)
+const legacyCertInput = ref<HTMLInputElement | null>(null)
+
+function onLegacyCertChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  legacyCertFile.value = input.files?.[0] ?? null
+}
+
+const feePreview = ref({ loading: false, error: '', stageATotal: 0, stageCTotal: 0, renewalTotal: 0 })
+
+function formatAmount(n: number) {
+  return new Intl.NumberFormat('en-NG', { minimumFractionDigits: 2 }).format(n)
+}
+
+watch(() => form.value.street_type, async (streetTypeId) => {
+  if (!streetTypeId) return
+  feePreview.value = { loading: true, error: '', stageATotal: 0, stageCTotal: 0, renewalTotal: 0 }
+  try {
+    const [aRes, cRes, rRes] = await Promise.all([
+      paymentApi.getBreakdown('stage_a'),
+      paymentApi.getBreakdown('stage_c', streetTypeId),
+      paymentApi.getBreakdown('renewal'),
+    ])
+    feePreview.value = {
+      loading: false,
+      error: '',
+      stageATotal: parseFloat(aRes.data.total) || 0,
+      stageCTotal: parseFloat(cRes.data.total) || 0,
+      renewalTotal: parseFloat(rRes.data.total) || 0,
+    }
+  } catch {
+    feePreview.value = { loading: false, error: 'Could not load fee estimate.', stageATotal: 0, stageCTotal: 0, renewalTotal: 0 }
+  }
+})
 
 const geoSupported = 'geolocation' in navigator
 const geoState = ref<'idle' | 'loading' | 'success' | 'error'>('idle')
@@ -279,18 +407,31 @@ async function handleSubmit() {
   errorMessage.value = ''
   submitting.value = true
   try {
-    const { data } = await applicationApi.create({
-      proposed_street_name: form.value.proposed_street_name,
-      street_type: form.value.street_type,
-      ward: form.value.ward,
-      location_description: form.value.location_description,
-    })
+    let payload: FormData | Record<string, unknown>
+    if (isLegacy.value && legacyCertFile.value) {
+      const fd = new FormData()
+      fd.append('proposed_street_name', form.value.proposed_street_name)
+      fd.append('street_type', form.value.street_type)
+      fd.append('ward', form.value.ward)
+      fd.append('location_description', form.value.location_description)
+      fd.append('is_legacy', 'true')
+      fd.append('legacy_certificate', legacyCertFile.value)
+      payload = fd
+    } else {
+      payload = {
+        proposed_street_name: form.value.proposed_street_name,
+        street_type: form.value.street_type,
+        ward: form.value.ward,
+        location_description: form.value.location_description,
+      }
+    }
+    const { data } = await applicationApi.create(payload)
     router.push(`/applications/${data.id}`)
   } catch (err: unknown) {
     const e = err as { response?: { data?: Record<string, string[]> } }
-    const data = e.response?.data
-    errorMessage.value = data
-      ? Object.entries(data).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' · ')
+    const d = e.response?.data
+    errorMessage.value = d
+      ? Object.entries(d).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' · ')
       : 'Failed to create application. Please try again.'
   } finally {
     submitting.value = false

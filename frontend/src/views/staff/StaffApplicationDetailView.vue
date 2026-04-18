@@ -21,6 +21,11 @@
               <div class="flex items-center gap-3 flex-wrap">
                 <h1 class="text-white text-xl font-bold tracking-tight">{{ application.proposed_street_name }}</h1>
                 <StatusBadge :status="application.status" />
+                <span v-if="application.is_legacy"
+                      class="text-xs font-bold px-2.5 py-0.5 rounded-full"
+                      style="background: rgba(251,191,36,0.18); color: #fbbf24; border: 1px solid rgba(251,191,36,0.35)">
+                  Legacy Registration
+                </span>
               </div>
               <p class="text-slate-400 text-sm mt-1">
                 {{ application.street_type_name }} &nbsp;·&nbsp; {{ formatDate(application.created_at) }}
@@ -186,8 +191,37 @@
               </ul>
             </div>
 
-            <!-- Documents — hidden for finance, only naming committee and chairman need them -->
-            <div v-if="!auth.isFinance" class="rounded-2xl overflow-hidden" style="background: #fff; border: 1px solid #e2e8f0">
+            <!-- Legacy certificate — shown instead of documents for legacy apps -->
+            <div v-if="!auth.isFinance && application.is_legacy"
+                 class="rounded-2xl overflow-hidden"
+                 style="background: linear-gradient(135deg, #fffbeb, #fef3c7); border: 1px solid rgba(251,191,36,0.3)">
+              <div class="px-5 py-4 flex items-center gap-3" style="border-bottom: 1px solid rgba(251,191,36,0.2)">
+                <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                     style="background: rgba(251,191,36,0.2); border: 1px solid rgba(251,191,36,0.35)">
+                  <DocumentIcon class="w-4 h-4" style="color: #b45309" />
+                </div>
+                <div>
+                  <h2 class="text-sm font-bold" style="color: #92400e">Existing Certificate (Legacy)</h2>
+                  <p class="text-xs mt-0.5" style="color: #b45309">
+                    Applicant already holds a manual certificate. Document verification is not required.
+                  </p>
+                </div>
+              </div>
+              <div class="p-5">
+                <a v-if="application.legacy_certificate_url"
+                   :href="application.legacy_certificate_url" target="_blank"
+                   class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                   style="background: rgba(251,191,36,0.15); border: 1px solid rgba(251,191,36,0.4); color: #92400e">
+                  <DocumentIcon class="w-4 h-4" />
+                  View Uploaded Certificate
+                </a>
+                <p v-else class="text-sm text-amber-700 italic">No certificate file attached.</p>
+              </div>
+            </div>
+
+            <!-- Documents — hidden for finance and legacy apps -->
+            <div v-if="!auth.isFinance && !application.is_legacy"
+                 class="rounded-2xl overflow-hidden" style="background: #fff; border: 1px solid #e2e8f0">
               <div class="px-5 py-4" style="border-bottom: 1px solid #f1f5f9">
                 <h2 class="text-sm font-bold text-slate-900">Uploaded Documents</h2>
               </div>
@@ -338,8 +372,8 @@
                 <h2 class="text-sm font-bold text-slate-900">Committee Review</h2>
               </div>
               <form @submit.prevent="handleCommitteeReview" class="p-5 space-y-4" novalidate>
-                <!-- Warning when trying to approve with unverified docs -->
-                <div v-if="committeeForm.decision === 'approved' && !allDocsVerified"
+                <!-- Warning when trying to approve with unverified docs (not shown for legacy apps) -->
+                <div v-if="committeeForm.decision === 'approved' && !allDocsVerified && !application.is_legacy"
                      class="flex items-start gap-2.5 rounded-xl px-3.5 py-3"
                      style="background: rgba(234,179,8,0.06); border: 1px solid rgba(234,179,8,0.3)">
                   <svg class="w-4 h-4 mt-0.5 flex-shrink-0" style="color: #b45309" fill="currentColor" viewBox="0 0 20 20">
@@ -510,6 +544,8 @@ interface Application {
   created_at: string
   updated_at?: string
   applicant?: Applicant
+  is_legacy?: boolean
+  legacy_certificate_url?: string | null
   certificate_file?: string | null
   google_map_uploaded?: boolean
   signpost_installed?: boolean
@@ -576,7 +612,8 @@ const submittedPayment = computed(() =>
 )
 
 const allDocsVerified = computed(() =>
-  documents.value.length > 0 && documents.value.every(d => d.is_verified)
+  application.value?.is_legacy ||
+  (documents.value.length > 0 && documents.value.every(d => d.is_verified))
 )
 
 const isDocReviewStage = computed(() =>

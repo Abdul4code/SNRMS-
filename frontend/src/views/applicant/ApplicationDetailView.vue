@@ -29,7 +29,7 @@
             </div>
             <!-- Action buttons -->
             <div class="flex flex-wrap gap-2">
-              <RouterLink v-if="application.status === 'draft' && !allDocsUploaded"
+              <RouterLink v-if="application.status === 'draft' && !application.is_legacy && !allDocsUploaded"
                           :to="`/applications/${application.id}/documents`"
                           class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all"
                           style="background: linear-gradient(135deg, #059669, #047857); box-shadow: 0 4px 14px rgba(5,150,105,0.35)">
@@ -41,7 +41,7 @@
                           style="background: linear-gradient(135deg, #dc2626, #b91c1c); box-shadow: 0 4px 14px rgba(220,38,38,0.35)">
                 Re-upload Documents
               </RouterLink>
-              <button v-if="application.status === 'draft' && allDocsUploaded"
+              <button v-if="application.status === 'draft' && (application.is_legacy || allDocsUploaded)"
                       :disabled="actionLoading"
                       class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-60"
                       style="background: linear-gradient(135deg, #0284c7, #0369a1); box-shadow: 0 4px 14px rgba(2,132,199,0.35)"
@@ -133,8 +133,36 @@
               </dl>
             </div>
 
-            <!-- Documents card -->
-            <div class="rounded-2xl overflow-hidden"
+            <!-- Legacy certificate card -->
+            <div v-if="application.is_legacy"
+                 class="rounded-2xl overflow-hidden"
+                 style="background: linear-gradient(135deg, #fffbeb, #fef3c7); border: 1px solid rgba(251,191,36,0.3)">
+              <div class="px-5 py-4 flex items-center gap-3" style="border-bottom: 1px solid rgba(251,191,36,0.2)">
+                <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                     style="background: rgba(251,191,36,0.2); border: 1px solid rgba(251,191,36,0.35)">
+                  <DocumentIcon class="w-4 h-4" style="color: #b45309" />
+                </div>
+                <div>
+                  <h2 class="text-sm font-bold" style="color: #92400e">Existing Certificate</h2>
+                  <p class="text-xs mt-0.5" style="color: #b45309">
+                    Your previously issued manual certificate — submitted for digital registration.
+                  </p>
+                </div>
+              </div>
+              <div class="p-5">
+                <a v-if="application.legacy_certificate_url"
+                   :href="application.legacy_certificate_url" target="_blank"
+                   class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                   style="background: rgba(251,191,36,0.15); border: 1px solid rgba(251,191,36,0.4); color: #92400e">
+                  <DocumentIcon class="w-4 h-4" />
+                  View Uploaded Certificate
+                </a>
+              </div>
+            </div>
+
+            <!-- Documents card (not shown for legacy apps) -->
+            <div v-if="!application.is_legacy"
+                 class="rounded-2xl overflow-hidden"
                  style="background: #fff; border: 1px solid #e2e8f0">
               <div class="px-5 py-4 flex items-center justify-between" style="border-bottom: 1px solid #f1f5f9">
                 <h2 class="text-sm font-bold text-slate-900">Documents</h2>
@@ -307,6 +335,8 @@ interface Application {
   created_at: string
   committee_remarks?: string
   chairman_remarks?: string
+  is_legacy?: boolean
+  legacy_certificate_url?: string | null
   certificate_file?: string | null
   certificate_number?: string
   certificate_issued_at?: string
