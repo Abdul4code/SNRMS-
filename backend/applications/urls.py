@@ -1,6 +1,8 @@
 from django.urls import path
 
 from .views import (
+    DuplicateCheckView,
+    AdminApplicationRegistryView,
     ApplicationCompletionView,
     ApplicationDetailView,
     ApplicationListCreateView,
@@ -20,6 +22,8 @@ app_name = 'applications'
 urlpatterns = [
     # Collection
     path('', ApplicationListCreateView.as_view(), name='application-list-create'),
+    path('check-duplicate/', DuplicateCheckView.as_view(), name='application-check-duplicate'),
+    path('registry/', AdminApplicationRegistryView.as_view(), name='application-registry'),
 
     # Single resource
     path('<uuid:pk>/', ApplicationDetailView.as_view(), name='application-detail'),

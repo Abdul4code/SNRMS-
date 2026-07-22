@@ -112,6 +112,15 @@ class SubmitPaymentView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
+        # Payments are routed exclusively through the Paystack gateway. The manual
+        # teller/reference path is closed for applicants; staff may still record a
+        # payment out-of-band if the council needs to (e.g. a verified bank transfer).
+        if getattr(request.user, 'role', None) == 'applicant':
+            return Response(
+                {'detail': 'Payments must be made online through the payment gateway. '
+                           'Please use the "Pay online" option.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         payment = get_object_or_404(
             Payment.objects.select_related('application'),
             pk=pk,
@@ -435,3 +444,98 @@ class FeeConfigUpdateView(generics.RetrieveUpdateDestroyAPIView):
         instance = self.get_object()
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# ---------------------------------------------------------------------------
+# Online payment gateway (Paystack) — with demo fallback
+# ---------------------------------------------------------------------------
+from django.conf import settings as _settings  # noqa: E402
+from django.utils.decorators import method_decorator  # noqa: E402
+from django.views.decorators.csrf import csrf_exempt  # noqa: E402
+from . import gateway  # noqa: E402
+
+
+class InitializePaymentView(APIView):
+    """POST /payments/<pk>/initialize/ — start an online payment for a payment record."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        payment = get_object_or_404(Payment.objects.select_related('application', 'application__applicant'), pk=pk)
+        if payment.application.applicant_id != request.user.id:
+            return Response({'detail': 'Not your payment.'}, status=status.HTTP_403_FORBIDDEN)
+        if payment.status == PaymentStatus.CONFIRMED:
+            return Response({'detail': 'This payment is already confirmed.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not gateway.is_configured():
+            # Demo mode: no keys — front-end will offer a "simulate" action.
+            payment.payment_reference = gateway.new_reference(payment)
+            payment.save(update_fields=['payment_reference', 'updated_at'])
+            return Response({'mode': 'demo', 'reference': payment.payment_reference})
+
+        callback = request.data.get('callback_url') or _settings.PAYMENT_CALLBACK_URL
+        try:
+            result = gateway.initialize(payment, email=request.user.email, callback_url=callback)
+        except Exception as exc:  # noqa: BLE001
+            return Response({'detail': f'Gateway error: {exc}'}, status=status.HTTP_502_BAD_GATEWAY)
+        return Response({'mode': 'paystack', **result})
+
+
+class VerifyPaymentView(APIView):
+    """GET /payments/verify/?reference=... — verify a Paystack transaction and confirm."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        reference = request.query_params.get('reference', '')
+        payment = get_object_or_404(Payment.objects.select_related('application'), payment_reference=reference)
+        if not gateway.is_configured():
+            return Response({'detail': 'Gateway not configured.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            result = gateway.verify(reference)
+        except Exception as exc:  # noqa: BLE001
+            return Response({'detail': f'Gateway error: {exc}'}, status=status.HTTP_502_BAD_GATEWAY)
+        if not result['success']:
+            return Response({'status': 'failed', 'detail': 'Payment not successful.'}, status=status.HTTP_400_BAD_REQUEST)
+        gateway.mark_paid(payment, amount=result['amount'])
+        return Response({'status': 'confirmed', 'payment': PaymentSerializer(payment).data})
+
+
+class SimulatePaymentView(APIView):
+    """POST /payments/<pk>/simulate/ — demo only: mark an online payment as paid.
+
+    Enabled only when no live gateway is configured (i.e. demo installs), so it
+    can never bypass a real gateway in production.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        if gateway.is_configured():
+            return Response({'detail': 'Simulation disabled when a live gateway is configured.'}, status=status.HTTP_400_BAD_REQUEST)
+        payment = get_object_or_404(Payment.objects.select_related('application', 'application__applicant'), pk=pk)
+        if payment.application.applicant_id != request.user.id:
+            return Response({'detail': 'Not your payment.'}, status=status.HTTP_403_FORBIDDEN)
+        if not payment.payment_reference:
+            payment.payment_reference = gateway.new_reference(payment)
+            payment.save(update_fields=['payment_reference', 'updated_at'])
+        gateway.mark_paid(payment)
+        return Response({'status': 'confirmed', 'payment': PaymentSerializer(payment).data})
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class PaystackWebhookView(APIView):
+    """POST /payments/paystack/webhook/ — Paystack calls this on payment events."""
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        signature = request.META.get('HTTP_X_PAYSTACK_SIGNATURE', '')
+        if not gateway.is_configured() or not gateway.valid_signature(request.body, signature):
+            return Response(status=status.HTTP_401_UNAUTHORIZED)
+        event = request.data or {}
+        if event.get('event') == 'charge.success':
+            reference = event.get('data', {}).get('reference', '')
+            try:
+                payment = Payment.objects.select_related('application').get(payment_reference=reference)
+                gateway.mark_paid(payment, amount=(event['data'].get('amount', 0) / 100))
+            except Payment.DoesNotExist:
+                pass
+        return Response({'status': 'ok'})

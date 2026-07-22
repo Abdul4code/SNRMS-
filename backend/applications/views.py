@@ -871,3 +871,73 @@ class ApplicationStatusHistoryView(generics.ListAPIView):
             from rest_framework.exceptions import NotFound
             raise NotFound('Application not found.')
         return StatusHistory.objects.filter(application=application).select_related('changed_by')
+
+
+class DuplicateCheckView(APIView):
+    """POST /applications/check-duplicate/ — check a proposed street name for duplicates."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from .duplicate import check_duplicate
+        name = (request.data.get('name') or '').strip()
+        if not name:
+            return Response({'detail': 'name is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        report = check_duplicate(
+            name=name,
+            locality=request.data.get('locality'),
+            latitude=request.data.get('latitude'),
+            longitude=request.data.get('longitude'),
+        )
+        return Response(report)
+
+
+class AdminApplicationRegistryView(APIView):
+    """GET /applications/registry/ — full applicant database for admins.
+
+    Returns every application with applicant name, email, phone, locality,
+    status, fees paid and payment references. Staff only.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        role = getattr(request.user, 'role', None)
+        if role not in ('finance', 'naming_committee', 'committee_chairman'):
+            return Response({'detail': 'Not available.'}, status=status.HTTP_403_FORBIDDEN)
+
+        from payments.models import Payment, PaymentStatus
+        qs = (Application.objects.select_related('applicant', 'street_type')
+              .prefetch_related('payments').order_by('-created_at'))
+        search = request.query_params.get('search', '').strip()
+        if search:
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(proposed_street_name__icontains=search)
+                | Q(applicant__email__icontains=search)
+                | Q(applicant__first_name__icontains=search)
+                | Q(applicant__last_name__icontains=search)
+                | Q(reference_number__icontains=search)
+            )
+        rows = []
+        for a in qs[:1000]:
+            pays = list(a.payments.all())
+            confirmed = [p for p in pays if p.status == PaymentStatus.CONFIRMED]
+            rows.append({
+                'id': str(a.id),
+                'reference_number': a.reference_number or '',
+                'proposed_street_name': a.proposed_street_name,
+                'street_type': a.street_type.name if a.street_type else '',
+                'status': a.status,
+                'ward': a.get_ward_display(),
+                'locality': a.locality or '',
+                'applicant_name': f'{a.applicant.first_name} {a.applicant.last_name}'.strip() if a.applicant else '',
+                'applicant_email': a.applicant.email if a.applicant else '',
+                'applicant_phone': getattr(a.applicant, 'phone', '') if a.applicant else '',
+                'created_at': a.created_at,
+                'expires_at': a.expires_at,
+                'total_paid': sum(float(p.amount_submitted or 0) for p in confirmed),
+                'payment_refs': [
+                    {'stage': p.stage, 'reference': p.payment_reference or '', 'status': p.status}
+                    for p in pays
+                ],
+            })
+        return Response({'count': len(rows), 'results': rows})

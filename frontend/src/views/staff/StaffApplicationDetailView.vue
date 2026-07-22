@@ -106,6 +106,30 @@
                   :street-name="application.proposed_street_name"
                   :proposed-street-name="application.proposed_street_name"
                 />
+                <!-- External views + duplicate check -->
+                <div v-if="coords" class="mt-3 flex flex-wrap gap-2">
+                  <a :href="streetViewUrl" target="_blank" rel="noopener"
+                     class="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white" style="background:#059669">
+                    Open Street View
+                  </a>
+                  <a :href="mapsUrl" target="_blank" rel="noopener"
+                     class="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 border border-slate-200 hover:bg-slate-50">
+                    Open in Google Maps
+                  </a>
+                  <span v-if="application.locality" class="inline-flex items-center text-xs text-slate-500 px-2">Locality: <span class="font-semibold text-slate-700 ml-1">{{ application.locality }}</span></span>
+                </div>
+                <!-- Duplicate check verdict for reviewers -->
+                <div v-if="dupReport" class="mt-3 rounded-xl p-3 text-xs"
+                     :style="dupReport.verdict === 'duplicate' ? 'background:#fee2e2' : dupReport.verdict === 'possible' ? 'background:#fef3c7' : 'background:#dcfce7'">
+                  <p class="font-bold" :style="dupReport.verdict === 'duplicate' ? 'color:#b91c1c' : dupReport.verdict === 'possible' ? 'color:#b45309' : 'color:#059669'">
+                    {{ dupReport.verdict === 'duplicate' ? '⚠ Name already exists in the registry' : dupReport.verdict === 'possible' ? 'Name exists in another locality' : '✓ No existing street with this name' }}
+                  </p>
+                  <ul v-if="dupReport.name_matches.length" class="mt-1 space-y-0.5 text-slate-600">
+                    <li v-for="m in dupReport.name_matches.slice(0,4)" :key="m.code">
+                      • {{ m.name }} <span class="font-mono text-slate-400">{{ m.code }}</span><span v-if="m.locality"> — {{ m.locality }}</span><span v-if="m.distance_m != null"> ({{ m.distance_m }}m)</span>
+                    </li>
+                  </ul>
+                </div>
               </div>
             </div>
 
@@ -538,6 +562,9 @@ interface Application {
   street_type?: string
   street_type_name?: string
   ward_display?: string
+  locality?: string
+  latitude?: string
+  longitude?: string
   lga_area?: string
   location_description: string
   status: string
@@ -587,6 +614,22 @@ const actionSuccess = ref('')
 
 const financeForm = ref({ decision: '', finance_remarks: '' })
 const committeeForm = ref({ decision: '', remarks: '' })
+
+// Location coordinates (from structured fields or parsed from the description)
+const coords = computed<{ lat: number; lng: number } | null>(() => {
+  const a = application.value as (Application & { latitude?: string; longitude?: string; location_description?: string }) | null
+  if (!a) return null
+  if (a.latitude && a.longitude) return { lat: Number(a.latitude), lng: Number(a.longitude) }
+  const m = (a.location_description || '').match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/)
+  return m ? { lat: Number(m[1]), lng: Number(m[2]) } : null
+})
+const streetViewUrl = computed(() =>
+  coords.value ? `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${coords.value.lat},${coords.value.lng}` : '#')
+const mapsUrl = computed(() =>
+  coords.value ? `https://www.google.com/maps/search/?api=1&query=${coords.value.lat},${coords.value.lng}` : '#')
+
+interface DupMatch { code: string; name: string; locality: string; distance_m: number | null }
+const dupReport = ref<{ verdict: string; name_matches: DupMatch[] } | null>(null)
 const chairmanForm = ref({ decision: '', remarks: '' })
 const certFile = ref<File | null>(null)
 const certExpiresAt = ref('')
@@ -654,6 +697,19 @@ async function load() {
     documents.value = Array.isArray(docRes.data) ? docRes.data : docRes.data.results ?? []
     payments.value = Array.isArray(payRes.data) ? payRes.data : payRes.data.results ?? []
     history.value = Array.isArray(histRes.data) ? histRes.data : histRes.data.results ?? []
+    // Duplicate check for reviewers
+    if (application.value) {
+      const a = application.value as Application & { locality?: string }
+      try {
+        const { data } = await applicationApi.checkDuplicate({
+          name: a.proposed_street_name,
+          locality: a.locality,
+          latitude: coords.value?.lat,
+          longitude: coords.value?.lng,
+        })
+        dupReport.value = data
+      } catch { dupReport.value = null }
+    }
   } finally {
     loading.value = false
   }

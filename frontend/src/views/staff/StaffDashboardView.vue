@@ -30,7 +30,28 @@
         </div>
       </div>
 
-      <!-- Finance: confirmed payment amounts by stage -->
+      <!-- Street registry metrics (all admin levels) -->
+      <div v-if="registrySummary" class="rounded-2xl p-5" style="background:#fff;border:1px solid #e2e8f0;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+        <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Street Registry</p>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div>
+            <p class="text-3xl font-bold tracking-tight text-slate-900">{{ registrySummary.total_buildings.toLocaleString() }}</p>
+            <p class="text-xs text-slate-500 mt-1 font-semibold uppercase tracking-wide">Buildings</p>
+          </div>
+          <div>
+            <p class="text-3xl font-bold tracking-tight" style="color:#059669">{{ registrySummary.named_streets.toLocaleString() }}</p>
+            <p class="text-xs text-slate-500 mt-1 font-semibold uppercase tracking-wide">Named streets</p>
+          </div>
+          <div>
+            <p class="text-3xl font-bold tracking-tight" style="color:#d97706">{{ registrySummary.unnamed_streets.toLocaleString() }}</p>
+            <p class="text-xs text-slate-500 mt-1 font-semibold uppercase tracking-wide">Unnamed streets</p>
+          </div>
+          <div>
+            <p class="text-3xl font-bold tracking-tight text-slate-900">{{ registrySummary.renaming_in_progress.toLocaleString() }}</p>
+            <p class="text-xs text-slate-500 mt-1 font-semibold uppercase tracking-wide">Naming in progress</p>
+          </div>
+        </div>
+      </div>
       <div v-if="auth.isFinance || auth.isChairman" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div class="rounded-2xl p-6"
              style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06)">
@@ -280,7 +301,7 @@
 import { ref, computed, reactive, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { ChevronRightIcon, CheckCircleIcon, UserGroupIcon, BanknotesIcon } from '@heroicons/vue/24/outline'
-import { applicationApi, paymentApi } from '@/services/api'
+import { applicationApi, paymentApi, configApi } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import StatusBadge from '@/components/StatusBadge.vue'
 
@@ -297,6 +318,9 @@ interface Application {
 }
 
 const auth = useAuthStore()
+
+interface RegistrySummary { total_buildings: number; named_streets: number; unnamed_streets: number; renaming_in_progress: number }
+const registrySummary = ref<RegistrySummary | null>(null)
 
 // Pending actions for this role (loaded with server-side status filter)
 const pendingApps = ref<Application[]>([])
@@ -478,6 +502,7 @@ async function loadRoleStats() {
 
 onMounted(async () => {
   loadingApps.value = true
+  configApi.getStreetSummary().then(r => { registrySummary.value = r.data }).catch(() => {})
   try {
     const role = auth.user?.role ?? ''
     const myPendingStatuses = ROLE_PENDING_STATUSES[role] ?? []

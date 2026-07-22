@@ -39,7 +39,7 @@
             </div>
             <div>
               <h2 class="text-sm font-bold text-slate-900">{{ stageLabel }} — Fee Breakdown</h2>
-              <p class="text-xs text-slate-500 mt-0">Pay at any bank branch and submit your teller below</p>
+              <p class="text-xs text-slate-500 mt-0">Pay securely online by card, bank transfer or USSD</p>
             </div>
           </div>
           <div class="px-5 py-4">
@@ -135,106 +135,33 @@
           </div>
         </div>
 
-        <!-- Payment submission form — only if there's a pending/rejected payment record -->
+        <!-- Pay online (gateway) — shown when a payment is due -->
         <div v-if="pendingPayment" class="rounded-2xl overflow-hidden"
-             style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06)">
-          <div class="px-6 py-5" style="border-bottom: 1px solid #f1f5f9">
-            <h2 class="text-sm font-bold text-slate-900">
-              {{ rejectedPayment ? 'Re-submit Payment Evidence' : 'Submit Payment Evidence' }}
-            </h2>
-            <p class="text-xs text-slate-500 mt-0.5">Enter the details from your bank teller or payment receipt</p>
-          </div>
-
-          <transition enter-active-class="transition duration-200 ease-out"
-                      enter-from-class="opacity-0 -translate-y-1" enter-to-class="opacity-100 translate-y-0">
-            <div v-if="errorMsg" class="mx-5 mt-5 flex items-start gap-3 rounded-xl border border-red-100 bg-red-50 p-3.5">
-              <svg class="w-4 h-4 mt-0.5 flex-shrink-0 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
-              </svg>
-              <p class="text-sm text-red-700">{{ errorMsg }}</p>
-            </div>
-          </transition>
-          <transition enter-active-class="transition duration-200 ease-out"
-                      enter-from-class="opacity-0 -translate-y-1" enter-to-class="opacity-100 translate-y-0">
-            <div v-if="successMsg" class="mx-5 mt-5 flex items-start gap-3 rounded-xl border border-emerald-100 bg-emerald-50 p-3.5">
-              <svg class="w-4 h-4 mt-0.5 flex-shrink-0 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"/>
-              </svg>
-              <p class="text-sm text-emerald-700">{{ successMsg }}</p>
-            </div>
-          </transition>
-
-          <form @submit.prevent="handlePaymentSubmit" class="px-5 py-5 space-y-4" novalidate>
-            <div>
-              <label class="block text-sm font-semibold text-slate-700 mb-1.5">
-                Payment Reference / Teller No. <span class="text-red-500">*</span>
-              </label>
-              <input v-model="form.payment_reference" type="text" required
-                     placeholder="e.g. TL20240517001"
-                     class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-mono text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:bg-white transition-all"/>
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-semibold text-slate-700 mb-1.5">
-                  Bank Name <span class="text-red-500">*</span>
-                </label>
-                <input v-model="form.bank_name" type="text" required placeholder="e.g. Access Bank"
-                       class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:bg-white transition-all"/>
-              </div>
-              <div>
-                <label class="block text-sm font-semibold text-slate-700 mb-1.5">
-                  Payment Date <span class="text-red-500">*</span>
-                </label>
-                <input v-model="form.payment_date" type="date" required
-                       class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:bg-white transition-all"/>
-              </div>
-            </div>
-            <div>
-              <label class="block text-sm font-semibold text-slate-700 mb-1.5">
-                Amount Paid (₦) <span class="text-red-500">*</span>
-              </label>
-              <div class="relative">
-                <span class="absolute inset-y-0 left-4 flex items-center text-slate-500 font-semibold text-sm pointer-events-none">₦</span>
-                <input v-model="form.amount_submitted" type="text" inputmode="decimal" required placeholder="0.00"
-                       @keydown="filterMoneyKey"
-                       @paste="(e) => pasteMoneyAmount(e, form, 'amount_submitted')"
-                       class="block w-full rounded-xl border border-slate-200 bg-slate-50 pl-8 pr-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:bg-white transition-all"/>
-              </div>
-              <p v-if="feeTotal" class="mt-1.5 text-xs text-slate-500">
-                Expected amount: <span class="font-semibold text-slate-700">₦{{ formatAmount(feeTotal) }}</span>
-              </p>
-            </div>
-            <div>
-              <label class="block text-sm font-semibold text-slate-700 mb-1.5">
-                Receipt / Teller Upload <span class="text-slate-400 font-normal text-xs">(optional)</span>
-              </label>
-              <label class="flex items-center gap-3 p-4 rounded-xl border-2 border-dashed cursor-pointer transition-colors"
-                     :class="receiptFile ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 hover:border-slate-300 bg-slate-50'">
-                <ArrowUpTrayIcon class="w-5 h-5 flex-shrink-0"
-                                 :class="receiptFile ? 'text-emerald-500' : 'text-slate-400'" />
-                <div>
-                  <p class="text-sm font-medium text-slate-700">
-                    {{ receiptFile ? receiptFile.name : 'Click to attach receipt' }}
-                  </p>
-                  <p v-if="receiptFile" class="text-xs text-slate-500">{{ (receiptFile.size / 1024).toFixed(1) }} KB</p>
-                  <p v-else class="text-xs text-slate-400 mt-0.5">PDF, JPG, PNG</p>
-                </div>
-                <input type="file" class="hidden" accept=".pdf,.jpg,.jpeg,.png" @change="onFileChange" />
-              </label>
-            </div>
-
-            <button type="submit"
-                    :disabled="submitting || !form.payment_reference || !form.bank_name || !form.payment_date || !form.amount_submitted"
-                    class="flex items-center justify-center gap-2 w-full px-5 py-3.5 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                    style="background: linear-gradient(135deg, #059669, #047857); box-shadow: 0 4px 16px rgba(5,150,105,0.3)">
-              <svg v-if="submitting" class="animate-spin w-4 h-4 opacity-80" viewBox="0 0 24 24" fill="none">
+             style="background: #0f172a; box-shadow: 0 2px 8px rgba(0,0,0,0.06)">
+          <div class="px-6 py-5">
+            <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1">Fastest option</p>
+            <h2 class="text-white text-sm font-bold">Pay online</h2>
+            <p class="text-slate-400 text-xs mt-0.5">
+              Pay by card, bank transfer or USSD. Your application advances automatically once payment succeeds — no waiting for manual confirmation.
+            </p>
+            <div v-if="onlineError" class="mt-3 text-xs text-red-300">{{ onlineError }}</div>
+            <button
+              @click="payOnline"
+              :disabled="onlineBusy"
+              class="mt-4 inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+              style="background:#059669">
+              <svg v-if="onlineBusy" class="animate-spin w-4 h-4 opacity-80" viewBox="0 0 24 24" fill="none">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
               </svg>
-              {{ submitting ? 'Submitting…' : 'Submit Payment Evidence' }}
+              {{ onlineBusy ? 'Processing…' : `Pay ₦${formatAmount(pendingPayment.amount_expected)} online` }}
             </button>
-          </form>
+            <p v-if="demoMode" class="text-[11px] text-slate-500 mt-2">
+              Demo mode (no live gateway configured): clicking simulates a successful payment.
+            </p>
+          </div>
         </div>
+
 
         <!-- Back to application after teller submitted -->
         <div v-if="tellerSubmitted" class="rounded-2xl overflow-hidden"
@@ -291,6 +218,7 @@ interface PaymentRecord {
   payment_date?: string
   status: string
   amount_submitted?: number
+  amount_expected: number
   finance_remarks?: string
 }
 
@@ -305,6 +233,9 @@ const pendingPayment = ref<PaymentRecord | null>(null)
 const rejectedPayment = computed(() => payments.value.find(p => p.status === 'rejected') ?? null)
 const submitting = ref(false)
 const tellerSubmitted = ref(false)
+const onlineBusy = ref(false)
+const onlineError = ref('')
+const demoMode = ref(false)
 const errorMsg = ref('')
 const successMsg = ref('')
 const receiptFile = ref<File | null>(null)
@@ -437,5 +368,45 @@ async function loadData() {
   }
 }
 
-onMounted(loadData)
+async function payOnline() {
+  if (!pendingPayment.value) return
+  onlineError.value = ''
+  onlineBusy.value = true
+  try {
+    const { data } = await paymentApi.initializePayment(pendingPayment.value.id, window.location.href.split('?')[0])
+    if (data.mode === 'paystack' && data.authorization_url) {
+      // Redirect to Paystack checkout; on return, ?reference= is verified on mount.
+      window.location.href = data.authorization_url
+      return
+    }
+    // Demo mode — no live gateway configured: simulate a successful payment.
+    demoMode.value = true
+    await paymentApi.simulatePayment(pendingPayment.value.id)
+    await loadData()
+    tellerSubmitted.value = true
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { detail?: string } } }
+    onlineError.value = err.response?.data?.detail || 'Could not start online payment. Please try again.'
+  } finally {
+    onlineBusy.value = false
+  }
+}
+
+onMounted(async () => {
+  await loadData()
+  // If we returned from Paystack checkout, verify the transaction.
+  const reference = (route.query.reference || route.query.trxref) as string | undefined
+  if (reference) {
+    onlineBusy.value = true
+    try {
+      await paymentApi.verifyPayment(reference)
+      await loadData()
+      tellerSubmitted.value = true
+    } catch {
+      onlineError.value = 'We could not confirm that payment. If you were debited, please contact the council.'
+    } finally {
+      onlineBusy.value = false
+    }
+  }
+})
 </script>

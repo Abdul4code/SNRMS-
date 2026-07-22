@@ -66,6 +66,24 @@ const router = createRouter({
 
     // ── Common authenticated ─────────────────────────────────────────────────
     {
+      path: '/admin/applications-database',
+      name: 'applications-database',
+      component: () => import('@/views/admin/ApplicationsDatabaseView.vue'),
+      meta: { requiresAuth: true, roles: ['finance', 'naming_committee', 'committee_chairman'] },
+    },
+    {
+      path: '/admin/streets',
+      name: 'manage-streets',
+      component: () => import('@/views/admin/StreetManagementView.vue'),
+      meta: { requiresAuth: true, roles: ['naming_committee', 'committee_chairman'] },
+    },
+    {
+      path: '/registry',
+      name: 'street-registry',
+      component: () => import('@/views/StreetRegistryView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/notifications',
       name: 'notifications',
       component: () => import('@/views/NotificationsView.vue'),

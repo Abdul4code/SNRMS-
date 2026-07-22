@@ -2,6 +2,10 @@ from django.urls import path
 
 from .views import (
     ApplicationPaymentsView,
+    InitializePaymentView,
+    VerifyPaymentView,
+    SimulatePaymentView,
+    PaystackWebhookView,
     ConfirmPaymentView,
     FeeBreakdownView,
     FeeConfigListView,
@@ -39,6 +43,12 @@ urlpatterns = [
         ConfirmPaymentView.as_view(),
         name='payment-confirm',
     ),
+
+    # Online payment gateway
+    path('<uuid:pk>/initialize/', InitializePaymentView.as_view(), name='payment-initialize'),
+    path('<uuid:pk>/simulate/', SimulatePaymentView.as_view(), name='payment-simulate'),
+    path('verify/', VerifyPaymentView.as_view(), name='payment-verify'),
+    path('paystack/webhook/', PaystackWebhookView.as_view(), name='paystack-webhook'),
 
     # Payment stats (finance/chairman)
     path(

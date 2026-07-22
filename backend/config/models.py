@@ -161,6 +161,10 @@ class BuildingSurvey(models.Model):
     land_size = models.CharField(max_length=100, blank=True)
     photo_url = models.URLField(max_length=500, blank=True)
 
+    street = models.ForeignKey(
+        'config.Street', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='buildings',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -169,3 +173,49 @@ class BuildingSurvey(models.Model):
 
     def __str__(self):
         return f'{self.proposed_auto_number} {self.proposed_street_name} ({self.locality})'
+
+
+class Street(models.Model):
+    """Canonical, de-duplicated street in the LGA registry.
+
+    Built from surveyed buildings: many free-text/misspelled variants collapse
+    into one Street here, giving a single trackable record per street.
+    """
+    class RegistrationStatus(models.TextChoices):
+        SURVEYED = 'surveyed', 'Surveyed (named, not yet registered)'
+        REGISTERED = 'registered', 'Registered'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=200)
+    normalized_key = models.CharField(max_length=200, unique=True, db_index=True)
+    code = models.CharField(max_length=20, unique=True)
+    street_type = models.ForeignKey(
+        StreetType, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='streets',
+    )
+    ward = models.CharField(max_length=100, blank=True)
+    locality = models.CharField(max_length=200, blank=True)
+    building_count = models.PositiveIntegerField(default=0)
+    name_variants = models.PositiveIntegerField(default=1, help_text='How many raw spellings merged into this street')
+    latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    # Authoritative digitised centre-line (GeoJSON LineString geometry, stored as JSON text).
+    geometry = models.TextField(blank=True, default='')
+    SOURCE_SURVEY = 'survey'
+    SOURCE_DIGITISED = 'digitised'
+    source = models.CharField(
+        max_length=20, default=SOURCE_SURVEY,
+        choices=[(SOURCE_SURVEY, 'Auto (from survey points)'), (SOURCE_DIGITISED, 'Digitised (ground-truth)')],
+    )
+    registration_status = models.CharField(
+        max_length=20, choices=RegistrationStatus.choices,
+        default=RegistrationStatus.SURVEYED,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'streets'
+        ordering = ['name']
+
+    def __str__(self):
+        return f'{self.code} — {self.name}'

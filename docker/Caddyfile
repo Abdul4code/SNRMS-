@@ -1,0 +1,27 @@
+{$DOMAIN} {
+    encode gzip
+
+    # API, Django admin and its static assets go to the backend
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
+    handle /admin/* {
+        reverse_proxy backend:8000
+    }
+    handle /static/* {
+        reverse_proxy backend:8000
+    }
+
+    # Uploaded files (receipts, certificates)
+    handle /media/* {
+        root * /srv
+        file_server
+    }
+
+    # Everything else = the Vue single-page app
+    handle {
+        root * /srv
+        try_files {path} /index.html
+        file_server
+    }
+}

@@ -24,22 +24,48 @@ STREET_TYPES = [
     ('Rise',       'RISE'),
     ('Grove',      'GRV'),
     ('Mews',       'MEWS'),
+    # Specialized / specialized road types
+    ('Parkway',    'PKWY'),
+    ('Esplanade',  'ESP'),
+    ('Circus',     'CIR'),
+    ('Plaza',      'PLZ'),
 ]
 
-# Street name fee amounts per street type (others default to 30000)
+# Street-name (Stage C) fee per street type — official Ibeju-Lekki LGA schedule.
+# Specialized types not on the official sheet default to 1,000,000 (marked TODO).
 STREET_NAME_FEE_OVERRIDES = {
-    'Road':    50000,
-    'Street':  40000,
-    'Close':   35000,
-    'Avenue':  60000,
+    'Court':     1500000,
+    'Crescent':  1000000,
+    'Way':       2000000,
+    'Close':     1500000,
+    'Street':     500000,
+    'Road':       700000,
+    'Avenue':    1000000,
+    'Boulevard': 2000000,
+    'Lane':      2000000,
+    'Drive':      500000,
+    # --- Specialized types: no official fee supplied; placeholder pending LGA confirmation ---
+    'Parkway':   1000000,
+    'Esplanade': 1000000,
+    'Circus':    1000000,
+    'Plaza':     1000000,
+    'Mews':      1000000,
+    'Terrace':   1000000,
+    'Place':     1000000,
+    'Gardens':   1000000,
+    'Rise':      1000000,
+    'Grove':     1000000,
 }
 
-# Flat fee components (component_value, amount)
+# Default street-name fee for any type not explicitly listed above.
+DEFAULT_STREET_NAME_FEE = 1000000
+
+# Stage A flat fee components — non-refundable, per the reviewed SNRMS workflow.
 FLAT_FEES = [
-    (FeeComponent.APPLICATION_FEE,          5000),
-    (FeeComponent.INSPECTION_FEE,          10000),
-    (FeeComponent.RADIO_TV_TAX,             2000),
-    (FeeComponent.COMMITTEE_VERIFICATION_FEE, 8000),
+    (FeeComponent.APPLICATION_FEE,           50000),   # ₦50,000 application fee
+    (FeeComponent.INSPECTION_FEE,            50000),   # ₦50,000 inspection fee
+    (FeeComponent.RADIO_TV_TAX,              10000),   # ₦10,000 Radio & TV tax
+    (FeeComponent.COMMITTEE_VERIFICATION_FEE, 100000), # ₦100,000 committee verification fee
     (FeeComponent.SIGNPOST_INSTALLATION_FEE, 25000),
     (FeeComponent.MAP_UPLOAD_FEE,           5000),
     (FeeComponent.RENEWAL_FEE,             20000),
@@ -98,7 +124,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.MIGRATE_HEADING('=== Seeding street name fees ==='))
 
         for name, street_type_obj in street_type_objects.items():
-            amount = STREET_NAME_FEE_OVERRIDES.get(name, 30000)
+            amount = STREET_NAME_FEE_OVERRIDES.get(name, DEFAULT_STREET_NAME_FEE)
             obj, created = FeeConfiguration.objects.get_or_create(
                 component=FeeComponent.STREET_NAME_FEE,
                 street_type=street_type_obj,
@@ -125,7 +151,12 @@ class Command(BaseCommand):
         # ------------------------------------------------------------------
         self.stdout.write(self.style.MIGRATE_HEADING('=== Seeding building survey data ==='))
 
-        csv_path = Path(__file__).resolve().parents[4] / 'Street_Naming_and_Auto_House_Numbering.csv'
+        from django.conf import settings as _settings
+        candidate_paths = [
+            Path(_settings.BASE_DIR) / 'Street_Naming_and_Auto_House_Numbering.csv',
+            Path(__file__).resolve().parents[4] / 'Street_Naming_and_Auto_House_Numbering.csv',
+        ]
+        csv_path = next((p for p in candidate_paths if p.exists()), candidate_paths[0])
         if not csv_path.exists():
             self.stdout.write(self.style.WARNING(f'CSV not found at {csv_path}, skipping survey seed.'))
             return

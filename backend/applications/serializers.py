@@ -4,6 +4,32 @@ from accounts.serializers import UserSerializer
 from .models import Application, ApplicationStatus, StatusHistory, Ward
 
 
+
+# Street-type words (and common abbreviations) that applicants often type at the
+# end of the name. The selected Street Type already covers this, so it is
+# stripped internally to keep the registry clean and duplicate checks accurate.
+_TYPE_SUFFIXES = {
+    'street', 'st', 'str', 'streeet', 'road', 'rd', 'close', 'cl', 'avenue', 'ave', 'av',
+    'crescent', 'cres', 'cresent', 'cr', 'drive', 'dr', 'lane', 'ln', 'way',
+    'boulevard', 'blvd', 'court', 'ct', 'place', 'pl', 'terrace', 'ter',
+    'gardens', 'garden', 'gdns', 'rise', 'grove', 'grv', 'mews', 'parkway',
+    'pkwy', 'esplanade', 'circus', 'plaza', 'mall',
+}
+
+
+def strip_street_type_suffix(name: str) -> str:
+    """Remove a trailing street-type word: "Ajose Street" -> "Ajose"."""
+    import re as _re
+    cleaned = _re.sub(r'\s+', ' ', (name or '').strip())
+    while True:
+        parts = cleaned.split()
+        if len(parts) >= 2 and parts[-1].lower().strip('.,') in _TYPE_SUFFIXES:
+            cleaned = ' '.join(parts[:-1]).strip()
+            continue
+        break
+    return cleaned or (name or '').strip()
+
+
 class StatusHistorySerializer(serializers.ModelSerializer):
     changed_by = serializers.SerializerMethodField()
 
@@ -94,6 +120,9 @@ class ApplicationDetailSerializer(serializers.ModelSerializer):
             'location_description',
             'ward',
             'ward_display',
+            'locality',
+            'latitude',
+            'longitude',
             'lga_area',
             'status',
             'is_legacy',
@@ -151,11 +180,17 @@ class ApplicationCreateSerializer(serializers.ModelSerializer):
             'street_type',
             'location_description',
             'ward',
+            'locality',
+            'latitude',
+            'longitude',
             'lga_area',
             'is_legacy',
             'legacy_certificate',
         ]
         read_only_fields = ['id']
+
+    def validate_proposed_street_name(self, value):
+        return strip_street_type_suffix(value)
 
     def validate(self, attrs):
         if attrs.get('is_legacy') and not attrs.get('legacy_certificate'):
@@ -178,8 +213,14 @@ class ApplicationUpdateSerializer(serializers.ModelSerializer):
             'street_type',
             'location_description',
             'ward',
+            'locality',
+            'latitude',
+            'longitude',
             'lga_area',
         ]
+
+    def validate_proposed_street_name(self, value):
+        return strip_street_type_suffix(value)
 
     def validate(self, attrs):
         instance = self.instance

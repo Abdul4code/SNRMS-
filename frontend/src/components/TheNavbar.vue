@@ -34,9 +34,14 @@
               <NavLink to="/admin/street-types">Street Types</NavLink>
               <NavLink to="/admin/renewal-settings">Renewal Settings</NavLink>
             </template>
+            <template v-if="auth.isNamingCommittee || auth.isChairman">
+              <NavLink to="/admin/streets">Manage Streets</NavLink>
+            </template>
             <template v-if="auth.isFinance">
               <NavLink to="/admin/fees">Fee Config</NavLink>
             </template>
+            <NavLink v-if="auth.isStaff" to="/admin/applications-database">Database</NavLink>
+            <NavLink to="/registry">Street Map</NavLink>
           </div>
         </div>
 
@@ -156,6 +161,7 @@
 
         <!-- Nav links -->
         <div class="px-3 pt-3 space-y-0.5">
+          <MobileLink to="/registry" @click="mobileOpen = false">Street Map</MobileLink>
           <template v-if="auth.isApplicant">
             <MobileLink to="/applications" @click="mobileOpen = false">My Applications</MobileLink>
           </template>
@@ -212,9 +218,9 @@ const mobileOpen = ref(false)
 const roleLabel = computed(() => {
   const map: Record<string, string> = {
     applicant: 'Applicant',
-    finance: 'Finance',
-    naming_committee: 'Committee',
-    committee_chairman: 'Chairman',
+    finance: 'Council Treasurer',
+    naming_committee: 'Street Naming Committee',
+    committee_chairman: 'Local Government Chairman',
   }
   return map[auth.user?.role ?? ''] ?? auth.user?.role ?? ''
 })
@@ -222,7 +228,7 @@ const roleLabel = computed(() => {
 const initials = computed(() => {
   const u = auth.user
   if (!u) return '?'
-  if (u.first_name && u.last_name) return (u.first_name[0] + u.last_name[0]).toUpperCase()
+  if (u.first_name && u.last_name) return ((u.first_name[0] ?? "") + (u.last_name[0] ?? "")).toUpperCase()
   return (u.email?.[0] ?? '?').toUpperCase()
 })
 

@@ -2,7 +2,7 @@ from urllib.parse import quote
 
 from rest_framework import serializers
 
-from config.models import BuildingSurvey, RenewalSettings, StreetType
+from config.models import BuildingSurvey, RenewalSettings, Street, StreetType
 
 
 class StreetTypeSerializer(serializers.ModelSerializer):
@@ -55,6 +55,16 @@ class RenewalSettingsSerializer(serializers.ModelSerializer):
 
 class BuildingSurveyMapSerializer(serializers.ModelSerializer):
     photo_url = serializers.SerializerMethodField()
+    is_named = serializers.SerializerMethodField()
+    street_code = serializers.CharField(source='street.code', default='', read_only=True)
+    street_name = serializers.CharField(source='street.name', default='', read_only=True)
+
+    # Placeholder values enumerators used to mean "no name".
+    _UNNAMED_TOKENS = {'', 'none', 'na', 'n/a', 'nil', 'null', 'no', 'nan', '-', '.'}
+
+    def get_is_named(self, obj):
+        val = (obj.existing_street_name or '').strip().lower()
+        return val not in self._UNNAMED_TOKENS
 
     class Meta:
         model = BuildingSurvey
@@ -62,6 +72,10 @@ class BuildingSurveyMapSerializer(serializers.ModelSerializer):
             'kobo_id',
             'latitude',
             'longitude',
+            'existing_street_name',
+            'is_named',
+            'street_code',
+            'street_name',
             'proposed_street_name',
             'proposed_auto_number',
             'building_use',
@@ -82,3 +96,15 @@ class BuildingSurveyMapSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         proxy = f'/api/config/building-surveys/photo/?url={quote(obj.photo_url, safe="")}'
         return request.build_absolute_uri(proxy) if request else proxy
+
+
+class StreetSerializer(serializers.ModelSerializer):
+    street_type_name = serializers.CharField(source='street_type.name', default='', read_only=True)
+
+    class Meta:
+        model = Street
+        fields = [
+            'id', 'name', 'code', 'street_type_name', 'ward', 'locality',
+            'building_count', 'name_variants', 'registration_status',
+            'source', 'geometry',
+        ]

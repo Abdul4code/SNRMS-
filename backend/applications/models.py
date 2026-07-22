@@ -99,6 +99,9 @@ class Application(models.Model):
     location_description = models.TextField()
     ward = models.CharField(max_length=20, choices=Ward.choices, default=Ward.WARD_A)
     lga_area = models.CharField(max_length=200, default='Ibeju-Lekki')
+    locality = models.CharField(max_length=200, blank=True, help_text='Town/estate/community — a finer check than ward')
+    latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
     status = models.CharField(
         max_length=50, choices=ApplicationStatus.choices,
         default=ApplicationStatus.DRAFT

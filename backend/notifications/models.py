@@ -41,3 +41,29 @@ class Notification(models.Model):
 
     def __str__(self):
         return f'{self.title} -> {self.recipient.email}'
+
+
+class ReminderStage(models.TextChoices):
+    APPLICATION_DUE = 'application_due', 'Application payment/action due'
+    EXPIRY_3_MONTHS = 'expiry_3_months', '3 months before expiry'
+    EXPIRY_1_MONTH = 'expiry_1_month', '1 month before expiry'
+    EXPIRY_DUE = 'expiry_due', 'On expiry date'
+    GRACE_START = 'grace_start', 'Grace period started (day after expiry)'
+    GRACE_REMINDER = 'grace_reminder', 'Grace period reminder (days left)'
+
+
+class ReminderLog(models.Model):
+    """One row per (application, stage) so a reminder is never sent twice."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    application = models.ForeignKey(
+        'applications.Application', on_delete=models.CASCADE, related_name='reminder_logs')
+    stage = models.CharField(max_length=32, choices=ReminderStage.choices)
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'reminder_logs'
+        unique_together = ('application', 'stage')
+        ordering = ['-sent_at']
+
+    def __str__(self):
+        return f'{self.stage} -> {self.application_id}'

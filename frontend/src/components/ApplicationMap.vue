@@ -419,8 +419,8 @@ const coords = computed<[number, number] | null>(() => {
   if (!raw) return null
   const match = raw.match(/^(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)$/)
   if (!match) return null
-  const lat = parseFloat(match[1])
-  const lng = parseFloat(match[2])
+  const lat = parseFloat(match[1]!)
+  const lng = parseFloat(match[2]!)
   if (isNaN(lat) || isNaN(lng)) return null
   return [lat, lng]
 })

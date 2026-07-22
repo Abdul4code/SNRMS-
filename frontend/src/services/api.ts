@@ -1,7 +1,7 @@
 import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios'
 
 const api: AxiosInstance = axios.create({
-  baseURL: 'http://localhost:8000/api/',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/',
   headers: { 'Content-Type': 'application/json' },
 })
 
@@ -58,7 +58,8 @@ api.interceptors.response.use(
       isRefreshing = true
 
       try {
-        const { data } = await axios.post('http://localhost:8000/api/auth/token/refresh/', {
+        const { data } = await axios.post(
+          (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/') + 'auth/token/refresh/', {
           refresh: refreshToken,
         })
         const newAccess = data.access
@@ -116,6 +117,10 @@ export const applicationApi = {
     api.post('/applications/', data, {
       headers: data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {},
     }),
+  checkDuplicate: (data: Record<string, unknown>) =>
+    api.post('/applications/check-duplicate/', data),
+  getRegistry: (params?: Record<string, unknown>) =>
+    api.get('/applications/registry/', { params }),
   update: (id: number | string, data: Record<string, unknown>) =>
     api.patch(`/applications/${id}/`, data),
   submit: (id: number | string) =>
@@ -169,6 +174,12 @@ export const paymentApi = {
       headers:
         data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {},
     }),
+  initializePayment: (paymentId: number | string, callbackUrl?: string) =>
+    api.post(`/payments/${paymentId}/initialize/`, { callback_url: callbackUrl }),
+  simulatePayment: (paymentId: number | string) =>
+    api.post(`/payments/${paymentId}/simulate/`, {}),
+  verifyPayment: (reference: string) =>
+    api.get('/payments/verify/', { params: { reference } }),
   confirmPayment: (paymentId: number | string, data: Record<string, unknown>) =>
     api.post(`/payments/${paymentId}/confirm/`, data),
   listFeeConfig: () =>
@@ -205,6 +216,18 @@ export const configApi = {
     api.patch(`/config/street-types/${id}/`, data),
   getBuildingSurveys: () =>
     api.get('/config/building-surveys/'),
+  getStreets: (params?: Record<string, unknown>) =>
+    api.get('/config/streets/', { params }),
+  getStreetSummary: () =>
+    api.get('/config/streets/summary/'),
+  getStreetBuildings: (id: string) =>
+    api.get(`/config/streets/${id}/buildings/`),
+  mergeStreets: (targetId: string, sourceIds: string[]) =>
+    api.post('/config/streets/merge/', { target_id: targetId, source_ids: sourceIds }),
+  splitStreet: (id: string, name: string, buildingIds: number[], streetTypeId?: string) =>
+    api.post(`/config/streets/${id}/split/`, { name, building_ids: buildingIds, street_type_id: streetTypeId }),
+  updateStreet: (id: string, data: Record<string, unknown>) =>
+    api.patch(`/config/streets/${id}/update/`, data),
   getRenewalSettings: () =>
     api.get('/config/renewal-settings/'),
   updateRenewalSettings: (data: Record<string, unknown>) =>

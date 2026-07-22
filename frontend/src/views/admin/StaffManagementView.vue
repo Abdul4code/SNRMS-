@@ -198,9 +198,9 @@
                     <select v-model="newStaff.role" required
                             class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
                       <option value="">Select role…</option>
-                      <option value="finance">Finance Officer</option>
-                      <option value="naming_committee">Naming Committee</option>
-                      <option value="committee_chairman">Committee Chairman</option>
+                      <option value="committee_chairman">Local Government Chairman</option>
+                      <option value="finance">Council Treasurer</option>
+                      <option value="naming_committee">Street Naming Committee</option>
                     </select>
                   </div>
                   <div>

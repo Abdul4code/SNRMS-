@@ -48,6 +48,32 @@
                    placeholder="e.g. Chief Bola Tinubu Boulevard"
                    class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:bg-white transition-all"/>
             <p class="mt-1.5 text-xs text-slate-500">Enter the proposed name of the street </p>
+
+            <!-- Live duplicate check -->
+            <div v-if="dupChecking" class="mt-2 text-xs text-slate-400">Checking the registry for this name…</div>
+            <div v-else-if="dup && dup.verdict === 'duplicate'" class="mt-2 rounded-xl border border-red-200 bg-red-50 p-3">
+              <p class="text-sm font-bold text-red-700">This street name already exists.</p>
+              <p class="text-xs text-red-600 mt-0.5">
+                A street named "{{ form.proposed_street_name }}" is already in the registry{{ dup.name_matches[0]?.locality ? ' at ' + dup.name_matches[0].locality : '' }}. You cannot register a duplicate name.
+              </p>
+              <ul class="mt-1.5 space-y-0.5">
+                <li v-for="m in dup.name_matches.slice(0,3)" :key="m.code" class="text-xs text-red-600">
+                  • {{ m.name }} <span class="font-mono text-red-400">{{ m.code }}</span>
+                  <span v-if="m.locality"> — {{ m.locality }}</span>
+                  <span v-if="m.distance_m != null"> ({{ m.distance_m }}m away)</span>
+                </li>
+              </ul>
+            </div>
+            <div v-else-if="dup && dup.verdict === 'possible'" class="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+              <p class="text-sm font-bold text-amber-700">A street with this name exists elsewhere.</p>
+              <p class="text-xs text-amber-600 mt-0.5">
+                "{{ form.proposed_street_name }}" already exists in another locality. It may still be allowed here, but the committee will review carefully. Setting your locality helps confirm.
+              </p>
+            </div>
+            <div v-else-if="dup && dup.verdict === 'clear' && form.proposed_street_name.length >= 3" class="mt-2 text-xs font-medium" style="color:#059669">
+              ✓ No existing street with this name — good to go.
+              <span v-if="dup.nearby.length" class="text-slate-400 font-normal">({{ dup.nearby.length }} named street{{ dup.nearby.length > 1 ? 's' : '' }} nearby)</span>
+            </div>
           </div>
 
           <!-- Street type -->
@@ -127,82 +153,56 @@
             </div>
           </div>
 
+          <!-- Locality -->
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-1.5">
+              Locality / Town / Estate <span class="text-red-500">*</span>
+            </label>
+            <input v-model="form.locality" type="text" required list="locality-suggestions"
+                   placeholder="e.g. Awoyaya, Bogije, Lakowe, Oribanwa"
+                   class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:bg-white transition-all"/>
+            <datalist id="locality-suggestions">
+              <option v-for="l in localitySuggestions" :key="l" :value="l" />
+            </datalist>
+            <p class="mt-1.5 text-xs text-slate-500">The community your street is in — used as a second check against duplicate names.</p>
+          </div>
+
           <!-- Geolocation capture -->
           <div>
             <label class="block text-sm font-semibold text-slate-700 mb-1.5">
               Street Location <span class="text-red-500">*</span>
             </label>
 
-            <!-- Idle state -->
-            <div v-if="geoState === 'idle'" class="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 p-6 flex flex-col items-center gap-3">
-              <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background: rgba(5,150,105,0.08); border: 1px solid rgba(5,150,105,0.15)">
-                <MapPinIcon class="w-5 h-5" style="color: #059669" />
-              </div>
-              <div class="text-center">
-                <p class="text-sm font-semibold text-slate-700">Capture GPS Location</p>
-                <p class="text-xs text-slate-500 mt-0.5">Use your device's GPS to pinpoint the street location</p>
-              </div>
-              <button type="button"
-                      class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
-                      style="background: linear-gradient(135deg, #059669, #047857); box-shadow: 0 4px 14px rgba(5,150,105,0.3)"
-                      @click="captureLocation">
-                <MapPinIcon class="w-4 h-4" />
-                Capture My Location
-              </button>
-              <p v-if="!geoSupported" class="text-xs text-red-500">Geolocation is not supported by your browser.</p>
-            </div>
-
-            <!-- Loading state -->
-            <div v-else-if="geoState === 'loading'" class="rounded-xl border border-slate-200 bg-slate-50 p-6 flex flex-col items-center gap-3">
-              <div class="w-10 h-10 rounded-full border-2 border-slate-200 border-t-emerald-500 animate-spin"></div>
-              <p class="text-sm text-slate-600 font-medium">Acquiring your location…</p>
-              <p class="text-xs text-slate-400">Please allow location access if prompted</p>
-            </div>
-
-            <!-- Success state -->
-            <div v-else-if="geoState === 'success'" class="rounded-xl overflow-hidden" style="border: 1px solid rgba(5,150,105,0.2); background: rgba(5,150,105,0.04)">
-              <div class="flex items-center gap-3 px-4 py-3" style="border-bottom: 1px solid rgba(5,150,105,0.12)">
-                <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background: rgba(5,150,105,0.15)">
-                  <CheckCircleIcon class="w-4 h-4" style="color: #059669" />
-                </div>
-                <p class="text-sm font-semibold" style="color: #047857">Location Captured</p>
-                <button type="button" class="ml-auto text-xs font-semibold text-slate-400 hover:text-slate-600 transition-colors flex items-center gap-1" @click="resetGeo">
-                  <ArrowPathIcon class="w-3.5 h-3.5" />
-                  Re-capture
+            <!-- Map street picker -->
+            <div class="rounded-xl overflow-hidden border border-slate-200">
+              <div class="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                <p class="text-xs text-slate-600 font-medium">Click the street you want to name on the map</p>
+                <button type="button" @click="locateMe"
+                        class="text-xs font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1">
+                  <MapPinIcon class="w-3.5 h-3.5" /> Use my location
                 </button>
               </div>
-              <div class="px-4 py-3 grid grid-cols-3 gap-3">
-                <div class="text-center">
-                  <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Latitude</p>
-                  <p class="text-sm font-mono font-semibold text-slate-800">{{ geoCoords.lat }}</p>
-                </div>
-                <div class="text-center">
-                  <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Longitude</p>
-                  <p class="text-sm font-mono font-semibold text-slate-800">{{ geoCoords.lng }}</p>
-                </div>
-                <div class="text-center">
-                  <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Accuracy</p>
-                  <p class="text-sm font-mono font-semibold text-slate-800">±{{ geoCoords.accuracy }}m</p>
-                </div>
+              <div ref="pickerMapEl" class="h-[320px] w-full" style="background:#eef2f7"></div>
+              <div class="flex items-center gap-4 px-4 py-2 text-[11px] border-t border-slate-100 text-slate-600">
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full" style="background:#059669"></span>Named</span>
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full" style="background:#d97706"></span>Unnamed</span>
+                <span v-if="pickerLoading" class="text-slate-400 ml-auto">Loading streets…</span>
               </div>
             </div>
 
-            <!-- Error state -->
-            <div v-else-if="geoState === 'error'" class="rounded-xl border border-red-100 bg-red-50 p-5 flex flex-col items-center gap-3">
-              <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background: rgba(239,68,68,0.1)">
-                <ExclamationCircleIcon class="w-5 h-5 text-red-500" />
-              </div>
-              <div class="text-center">
-                <p class="text-sm font-semibold text-red-700">Location Access Failed</p>
-                <p class="text-xs text-red-500 mt-0.5">{{ geoError }}</p>
-              </div>
-              <button type="button"
-                      class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border border-red-200 bg-white text-red-600 hover:bg-red-50 transition-all"
-                      @click="captureLocation">
-                <ArrowPathIcon class="w-4 h-4" />
-                Try Again
-              </button>
+            <!-- Recognition result -->
+            <div v-if="geoState === 'success' && recognized" class="mt-3 rounded-xl p-3"
+                 :style="recognized.is_named ? 'background:#fef3c7' : 'background:rgba(5,150,105,0.06)'">
+              <p class="text-sm font-bold" :style="recognized.is_named ? 'color:#b45309' : 'color:#047857'">
+                {{ recognized.is_named ? '⚠ This street is already named' : '✓ Unnamed street selected' }}
+              </p>
+              <p class="text-xs mt-0.5" :style="recognized.is_named ? 'color:#92400e' : 'color:#065f46'">
+                <template v-if="recognized.is_named">This location is on <strong>{{ recognized.name }}</strong>, which already has a name. Applications are for streets that are not yet named — please pick an amber (unnamed) street.</template>
+                <template v-else>You've selected an unnamed street<template v-if="recognized.locality"> in {{ recognized.locality }}</template>. Give it a name below.</template>
+              </p>
+              <p class="text-[11px] font-mono text-slate-500 mt-1">{{ geoCoords.lat }}, {{ geoCoords.lng }}</p>
             </div>
+            <div v-else class="mt-2 text-xs text-slate-400">Tap a point on the map to select the street's location.</div>
           </div>
 
           <!-- Legacy registration checkbox (shown after geo is captured) -->
@@ -262,7 +262,7 @@
           <!-- Actions -->
           <div class="flex items-center gap-3 pt-1">
             <button type="submit"
-                    :disabled="submitting || !form.proposed_street_name || !form.street_type || !form.ward || geoState !== 'success' || (isLegacy && !legacyCertFile)"
+                    :disabled="submitting || !form.proposed_street_name || !form.street_type || !form.ward || !form.locality || geoState !== 'success' || (isLegacy && !legacyCertFile) || dup?.verdict === 'duplicate'"
                     class="flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold text-white transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
                     style="background: linear-gradient(135deg, #059669, #047857); box-shadow: 0 4px 16px rgba(5,150,105,0.3)">
               <svg v-if="submitting" class="animate-spin w-4 h-4 opacity-80" viewBox="0 0 24 24" fill="none">
@@ -305,7 +305,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, nextTick } from 'vue'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import { useRouter, RouterLink } from 'vue-router'
 import {
   ChevronRightIcon, ChevronDownIcon, InformationCircleIcon,
@@ -316,11 +318,24 @@ import { applicationApi, configApi, paymentApi } from '@/services/api'
 interface StreetType { id: number; name: string }
 
 const router = useRouter()
-const form = ref({ proposed_street_name: '', street_type: '', ward: '', location_description: '' })
+const form = ref({ proposed_street_name: '', street_type: '', ward: '', locality: '', location_description: '' })
 const streetTypes = ref<StreetType[]>([])
 const streetTypesLoading = ref(false)
 const submitting = ref(false)
 const errorMessage = ref('')
+
+// --- Duplicate street-name check ---
+interface DupMatch { code: string; name: string; locality: string; registration_status: string; distance_m: number | null }
+interface DupNearby { code: string; name: string; distance_m: number; same_name: boolean }
+const dup = ref<{ verdict: string; name_matches: DupMatch[]; locality_matches: DupMatch[]; nearby: DupNearby[] } | null>(null)
+const dupChecking = ref(false)
+let dupTimer: ReturnType<typeof setTimeout>
+
+const localitySuggestions = [
+  'Awoyaya', 'Bogije', 'Lakowe', 'Oribanwa', 'Eputu', 'Ogunfayo', 'Abijo', 'Ibeju',
+  'Lekki Free Zone', 'Orimedu', 'Iwerekun', 'Magbon', 'Ilaje', 'Igando Oloja',
+  'Ibeju-Lekki', 'Badore', 'Sangotedo', 'Ajah',
+]
 
 const isLegacy = ref(false)
 const legacyCertFile = ref<File | null>(null)
@@ -358,50 +373,122 @@ watch(() => form.value.street_type, async (streetTypeId) => {
   }
 })
 
-const geoSupported = 'geolocation' in navigator
-const geoState = ref<'idle' | 'loading' | 'success' | 'error'>('idle')
-const geoError = ref('')
+const geoState = ref<'idle' | 'success'>('idle')
 const geoCoords = ref({ lat: '', lng: '', accuracy: '' })
 
-function captureLocation() {
-  if (!geoSupported) return
-  geoState.value = 'loading'
-  geoError.value = ''
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      const lat = pos.coords.latitude.toFixed(6)
-      const lng = pos.coords.longitude.toFixed(6)
-      const acc = Math.round(pos.coords.accuracy)
-      geoCoords.value = { lat, lng, accuracy: String(acc) }
-      form.value.location_description = `${lat},${lng}`
-      geoState.value = 'success'
-    },
-    (err) => {
-      const messages: Record<number, string> = {
-        1: 'Location access was denied. Please allow location permission in your browser settings.',
-        2: 'Location unavailable. Make sure GPS is enabled on your device.',
-        3: 'Location request timed out. Please try again.',
-      }
-      geoError.value = messages[err.code] ?? 'Unable to determine location.'
-      geoState.value = 'error'
-    },
-    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
-  )
+// --- Map street picker ---
+interface PickPoint { lat: number; lng: number; is_named: boolean; street_name: string; existing_street_name: string; locality: string }
+const pickerMapEl = ref<HTMLElement | null>(null)
+const pickerLoading = ref(true)
+const recognized = ref<{ is_named: boolean; name: string; locality: string } | null>(null)
+let pickerMap: L.Map | null = null
+let clickMarker: L.CircleMarker | null = null
+const pickPoints: PickPoint[] = []
+
+function inBounds(lat: number, lng: number) {
+  return lat >= 6.2 && lat <= 6.85 && lng >= 3.4 && lng <= 4.5
 }
 
-function resetGeo() {
-  geoState.value = 'idle'
-  geoCoords.value = { lat: '', lng: '', accuracy: '' }
-  form.value.location_description = ''
+function nearest(lat: number, lng: number): { pt: PickPoint; dist: number } | null {
+  let best: PickPoint | null = null
+  let bestD = Infinity
+  for (const p of pickPoints) {
+    const dLat = (p.lat - lat) * 111000
+    const dLng = (p.lng - lng) * 111000 * Math.cos(lat * Math.PI / 180)
+    const d = Math.hypot(dLat, dLng)
+    if (d < bestD) { bestD = d; best = p }
+  }
+  return best ? { pt: best, dist: bestD } : null
+}
+
+function selectAt(lat: number, lng: number) {
+  geoCoords.value = { lat: lat.toFixed(6), lng: lng.toFixed(6), accuracy: '' }
+  form.value.location_description = `${lat.toFixed(6)},${lng.toFixed(6)}`
+  geoState.value = 'success'
+  if (pickerMap) {
+    if (clickMarker) clickMarker.remove()
+    clickMarker = L.circleMarker([lat, lng], { radius: 8, color: '#0f172a', weight: 2, fillColor: '#38bdf8', fillOpacity: 0.9 }).addTo(pickerMap)
+  }
+  // Recognise the nearest surveyed street.
+  const near = nearest(lat, lng)
+  if (near && near.dist <= 120) {
+    recognized.value = {
+      is_named: near.pt.is_named,
+      name: near.pt.street_name || near.pt.existing_street_name,
+      locality: near.pt.locality,
+    }
+    // Auto-fill locality if empty.
+    if (!form.value.locality && near.pt.locality) form.value.locality = near.pt.locality
+  } else {
+    recognized.value = { is_named: false, name: '', locality: '' }
+  }
+}
+
+function locateMe() {
+  if (!('geolocation' in navigator)) return
+  navigator.geolocation.getCurrentPosition((pos) => {
+    const lat = pos.coords.latitude, lng = pos.coords.longitude
+    if (pickerMap) pickerMap.setView([lat, lng], 17)
+    if (inBounds(lat, lng)) selectAt(lat, lng)
+  }, () => {}, { enableHighAccuracy: true, timeout: 15000 })
+}
+
+async function initPicker() {
+  await nextTick()
+  if (!pickerMapEl.value) return
+  pickerMap = L.map(pickerMapEl.value, { preferCanvas: true, scrollWheelZoom: true })
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(pickerMap)
+  pickerMap.setView([6.465, 3.72], 13)
+  pickerMap.on('click', (e: L.LeafletMouseEvent) => selectAt(e.latlng.lat, e.latlng.lng))
+  try {
+    const { data } = await configApi.getBuildingSurveys()
+    const canvas = L.canvas({ padding: 0.5 })
+    const bounds: L.LatLngTuple[] = []
+    interface RawSurvey { latitude: number; longitude: number; is_named: boolean; street_name: string; existing_street_name: string; locality: string }
+    for (const s of data as RawSurvey[]) {
+      const lat = Number(s.latitude), lng = Number(s.longitude)
+      if (!Number.isFinite(lat) || !inBounds(lat, lng)) continue
+      pickPoints.push({ lat, lng, is_named: s.is_named, street_name: s.street_name, existing_street_name: s.existing_street_name, locality: s.locality })
+      L.circleMarker([lat, lng], { renderer: canvas, radius: 3.5, color: s.is_named ? '#059669' : '#d97706', fillColor: s.is_named ? '#059669' : '#d97706', fillOpacity: 0.6, weight: 1 }).addTo(pickerMap)
+      bounds.push([lat, lng])
+    }
+    if (bounds.length) pickerMap.fitBounds(L.latLngBounds(bounds).pad(0.05))
+  } finally {
+    pickerLoading.value = false
+  }
 }
 
 const nextSteps = [
-  'Your application is saved and reviewed by the finance team for Stage A processing fees.',
-  'Upon payment confirmation, the naming committee formally evaluates your proposed street name.',
-  'The Committee Chairman reviews the committee recommendation and gives a final decision.',
+  'Stage A: your application is saved and the Council Treasurer (Finance Unit) receives your non-refundable processing fees.',
+  'Stage B: after payment, the Chieftaincy section validates your royal father\'s recognition letter and the Street Naming Committee screens and interviews you.',
+  'Stage C: the Local Government Chairman reviews the committee recommendation and gives the final decision.',
   'After approval, a Stage C certificate issuance fee is required before your certificate is printed.',
-  'Your street name is officially registered and a certificate of naming is issued.',
+  'Stages D-F: signpost installed, street published to Google Maps, and a certificate of naming is issued and tracked for renewal.',
 ]
+
+function runDuplicateCheck() {
+  clearTimeout(dupTimer)
+  const name = form.value.proposed_street_name.trim()
+  if (name.length < 3) { dup.value = null; return }
+  dupTimer = setTimeout(async () => {
+    dupChecking.value = true
+    try {
+      const { data } = await applicationApi.checkDuplicate({
+        name,
+        locality: form.value.locality,
+        latitude: geoCoords.value.lat || undefined,
+        longitude: geoCoords.value.lng || undefined,
+      })
+      dup.value = data
+    } catch {
+      dup.value = null
+    } finally {
+      dupChecking.value = false
+    }
+  }, 500)
+}
+
+watch(() => [form.value.proposed_street_name, form.value.locality, geoCoords.value.lat], runDuplicateCheck)
 
 async function handleSubmit() {
   errorMessage.value = ''
@@ -413,7 +500,10 @@ async function handleSubmit() {
       fd.append('proposed_street_name', form.value.proposed_street_name)
       fd.append('street_type', form.value.street_type)
       fd.append('ward', form.value.ward)
+      fd.append('locality', form.value.locality)
       fd.append('location_description', form.value.location_description)
+      if (geoCoords.value.lat) fd.append('latitude', geoCoords.value.lat)
+      if (geoCoords.value.lng) fd.append('longitude', geoCoords.value.lng)
       fd.append('is_legacy', 'true')
       fd.append('legacy_certificate', legacyCertFile.value)
       payload = fd
@@ -422,7 +512,10 @@ async function handleSubmit() {
         proposed_street_name: form.value.proposed_street_name,
         street_type: form.value.street_type,
         ward: form.value.ward,
+        locality: form.value.locality,
         location_description: form.value.location_description,
+        latitude: geoCoords.value.lat || null,
+        longitude: geoCoords.value.lng || null,
       }
     }
     const { data } = await applicationApi.create(payload)
@@ -446,5 +539,6 @@ onMounted(async () => {
   } finally {
     streetTypesLoading.value = false
   }
+  initPicker()
 })
 </script>

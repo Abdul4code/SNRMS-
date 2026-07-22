@@ -377,7 +377,7 @@ async function loadApplications() {
       )
       const map: Record<string, string[]> = {}
       draftApps.forEach((a, i) => {
-        const d = results[i].data
+        const d = results[i]?.data ?? []
         const docs = Array.isArray(d) ? d : d.results ?? []
         map[a.id] = docs.map((doc: { document_type: string }) => doc.document_type)
       })

@@ -30,6 +30,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -122,3 +123,44 @@ CORS_ALLOW_CREDENTIALS = True
 
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
+
+# --- Payment gateway (Paystack) ---
+# Leave the keys blank for demo mode (applicants can simulate payment).
+# Add your Paystack TEST keys (sk_test_..., pk_test_...) to enable real sandbox checkout.
+PAYSTACK_SECRET_KEY = config('PAYSTACK_SECRET_KEY', default='')
+PAYSTACK_PUBLIC_KEY = config('PAYSTACK_PUBLIC_KEY', default='')
+PAYMENT_CALLBACK_URL = config('PAYMENT_CALLBACK_URL', default='http://localhost:5173/payment-callback')
+
+
+# --- Static files (WhiteNoise, for production) ---
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
+}
+
+# --- Production hardening (driven by env; safe defaults for local dev) ---
+CSRF_TRUSTED_ORIGINS = [o for o in config('CSRF_TRUSTED_ORIGINS', default='').split(',') if o]
+_extra_cors = [o for o in config('CORS_ALLOWED_ORIGINS', default='').split(',') if o]
+if _extra_cors:
+    CORS_ALLOWED_ORIGINS = CORS_ALLOWED_ORIGINS + _extra_cors
+
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=False, cast=bool)
+
+# --- Email (renewal & application notifications) ---
+# Console backend by default: emails print to the server log, so the flow works
+# with no mail account. Set EMAIL_HOST etc. in .env to send real email via SMTP.
+EMAIL_HOST = config('EMAIL_HOST', default='')
+if EMAIL_HOST:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+    EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+    EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+    EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+DEFAULT_FROM_EMAIL = config(
+    'DEFAULT_FROM_EMAIL', default='SNRMS Ibeju-Lekki <no-reply@ibeju-lekki.gov.ng>')

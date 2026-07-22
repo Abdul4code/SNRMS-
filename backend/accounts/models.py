@@ -5,9 +5,11 @@ from django.db import models
 
 class Role(models.TextChoices):
     APPLICANT = 'applicant', 'Applicant'
-    FINANCE = 'finance', 'Finance'
-    NAMING_COMMITTEE = 'naming_committee', 'Naming Committee'
-    COMMITTEE_CHAIRMAN = 'committee_chairman', 'Committee Chairman'
+    # Governance hierarchy (order matters): 1) Local Government Chairman,
+    # 2) Council Treasurer (Finance), 3) Street Naming Committee.
+    COMMITTEE_CHAIRMAN = 'committee_chairman', 'Local Government Chairman'
+    FINANCE = 'finance', 'Council Treasurer'
+    NAMING_COMMITTEE = 'naming_committee', 'Street Naming Committee'
 
 
 class UserManager(BaseUserManager):
