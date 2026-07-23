@@ -1,0 +1,64 @@
+# Backend-only stack for the Oracle E2.1.Micro (1 GB RAM).
+# Runs Postgres + Django (gunicorn) + Caddy (HTTPS for the API) + the reminders worker.
+# The Vue frontend is deployed to Netlify, NOT here — this avoids an OOM building Vue on 1 GB.
+#
+#   docker compose -f docker-compose.oracle.yml --env-file .env.prod up -d --build
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend.prod.Dockerfile
+    restart: always
+    env_file: .env.prod
+    depends_on:
+      - db
+    volumes:
+      - media_data:/app/media
+
+  caddy:
+    build:
+      context: .
+      dockerfile: docker/caddy-api.Dockerfile
+    restart: always
+    environment:
+      API_DOMAIN: ${API_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+    volumes:
+      - media_data:/srv/media
+      - caddy_data:/data
+      - caddy_config:/config
+
+  reminders:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend.prod.Dockerfile
+    restart: always
+    env_file: .env.prod
+    depends_on:
+      - db
+    command: >
+      sh -c "while true; do
+               sleep 86400;
+               python manage.py send_reminders || true;
+             done"
+
+volumes:
+  pgdata:
+  media_data:
+  caddy_data:
+  caddy_config:

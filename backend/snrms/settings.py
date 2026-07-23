@@ -60,16 +60,25 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'snrms.wsgi.application'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME', default='snrms'),
-        'USER': config('DB_USER', default='snrms'),
-        'PASSWORD': config('DB_PASSWORD', default='snrms'),
-        'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default='5432'),
+# If DATABASE_URL is present (e.g. Fly.io Postgres attach), use it; otherwise
+# fall back to the discrete DB_* variables used by local dev and docker-compose.
+DATABASE_URL = config('DATABASE_URL', default='')
+if DATABASE_URL:
+    import dj_database_url
+    DATABASES = {
+        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600),
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('DB_NAME', default='snrms'),
+            'USER': config('DB_USER', default='snrms'),
+            'PASSWORD': config('DB_PASSWORD', default='snrms'),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='5432'),
+        }
+    }
 
 AUTH_USER_MODEL = 'accounts.User'
 

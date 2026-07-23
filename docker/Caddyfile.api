@@ -1,0 +1,18 @@
+# Backend-only Caddy for the Oracle VM.
+# Terminates HTTPS for the API subdomain and reverse-proxies Django.
+# The Vue frontend is hosted separately on Netlify, so nothing is built here.
+
+{$API_DOMAIN} {
+    encode gzip
+
+    # Uploaded files (receipts, certificates) served straight from the shared volume
+    handle /media/* {
+        root * /srv
+        file_server
+    }
+
+    # Everything else (/api, /admin, /static) goes to Django/gunicorn
+    handle {
+        reverse_proxy backend:8000
+    }
+}
