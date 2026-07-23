@@ -1,35 +1,31 @@
-# Fly.io config for the SNRMS Django backend.
-# Deploy from this directory:  cd backend && fly deploy
+# fly.toml app configuration file generated for snrms-backend on 2026-07-23T21:22:37+02:00
 #
-# `app` must be globally unique — change it, or let `fly launch` set it.
-app = "snrms-backend"
-primary_region = "ams"   # Amsterdam; pick the region closest to your users
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'snrms-backend'
+primary_region = 'ams'
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = 'Dockerfile'
 
-# Runs in a temporary machine (with secrets + DB access) before each release.
 [deploy]
   release_command = "sh -c 'python manage.py migrate --noinput && python manage.py collectstatic --noinput'"
 
 [env]
-  DEBUG = "False"
-  # DATABASE_URL, SECRET_KEY, ALLOWED_HOSTS, CORS/CSRF origins, etc. are set as
-  # secrets via `fly secrets set ...` — never commit them here.
+  DEBUG = 'False'
+
+[[mounts]]
+  source = 'snrms_media'
+  destination = '/app/media'
 
 [http_service]
   internal_port = 8000
   force_https = true
-  auto_stop_machines = "stop"
+  auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 0
 
-# Persistent storage for uploaded receipts/certificates (create it first:
-#   fly volumes create snrms_media --size 1 --region ams)
-[mounts]
-  source = "snrms_media"
-  destination = "/app/media"
-
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "512mb"
+  size = 'shared-cpu-1x'
+  memory = '512mb'
