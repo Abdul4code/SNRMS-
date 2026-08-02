@@ -565,11 +565,19 @@ async function handleRegister() {
     await auth.login(form.value.email, form.value.password)
     router.push('/applications')
   } catch (err: unknown) {
-    const e = err as { response?: { data?: Record<string, string[]> } }
+    const e = err as { response?: { data?: unknown } }
     const data = e.response?.data
-    errorMessage.value = data
-      ? Object.entries(data).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' · ')
-      : 'Registration failed. Please try again.'
+    // Only field-error objects (e.g. {email: ["..."]}) get formatted. Anything
+    // else — an HTML error page, a plain string, a 502 — shows a clean message
+    // instead of dumping the raw response character by character.
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      errorMessage.value = Object.entries(data as Record<string, unknown>)
+        .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+        .join(' · ')
+    } else {
+      errorMessage.value = 'Registration failed. Please try again.'
+    }
+    verificationCode.value = ''  // clear so a fresh code can be typed
   } finally {
     loading.value = false
   }
@@ -577,6 +585,7 @@ async function handleRegister() {
 
 async function resendCode() {
   errorMessage.value = ''
+  verificationCode.value = ''  // clear the input so the new code can be typed
   sendingCode.value = true
   try { await authApi.requestVerification(form.value.email) } catch { /* ignore */ }
   finally { sendingCode.value = false }

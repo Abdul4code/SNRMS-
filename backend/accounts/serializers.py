@@ -1,4 +1,5 @@
 from django.contrib.auth import authenticate
+from django.db import IntegrityError
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -44,14 +45,21 @@ class RegisterSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         from accounts.models import EmailVerification
         code = validated_data.pop('verification_code', None)
-        user = User.objects.create_user(
-            email=validated_data['email'],
-            password=validated_data['password'],
-            first_name=validated_data['first_name'],
-            last_name=validated_data['last_name'],
-            phone=validated_data['phone'],
-            role=Role.APPLICANT,
-        )
+        try:
+            user = User.objects.create_user(
+                email=validated_data['email'],
+                password=validated_data['password'],
+                first_name=validated_data['first_name'],
+                last_name=validated_data['last_name'],
+                phone=validated_data['phone'],
+                role=Role.APPLICANT,
+            )
+        except IntegrityError:
+            # A concurrent submit (double-click / retry on a slow request) can slip
+            # past the uniqueness validator and collide on insert. Return a clean
+            # 400 instead of an unhandled 500 HTML page.
+            raise serializers.ValidationError(
+                {'email': ['An account with this email already exists.']})
         # Consume the verification code so it can't be reused.
         EmailVerification.objects.filter(
             email__iexact=validated_data['email'], code=code, consumed=False,
