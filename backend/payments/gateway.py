@@ -201,8 +201,11 @@ def _notify_admins(payment: Payment) -> None:
         is_active=True,
     ).exclude(email='')
     for admin in admins:
+        # In-app notification only — no email. Staff see payment alerts in the
+        # portal; the email copy is intentionally suppressed.
         notify(
             admin, title, message,
             notification_type=NotificationType.PAYMENT_CONFIRMED,
             application=app,
+            send_email=False,
         )
