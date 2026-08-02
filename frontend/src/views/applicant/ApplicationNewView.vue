@@ -7,11 +7,11 @@
         <nav class="flex items-center gap-2 text-xs text-slate-400 mb-4">
           <RouterLink to="/applications" class="hover:text-emerald-400 transition-colors">My Applications</RouterLink>
           <ChevronRightIcon class="w-3.5 h-3.5 opacity-40" />
-          <span class="text-slate-300">New Application</span>
+          <span class="text-slate-300">{{ isLegacy ? 'Validate Existing Registration' : 'New Application' }}</span>
         </nav>
-        <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1.5">New Request</p>
-        <h1 class="text-white text-2xl font-bold tracking-tight">Street Name Application</h1>
-        <p class="text-slate-400 text-sm mt-1">Submit a request to register a new street name in Ibeju-Lekki LGA</p>
+        <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1.5">{{ isLegacy ? 'Existing Registration' : 'New Request' }}</p>
+        <h1 class="text-white text-2xl font-bold tracking-tight">{{ isLegacy ? 'Validate Existing Registration' : 'Street Name Application' }}</h1>
+        <p class="text-slate-400 text-sm mt-1">{{ isLegacy ? 'Register a street name that already exists so it is validated and recognised in the system.' : 'Submit a request to register a new street name in Ibeju-Lekki Local Government Area' }}</p>
       </div>
     </div>
 
@@ -39,8 +39,42 @@
 
         <form @submit.prevent="handleSubmit" class="px-6 py-5 space-y-5" novalidate>
 
-          <!-- Proposed street name -->
+          <!-- Locality -->
           <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-1.5">
+              Locality / Town / Estate <span class="text-red-500">*</span>
+            </label>
+            <div class="relative">
+              <select v-model="form.locality" required @change="onLocalityChange"
+                      class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 pr-10 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:bg-white transition-all appearance-none">
+                <option value="" disabled>Select your locality — the map will zoom to it</option>
+                <option v-for="l in localityOptions" :key="l" :value="l">{{ l }}</option>
+              </select>
+              <ChevronDownIcon class="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+            <p class="mt-1.5 text-xs text-slate-500">Selecting your locality zooms the map to it and sets the ward automatically.</p>
+          </div>
+
+          <!-- Ward -->
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-1.5">
+              Ward <span class="text-red-500">*</span>
+            </label>
+            <div class="relative">
+              <select v-model="form.ward" required
+                      class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 pr-10 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:bg-white transition-all appearance-none">
+                <option value="" disabled>Select the ward</option>
+                <option v-for="(label, code) in WARD_LABELS" :key="code" :value="code">{{ label }}</option>
+              </select>
+              <ChevronDownIcon class="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+            <p class="mt-1.5 text-xs" :class="wardAutoSet ? 'text-emerald-600' : 'text-slate-500'">
+              {{ wardAutoSet ? '✓ Ward set automatically from your locality — change it if needed.' : 'Set automatically from your locality; you can also choose it here.' }}
+            </p>
+          </div>
+
+          <!-- Street name: free text (new) OR select from registry (validate) -->
+          <div v-if="!isLegacy">
             <label class="block text-sm font-semibold text-slate-700 mb-1.5">
               Proposed Street Name <span class="text-red-500">*</span>
             </label>
@@ -51,6 +85,13 @@
 
             <!-- Live duplicate check -->
             <div v-if="dupChecking" class="mt-2 text-xs text-slate-400">Checking the registry for this name…</div>
+            <div v-else-if="dup && dup.rename_blocked" class="mt-2 rounded-xl border border-red-200 bg-red-50 p-3">
+              <p class="text-sm font-bold text-red-700">This street cannot be renamed yet.</p>
+              <p class="text-xs text-red-600 mt-0.5">
+                "{{ dup.rename_blocked.name }}" is registered here until {{ formatExpiry(dup.rename_blocked.expires_at) }}.
+                A street can only be renamed after its current registration expires (if it is not renewed).
+              </p>
+            </div>
             <div v-else-if="dup && dup.verdict === 'duplicate'" class="mt-2 rounded-xl border border-red-200 bg-red-50 p-3">
               <p class="text-sm font-bold text-red-700">This street name already exists.</p>
               <p class="text-xs text-red-600 mt-0.5">
@@ -76,8 +117,28 @@
             </div>
           </div>
 
-          <!-- Street type -->
-          <div>
+          <div v-else>
+            <label class="block text-sm font-semibold text-slate-700 mb-1.5">
+              Select Street Name <span class="text-red-500">*</span>
+            </label>
+            <div class="relative">
+              <select v-model="form.registry_street_id" required
+                      class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:bg-white transition-all appearance-none">
+                <option value="" disabled>Select the street from the registry</option>
+                <option v-for="s in registryStreets" :key="s.id" :value="s.id">{{ s.name }}</option>
+              </select>
+              <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                <ChevronDownIcon class="w-4 h-4 text-slate-400" />
+              </div>
+            </div>
+            <p class="mt-1.5 text-xs text-slate-500">Choose the existing street you want to validate, then upload your documents and select its location below.</p>
+            <div v-if="validateNote" class="mt-2 rounded-xl border p-3"
+                 :class="validateNote.ok ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'">
+              <p class="text-xs" :class="validateNote.ok ? 'text-emerald-700' : 'text-amber-700'">{{ validateNote.msg }}</p>
+            </div>
+          </div>
+          <!-- Street type (new applications only) -->
+          <div v-if="!isLegacy">
             <label class="block text-sm font-semibold text-slate-700 mb-1.5">
               Street Type <span class="text-red-500">*</span>
             </label>
@@ -115,56 +176,19 @@
                     </svg>
                     Estimated Fees
                   </p>
-                  <div class="grid grid-cols-2 gap-3">
+                  <div class="grid grid-cols-1 gap-3">
                     <div class="rounded-lg px-3 py-2" style="background: rgba(255,255,255,0.7)">
-                      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Stage A · Due now</p>
+                      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Application fee · Due now</p>
                       <p class="text-sm font-bold text-slate-900">₦{{ formatAmount(feePreview.stageATotal) }}</p>
-                      <p class="text-[10px] text-slate-400 mt-0.5">Application processing</p>
+                      <p class="text-[10px] text-slate-400 mt-0.5">Payable to begin processing</p>
                     </div>
-                    <div class="rounded-lg px-3 py-2" style="background: rgba(255,255,255,0.7)">
-                      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
-                        {{ isLegacy ? 'Renewal · After approval' : 'Stage C · After approval' }}
-                      </p>
-                      <p class="text-sm font-bold text-slate-900">₦{{ formatAmount(isLegacy ? feePreview.renewalTotal : feePreview.stageCTotal) }}</p>
-                      <p class="text-[10px] text-slate-400 mt-0.5">{{ isLegacy ? 'Legacy renewal fee' : 'Certificate issuance' }}</p>
-                    </div>
+                    <p class="text-[11px] text-slate-500">
+                      The certificate fee (if your application is approved) will be communicated after the Local Government Chairman's approval.
+                    </p>
                   </div>
                 </div>
               </div>
             </transition>
-          </div>
-
-          <!-- Ward -->
-          <div>
-            <label class="block text-sm font-semibold text-slate-700 mb-1.5">
-              Ward <span class="text-red-500">*</span>
-            </label>
-            <div class="relative">
-              <select v-model="form.ward" required
-                      class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:bg-white transition-all appearance-none">
-                <option value="" disabled>Select a ward</option>
-                <option value="ward_a">Ward A - Central</option>
-                <option value="ward_b">Ward B - North</option>
-                <option value="ward_c">Ward C - South</option>
-              </select>
-              <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
-                <ChevronDownIcon class="w-4 h-4 text-slate-400" />
-              </div>
-            </div>
-          </div>
-
-          <!-- Locality -->
-          <div>
-            <label class="block text-sm font-semibold text-slate-700 mb-1.5">
-              Locality / Town / Estate <span class="text-red-500">*</span>
-            </label>
-            <input v-model="form.locality" type="text" required list="locality-suggestions"
-                   placeholder="e.g. Awoyaya, Bogije, Lakowe, Oribanwa"
-                   class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:bg-white transition-all"/>
-            <datalist id="locality-suggestions">
-              <option v-for="l in localitySuggestions" :key="l" :value="l" />
-            </datalist>
-            <p class="mt-1.5 text-xs text-slate-500">The community your street is in — used as a second check against duplicate names.</p>
           </div>
 
           <!-- Geolocation capture -->
@@ -183,10 +207,9 @@
                 </button>
               </div>
               <div ref="pickerMapEl" class="h-[320px] w-full" style="background:#eef2f7"></div>
-              <div class="flex items-center gap-4 px-4 py-2 text-[11px] border-t border-slate-100 text-slate-600">
-                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full" style="background:#059669"></span>Named</span>
-                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full" style="background:#d97706"></span>Unnamed</span>
-                <span v-if="pickerLoading" class="text-slate-400 ml-auto">Loading streets…</span>
+              <div class="flex items-center gap-4 px-4 py-2 text-[11px] border-t border-slate-100 text-slate-500">
+                <span>Zoom in and click the exact location of your street.</span>
+                <span v-if="pickerLoading" class="text-slate-400 ml-auto">Loading…</span>
               </div>
             </div>
 
@@ -201,68 +224,59 @@
                 <template v-else>You've selected an unnamed street<template v-if="recognized.locality"> in {{ recognized.locality }}</template>. Give it a name below.</template>
               </p>
               <p class="text-[11px] font-mono text-slate-500 mt-1">{{ geoCoords.lat }}, {{ geoCoords.lng }}</p>
+              <!-- #5: Show street's picture on demand so the applicant can confirm the location -->
+              <div class="mt-2">
+                <button type="button" v-if="!showPicture" @click="revealPicture"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white" style="background:#0f172a">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                  Show street's picture
+                </button>
+                <div v-else>
+                  <!-- Google Street View (ground-level) when a key is configured -->
+                  <img v-if="streetViewSrc" :src="streetViewSrc" alt="Street view at this location"
+                       class="w-full rounded-lg border border-slate-200 mb-2" style="max-height:240px;object-fit:cover"
+                       @error="onStreetViewError" />
+                  <!-- Satellite / aerial view of the exact spot — always available, no key needed -->
+                  <div ref="pictureMapEl" class="w-full rounded-lg border border-slate-200 overflow-hidden" style="height:240px"></div>
+                  <p class="text-[10px] text-slate-400 mt-0.5">
+                    {{ streetViewSrc ? 'Google Street View plus a satellite view of the exact spot.' : 'Satellite/aerial view of the exact spot you selected.' }}
+                  </p>
+                  <button type="button" @click="hidePicture" class="mt-1 text-[11px] text-slate-400 underline">Hide picture</button>
+                </div>
+              </div>
             </div>
             <div v-else class="mt-2 text-xs text-slate-400">Tap a point on the map to select the street's location.</div>
           </div>
 
-          <!-- Legacy registration checkbox (shown after geo is captured) -->
-          <transition enter-active-class="transition ease-out duration-200"
-                      enter-from-class="opacity-0 -translate-y-1" enter-to-class="opacity-100 translate-y-0"
-                      leave-active-class="transition ease-in duration-100"
-                      leave-from-class="opacity-100 translate-y-0" leave-to-class="opacity-0 -translate-y-1">
-            <div v-if="geoState === 'success'"
-                 class="rounded-xl p-4"
-                 style="background: rgba(251,191,36,0.06); border: 1px solid rgba(251,191,36,0.25)">
-              <label class="flex items-start gap-3 cursor-pointer select-none">
-                <div class="flex-shrink-0 mt-0.5">
-                  <input type="checkbox" v-model="isLegacy"
-                         class="w-4 h-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400 focus:ring-offset-0 cursor-pointer" />
-                </div>
-                <div>
-                  <p class="text-sm font-semibold text-slate-800">Have you registered this street and have a certificate before?</p>
-                  <p class="text-xs text-slate-500 mt-0.5">
-                    Check this if you previously obtained a manual street naming certificate and want to bring your registration into the digital system.
-                  </p>
-                </div>
-              </label>
-
-              <!-- Legacy certificate upload -->
-              <transition enter-active-class="transition ease-out duration-200"
-                          enter-from-class="opacity-0 -translate-y-1" enter-to-class="opacity-100 translate-y-0">
-                <div v-if="isLegacy" class="mt-4 pt-4" style="border-top: 1px solid rgba(251,191,36,0.2)">
-                  <label class="block text-sm font-semibold text-slate-700 mb-1.5">
-                    Existing Certificate <span class="text-red-500">*</span>
-                  </label>
-                  <div class="relative">
-                    <input type="file" ref="legacyCertInput" accept=".pdf,.jpg,.jpeg,.png"
-                           class="hidden" @change="onLegacyCertChange" />
-                    <button type="button"
-                            class="w-full flex items-center gap-3 rounded-xl border-2 border-dashed px-4 py-3 text-sm transition-colors"
-                            :class="legacyCertFile ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-slate-50 hover:border-slate-300'"
-                            @click="legacyCertInput?.click()">
-                      <svg class="w-4 h-4 flex-shrink-0" :class="legacyCertFile ? 'text-amber-500' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
-                      </svg>
-                      <span :class="legacyCertFile ? 'text-amber-700 font-medium' : 'text-slate-500'">
-                        {{ legacyCertFile ? legacyCertFile.name : 'Upload your existing certificate (PDF, JPG, PNG)' }}
-                      </span>
-                      <span v-if="legacyCertFile"
-                            class="ml-auto text-xs text-amber-600 underline hover:text-amber-700"
-                            @click.stop="legacyCertFile = null">Remove</span>
-                    </button>
-                  </div>
-                  <p class="text-xs text-slate-400 mt-1.5">
-                    After approval, you will pay the <strong>renewal fee</strong> instead of Stage C. Your certificate will be updated with a new expiry date.
-                  </p>
-                </div>
-              </transition>
+          <!-- Validate mode: upload the existing document -->
+          <div v-if="isLegacy" class="rounded-xl p-4" style="background: rgba(251,191,36,0.06); border: 1px solid rgba(251,191,36,0.25)">
+            <label class="block text-sm font-semibold text-slate-700 mb-1.5">
+              Existing Document / Certificate <span class="text-red-500">*</span>
+            </label>
+            <div class="relative">
+              <input type="file" ref="legacyCertInput" accept=".pdf,.jpg,.jpeg,.png" class="hidden" @change="onLegacyCertChange" />
+              <button type="button"
+                      class="w-full flex items-center gap-3 rounded-xl border-2 border-dashed px-4 py-3 text-sm transition-colors"
+                      :class="legacyCertFile ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-slate-50 hover:border-slate-300'"
+                      @click="legacyCertInput?.click()">
+                <svg class="w-4 h-4 flex-shrink-0" :class="legacyCertFile ? 'text-amber-500' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                </svg>
+                <span :class="legacyCertFile ? 'text-amber-700 font-medium' : 'text-slate-500'">
+                  {{ legacyCertFile ? legacyCertFile.name : 'Upload your existing certificate / document (PDF, JPG, PNG)' }}
+                </span>
+                <span v-if="legacyCertFile" class="ml-auto text-xs text-amber-600 underline hover:text-amber-700" @click.stop="legacyCertFile = null">Remove</span>
+              </button>
             </div>
-          </transition>
+            <p class="text-xs text-slate-400 mt-1.5">Upload the document that proves your existing registration. The committee will validate it against the registry.</p>
+          </div>
 
           <!-- Actions -->
           <div class="flex items-center gap-3 pt-1">
             <button type="submit"
-                    :disabled="submitting || !form.proposed_street_name || !form.street_type || !form.ward || !form.locality || geoState !== 'success' || (isLegacy && !legacyCertFile) || dup?.verdict === 'duplicate'"
+                    :disabled="submitting || !form.locality || !form.ward || geoState !== 'success'
+                      || (isLegacy ? (!form.registry_street_id || !legacyCertFile)
+                                   : (!form.proposed_street_name || !form.street_type || dup?.verdict === 'duplicate' || !!dup?.rename_blocked))"
                     class="flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold text-white transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
                     style="background: linear-gradient(135deg, #059669, #047857); box-shadow: 0 4px 16px rgba(5,150,105,0.3)">
               <svg v-if="submitting" class="animate-spin w-4 h-4 opacity-80" viewBox="0 0 24 24" fill="none">
@@ -305,10 +319,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, nextTick } from 'vue'
+import { ref, watch, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { useRouter, RouterLink } from 'vue-router'
+import { useRouter, useRoute, RouterLink } from 'vue-router'
 import {
   ChevronRightIcon, ChevronDownIcon, InformationCircleIcon,
   MapPinIcon, CheckCircleIcon, ArrowPathIcon, ExclamationCircleIcon,
@@ -318,7 +332,32 @@ import { applicationApi, configApi, paymentApi } from '@/services/api'
 interface StreetType { id: number; name: string }
 
 const router = useRouter()
-const form = ref({ proposed_street_name: '', street_type: '', ward: '', locality: '', location_description: '' })
+const form = ref({ proposed_street_name: '', street_type: '', ward: '', locality: '', location_description: '', registry_street_id: '' })
+const registryStreets = ref<{ id: string; name: string; latitude?: number | string | null; longitude?: number | string | null }[]>([])
+const validateNote = ref<{ ok: boolean; msg: string } | null>(null)
+
+function checkValidateMatch() {
+  if (!isLegacy.value) { validateNote.value = null; return }
+  const sid = form.value.registry_street_id
+  const lat = parseFloat(geoCoords.value.lat), lng = parseFloat(geoCoords.value.lng)
+  if (!sid || Number.isNaN(lat) || Number.isNaN(lng)) { validateNote.value = null; return }
+  const selected = registryStreets.value.find(s => String(s.id) === String(sid))
+  if (!selected) { validateNote.value = null; return }
+  let nearest: PickPoint | null = null, best = Infinity
+  for (const p of pickPoints) {
+    if (!p.is_named) continue
+    const d = Math.hypot((p.lat - lat) * 111000, (p.lng - lng) * 111000 * Math.cos(lat * Math.PI / 180))
+    if (d < best) { best = d; nearest = p }
+  }
+  const norm = (x: string) => (x || '').trim().toLowerCase().replace(/\s+/g, ' ')
+  if (!nearest || best > 60) {
+    validateNote.value = { ok: false, msg: 'The street selected for validation does not match any initially named street. It will be flagged to the Street Naming Committee Chairman as probably part of the old record.' }
+  } else if (norm(nearest.street_name || nearest.existing_street_name) !== norm(selected.name)) {
+    validateNote.value = { ok: false, msg: 'The name you wish to validate does not match the name already in the database at this location.' }
+  } else {
+    validateNote.value = { ok: true, msg: '\u2713 This location matches the selected street in the registry.' }
+  }
+}
 const streetTypes = ref<StreetType[]>([])
 const streetTypesLoading = ref(false)
 const submitting = ref(false)
@@ -327,17 +366,14 @@ const errorMessage = ref('')
 // --- Duplicate street-name check ---
 interface DupMatch { code: string; name: string; locality: string; registration_status: string; distance_m: number | null }
 interface DupNearby { code: string; name: string; distance_m: number; same_name: boolean }
-const dup = ref<{ verdict: string; name_matches: DupMatch[]; locality_matches: DupMatch[]; nearby: DupNearby[] } | null>(null)
+const dup = ref<{ verdict: string; name_matches: DupMatch[]; locality_matches: DupMatch[]; nearby: DupNearby[]; rename_blocked?: { name: string; reference: string; expires_at: string } | null } | null>(null)
 const dupChecking = ref(false)
 let dupTimer: ReturnType<typeof setTimeout>
 
-const localitySuggestions = [
-  'Awoyaya', 'Bogije', 'Lakowe', 'Oribanwa', 'Eputu', 'Ogunfayo', 'Abijo', 'Ibeju',
-  'Lekki Free Zone', 'Orimedu', 'Iwerekun', 'Magbon', 'Ilaje', 'Igando Oloja',
-  'Ibeju-Lekki', 'Badore', 'Sangotedo', 'Ajah',
-]
-
 const isLegacy = ref(false)
+const route = useRoute()
+// "Validate existing registration" enters this form in legacy mode.
+if (route.query.mode === 'legacy') isLegacy.value = true
 const legacyCertFile = ref<File | null>(null)
 const legacyCertInput = ref<HTMLInputElement | null>(null)
 
@@ -348,6 +384,9 @@ function onLegacyCertChange(e: Event) {
 
 const feePreview = ref({ loading: false, error: '', stageATotal: 0, stageCTotal: 0, renewalTotal: 0 })
 
+function formatExpiry(d?: string) {
+  return d ? new Date(d).toLocaleDateString('en-NG', { year: 'numeric', month: 'long', day: 'numeric' }) : ''
+}
 function formatAmount(n: number) {
   return new Intl.NumberFormat('en-NG', { minimumFractionDigits: 2 }).format(n)
 }
@@ -356,17 +395,13 @@ watch(() => form.value.street_type, async (streetTypeId) => {
   if (!streetTypeId) return
   feePreview.value = { loading: true, error: '', stageATotal: 0, stageCTotal: 0, renewalTotal: 0 }
   try {
-    const [aRes, cRes, rRes] = await Promise.all([
-      paymentApi.getBreakdown('stage_a'),
-      paymentApi.getBreakdown('stage_c', streetTypeId),
-      paymentApi.getBreakdown('renewal'),
-    ])
+    // Only the application (Stage A) fee is shown to the applicant. The Stage C /
+    // certificate amount is withheld until the Chairman approves the application.
+    const aRes = await paymentApi.getBreakdown('stage_a')
     feePreview.value = {
-      loading: false,
-      error: '',
+      loading: false, error: '',
       stageATotal: parseFloat(aRes.data.total) || 0,
-      stageCTotal: parseFloat(cRes.data.total) || 0,
-      renewalTotal: parseFloat(rRes.data.total) || 0,
+      stageCTotal: 0, renewalTotal: 0,
     }
   } catch {
     feePreview.value = { loading: false, error: 'Could not load fee estimate.', stageATotal: 0, stageCTotal: 0, renewalTotal: 0 }
@@ -375,13 +410,126 @@ watch(() => form.value.street_type, async (streetTypeId) => {
 
 const geoState = ref<'idle' | 'success'>('idle')
 const geoCoords = ref({ lat: '', lng: '', accuracy: '' })
+const streetViewSrc = ref('')
+const googleEnabled = ref(false)
+const showPicture = ref(false)
+const pictureMapEl = ref<HTMLElement | null>(null)
+let pictureMap: L.Map | null = null
+function revealPicture() {
+  const lat = parseFloat(geoCoords.value.lat), lng = parseFloat(geoCoords.value.lng)
+  if (Number.isNaN(lat) || Number.isNaN(lng)) return
+  if (googleEnabled.value) streetViewSrc.value = configApi.streetViewUrl(lat, lng)
+  showPicture.value = true
+  nextTick(() => {
+    if (pictureMap) { pictureMap.remove(); pictureMap = null }
+    if (!pictureMapEl.value) return
+    pictureMap = L.map(pictureMapEl.value, { zoomControl: true, attributionControl: false, dragging: true, scrollWheelZoom: false })
+    // Esri World Imagery — free satellite/aerial tiles, no API key required.
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }).addTo(pictureMap)
+    pictureMap.setView([lat, lng], 18)
+    L.circleMarker([lat, lng], { radius: 8, color: '#f59e0b', weight: 3, fillColor: '#f59e0b', fillOpacity: 0.5 }).addTo(pictureMap)
+    setTimeout(() => pictureMap?.invalidateSize(), 120)
+  })
+}
+function hidePicture() {
+  if (pictureMap) { pictureMap.remove(); pictureMap = null }
+  showPicture.value = false
+}
+function onStreetViewError() { streetViewSrc.value = '' }
+
+// --- Auto-pick ward from locality ---
+const WARD_LABELS: Record<string, string> = {
+  ward_a: 'Ward A (Ibeju 1)', ward_b: 'Ward B (Ibeju 2)', ward_c1: 'Ward C1 (Orimedu 1)',
+  ward_c2: 'Ward C2 (Orimedu 2)', ward_d: 'Ward D (Orimedu 3)', ward_e: 'Ward E (Iwerekun 1)',
+  ward_f: 'Ward F (Iwerekun 2)',
+}
+const localityWards = ref<Record<string, string>>({})
+const communities = ref<string[]>([])
+
+// Locality options are built from the SURVEY points themselves, so every option is
+// guaranteed to have points on the map to zoom to and a ward to auto-fill.
+const localityOptions = ref<string[]>([])
+const wardAutoSet = ref(false)
+const localityMeta = ref<Record<string, { ward: string; pts: [number, number][] }>>({})
+
+function titleCase(s: string) {
+  return s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
+}
+// Map the messy survey ward strings (e.g. "B", "Ward E", "Ibeju 1", "N/A") to the
+// canonical ward codes. Junk values return '' and are ignored in the vote.
+function normalizeWard(raw: string): string {
+  const s = (raw || '').trim().toLowerCase().replace(/\s+/g, ' ')
+  if (!s) return ''
+  const code = s.replace(/^ward\s*/, '').replace(/\s+/g, '')
+  const direct: Record<string, string> = {
+    a: 'ward_a', b: 'ward_b', c1: 'ward_c1', c2: 'ward_c2', d: 'ward_d', e: 'ward_e', f: 'ward_f',
+  }
+  if (direct[code]) return direct[code]
+  if (/ibeju\s*(1|i)\b/.test(s)) return 'ward_a'
+  if (/ibeju\s*(2|ii)\b/.test(s)) return 'ward_b'
+  if (/orimedu\s*1/.test(s)) return 'ward_c1'
+  if (/orimedu\s*2/.test(s)) return 'ward_c2'
+  if (/orimedu\s*3/.test(s)) return 'ward_d'
+  if (/iwerekun\s*1/.test(s)) return 'ward_e'
+  if (/iwerekun\s*2/.test(s)) return 'ward_f'
+  return ''
+}
+
+function rebuildLocalityIndex() {
+  const groups: Record<string, { display: string; wards: Record<string, number>; pts: [number, number][] }> = {}
+  for (const p of pickPoints) {
+    const raw = (p.locality || '').trim()
+    if (!raw) continue
+    const key = raw.toUpperCase().replace(/\s+/g, ' ')
+    if (!groups[key]) groups[key] = { display: titleCase(raw), wards: {}, pts: [] }
+    groups[key].pts.push([p.lat, p.lng])
+    const w = normalizeWard(p.ward || '')  // only count VALID ward codes
+    if (w) groups[key].wards[w] = (groups[key].wards[w] || 0) + 1
+  }
+  const meta: Record<string, { ward: string; pts: [number, number][] }> = {}
+  const opts: string[] = []
+  for (const key of Object.keys(groups)) {
+    const g = groups[key]
+    if (!g || g.pts.length < 2) continue  // skip stray single points / typos
+    const ward = Object.keys(g.wards).sort((a, b) => (g.wards[b] ?? 0) - (g.wards[a] ?? 0))[0] || ''
+    meta[g.display] = { ward, pts: g.pts }
+    opts.push(g.display)
+  }
+  opts.sort((a, b) => a.localeCompare(b))
+  localityOptions.value = opts
+  localityMeta.value = meta
+}
+
+function onLocalityChange() {
+  const meta = localityMeta.value[form.value.locality]
+  // Prefer the ward derived from the locality's points; if none could be derived,
+  // keep whatever the applicant already chose so they can set it manually.
+  if (meta && meta.ward) { form.value.ward = meta.ward; wardAutoSet.value = true }
+  else { wardAutoSet.value = false }
+  zoomToLocality()
+}
+
+function zoomToLocality() {
+  const sel = form.value.locality
+  if (!pickerMap || !sel) return
+  if (!pickPoints.length) { pendingZoomLocality = sel; return }
+  const meta = localityMeta.value[sel]
+  const pts = meta?.pts || []
+  if (pts.length >= 1) {
+    // Leaflet mis-measures if the container was resized/hidden — fix before fitting.
+    pickerMap.invalidateSize()
+    pickerMap.fitBounds(L.latLngBounds(pts).pad(0.25), { maxZoom: 16 })
+  }
+}
 
 // --- Map street picker ---
-interface PickPoint { lat: number; lng: number; is_named: boolean; street_name: string; existing_street_name: string; locality: string }
+interface PickPoint { lat: number; lng: number; is_named: boolean; street_name: string; existing_street_name: string; locality: string; ward: string; photo_url: string }
 const pickerMapEl = ref<HTMLElement | null>(null)
 const pickerLoading = ref(true)
-const recognized = ref<{ is_named: boolean; name: string; locality: string } | null>(null)
+const recognized = ref<{ is_named: boolean; name: string; locality: string; photo_url: string } | null>(null)
 let pickerMap: L.Map | null = null
+let streetLabelLayer: L.LayerGroup | null = null
+let pendingZoomLocality = ""
 let clickMarker: L.CircleMarker | null = null
 const pickPoints: PickPoint[] = []
 
@@ -403,6 +551,9 @@ function nearest(lat: number, lng: number): { pt: PickPoint; dist: number } | nu
 
 function selectAt(lat: number, lng: number) {
   geoCoords.value = { lat: lat.toFixed(6), lng: lng.toFixed(6), accuracy: '' }
+  if (pictureMap) { pictureMap.remove(); pictureMap = null }
+  showPicture.value = false
+  streetViewSrc.value = ''
   form.value.location_description = `${lat.toFixed(6)},${lng.toFixed(6)}`
   geoState.value = 'success'
   if (pickerMap) {
@@ -416,11 +567,12 @@ function selectAt(lat: number, lng: number) {
       is_named: near.pt.is_named,
       name: near.pt.street_name || near.pt.existing_street_name,
       locality: near.pt.locality,
+      photo_url: near.pt.photo_url || '',
     }
     // Auto-fill locality if empty.
     if (!form.value.locality && near.pt.locality) form.value.locality = near.pt.locality
   } else {
-    recognized.value = { is_named: false, name: '', locality: '' }
+    recognized.value = { is_named: false, name: '', locality: '', photo_url: '' }
   }
 }
 
@@ -440,21 +592,56 @@ async function initPicker() {
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(pickerMap)
   pickerMap.setView([6.465, 3.72], 13)
   pickerMap.on('click', (e: L.LeafletMouseEvent) => selectAt(e.latlng.lat, e.latlng.lng))
+  streetLabelLayer = L.layerGroup().addTo(pickerMap)
+  pickerMap.on('zoomend moveend', refreshStreetLabels)
   try {
     const { data } = await configApi.getBuildingSurveys()
-    const canvas = L.canvas({ padding: 0.5 })
     const bounds: L.LatLngTuple[] = []
-    interface RawSurvey { latitude: number; longitude: number; is_named: boolean; street_name: string; existing_street_name: string; locality: string }
+    interface RawSurvey { latitude: number; longitude: number; is_named: boolean; street_name: string; existing_street_name: string; locality: string; ward: string; photo_url: string }
     for (const s of data as RawSurvey[]) {
       const lat = Number(s.latitude), lng = Number(s.longitude)
       if (!Number.isFinite(lat) || !inBounds(lat, lng)) continue
-      pickPoints.push({ lat, lng, is_named: s.is_named, street_name: s.street_name, existing_street_name: s.existing_street_name, locality: s.locality })
-      L.circleMarker([lat, lng], { renderer: canvas, radius: 3.5, color: s.is_named ? '#059669' : '#d97706', fillColor: s.is_named ? '#059669' : '#d97706', fillOpacity: 0.6, weight: 1 }).addTo(pickerMap)
+      // Points are kept in memory for snapping/recognition, but NOT drawn on the
+      // map — the applicant shouldn't be confused by the survey dots.
+      pickPoints.push({ lat, lng, is_named: s.is_named, street_name: s.street_name, existing_street_name: s.existing_street_name, locality: s.locality, ward: (s as any).ward || '', photo_url: s.photo_url })
       bounds.push([lat, lng])
     }
     if (bounds.length) pickerMap.fitBounds(L.latLngBounds(bounds).pad(0.05))
   } finally {
     pickerLoading.value = false
+    rebuildLocalityIndex()
+    refreshStreetLabels()
+    // If a locality was chosen before points finished loading, zoom now.
+    if (pendingZoomLocality || form.value.locality) { pendingZoomLocality = ''; zoomToLocality() }
+  }
+}
+
+// Overlay existing street names (from the survey records) as labels, so the
+// applicant can see the names of nearby streets on the auto-zoomed map.
+function refreshStreetLabels() {
+  if (!pickerMap || !streetLabelLayer) return
+  streetLabelLayer.clearLayers()
+  if (pickerMap.getZoom() < 15) return  // only when zoomed in enough to be readable
+  const b = pickerMap.getBounds()
+  const groups: Record<string, { lat: number; lng: number; n: number }> = {}
+  for (const p of pickPoints) {
+    const name = (p.existing_street_name || p.street_name || '').trim()
+    if (!name || !p.is_named) continue
+    if (!b.contains([p.lat, p.lng] as L.LatLngTuple)) continue
+    const g = groups[name] || (groups[name] = { lat: 0, lng: 0, n: 0 })
+    g.lat += p.lat; g.lng += p.lng; g.n += 1
+  }
+  const names = Object.keys(groups)
+  for (const name of names.slice(0, 60)) {  // cap to keep the map readable
+    const g = groups[name]!
+    L.marker([g.lat / g.n, g.lng / g.n], {
+      interactive: false,
+      icon: L.divIcon({
+        className: 'street-name-label',
+        html: `<span style="background:rgba(255,255,255,0.82);border:1px solid #cbd5e1;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:600;color:#334155;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,0.1)">${name.replace(/</g, '')}</span>`,
+        iconSize: [0, 0],
+      }),
+    }).addTo(streetLabelLayer)
   }
 }
 
@@ -489,6 +676,7 @@ function runDuplicateCheck() {
 }
 
 watch(() => [form.value.proposed_street_name, form.value.locality, geoCoords.value.lat], runDuplicateCheck)
+watch(() => [form.value.registry_street_id, geoCoords.value.lat, geoCoords.value.lng], checkValidateMatch)
 
 async function handleSubmit() {
   errorMessage.value = ''
@@ -496,9 +684,12 @@ async function handleSubmit() {
   try {
     let payload: FormData | Record<string, unknown>
     if (isLegacy.value && legacyCertFile.value) {
+      const selected = registryStreets.value.find(s => String(s.id) === String(form.value.registry_street_id))
       const fd = new FormData()
-      fd.append('proposed_street_name', form.value.proposed_street_name)
-      fd.append('street_type', form.value.street_type)
+      // In validate mode the name comes from the selected registry street.
+      fd.append('proposed_street_name', selected?.name || '')
+      fd.append('registry_street_id', String(form.value.registry_street_id))
+      fd.append('street_type', form.value.street_type || '')
       fd.append('ward', form.value.ward)
       fd.append('locality', form.value.locality)
       fd.append('location_description', form.value.location_description)
@@ -539,6 +730,42 @@ onMounted(async () => {
   } finally {
     streetTypesLoading.value = false
   }
+  configApi.getLocalityWards().then(r => { localityWards.value = r.data.community_to_ward || {}; communities.value = Object.keys(r.data.community_to_ward || {}).sort() }).catch(() => {})
+  configApi.publicSettings().then(r => { googleEnabled.value = !!r.data.google_maps_enabled }).catch(() => {})
+  if (isLegacy.value) {
+    configApi.getStreets().then(r => {
+      registryStreets.value = (r.data as typeof registryStreets.value).slice().sort((a, b) => a.name.localeCompare(b.name))
+    }).catch(() => {})
+  }
   initPicker()
 })
+
+// The new-application and validate flows share this route, so navigating between
+// them (or re-entering) reuses this component instance. Re-initialise on every
+// entry so the map always rebuilds and re-zooms to the selected locality.
+watch(() => route.fullPath, async () => {
+  if (route.name !== 'application-new' && !route.path.startsWith('/applications/new')) return
+  isLegacy.value = route.query.mode === 'legacy'
+  // reset the form for a clean entry
+  form.value = { proposed_street_name: '', street_type: '', ward: '', locality: '', location_description: '', registry_street_id: '' }
+  geoCoords.value = { lat: '', lng: '', accuracy: '' }
+  recognized.value = null
+  validateNote.value = null
+  streetViewSrc.value = ''
+  if (pictureMap) { pictureMap.remove(); pictureMap = null }
+  showPicture.value = false
+  legacyCertFile.value = null
+  pickPoints.length = 0
+  pendingZoomLocality = ''
+  if (pickerMap) { pickerMap.remove(); pickerMap = null }
+  pickerLoading.value = true
+  if (isLegacy.value && !registryStreets.value.length) {
+    configApi.getStreets().then(r => {
+      registryStreets.value = (r.data as typeof registryStreets.value).slice().sort((a, b) => a.name.localeCompare(b.name))
+    }).catch(() => {})
+  }
+  await initPicker()
+})
+
+onUnmounted(() => { if (pickerMap) { pickerMap.remove(); pickerMap = null } if (pictureMap) { pictureMap.remove(); pictureMap = null } })
 </script>

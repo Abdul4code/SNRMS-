@@ -220,3 +220,34 @@ class DocumentRejectView(APIView):
 
         serializer = DocumentSerializer(document, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class AdminDocumentUploadView(APIView):
+    """POST /documents/admin-upload/ — staff issue a document TO the applicant (#10)."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if not _is_staff_role(request.user):
+            raise PermissionDenied('Only Council staff can issue documents to applicants.')
+        application_id = request.data.get('application_id')
+        file = request.FILES.get('file')
+        if not application_id or not file:
+            raise ValidationError({'detail': 'application_id and file are required.'})
+        try:
+            application = Application.objects.get(pk=application_id)
+        except Application.DoesNotExist:
+            raise NotFound('Application not found.')
+        doc = Document.objects.create(
+            application=application,
+            document_type='admin_correspondence',
+            direction='issued',
+            title=request.data.get('title', 'Council document'),
+            file=file,
+            original_filename=getattr(file, 'name', 'document'),
+            file_size=file.size,
+            mime_type=getattr(file, 'content_type', 'application/octet-stream'),
+            uploaded_by=request.user,
+            is_verified=True,
+        )
+        return Response(DocumentSerializer(doc, context={'request': request}).data,
+                        status=status.HTTP_201_CREATED)

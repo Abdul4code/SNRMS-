@@ -193,3 +193,44 @@ class StaffDetailView(RetrieveUpdateDestroyAPIView):
         user.is_active = False
         user.save(update_fields=['is_active'])
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class RequestEmailCodeView(APIView):
+    """POST /auth/request-verification/ {email} — email a 6-digit code (#2)."""
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        import random
+        from datetime import timedelta
+        from django.utils import timezone
+        from django.core.mail import send_mail
+        from django.conf import settings
+        from accounts.models import EmailVerification, User
+
+        email = (request.data.get('email') or '').strip().lower()
+        if not email:
+            return Response({'detail': 'Email is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if User.objects.filter(email__iexact=email).exists():
+            return Response({'detail': 'An account with this email already exists.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        # light rate-limit: max 1 code per 60s per email
+        recent = EmailVerification.objects.filter(
+            email__iexact=email, created_at__gt=timezone.now() - timedelta(seconds=60)).exists()
+        if recent:
+            return Response({'detail': 'A code was just sent. Please wait a minute before retrying.'},
+                            status=status.HTTP_429_TOO_MANY_REQUESTS)
+        code = f'{random.randint(0, 999999):06d}'
+        EmailVerification.objects.create(
+            email=email, code=code, expires_at=timezone.now() + timedelta(minutes=15))
+        try:
+            send_mail(
+                subject='[Ibeju-Lekki SNRMS] Your verification code',
+                message=(f'Your verification code is {code}. It expires in 15 minutes.\n\n'
+                         f'Enter it to complete your registration on the Ibeju-Lekki Street Naming '
+                         f'Registration Management System.'),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[email], fail_silently=True,
+            )
+        except Exception:  # noqa: BLE001
+            pass
+        return Response({'status': 'sent', 'message': 'A verification code has been sent to your email.'})

@@ -101,10 +101,38 @@ def check_duplicate(name, locality=None, latitude=None, longitude=None):
     else:
         verdict = 'clear'
 
+    # "Cannot rename until the previous name expires" — a street with an active
+    # (unexpired) registration cannot be renamed until its registration lapses.
+    from django.utils import timezone
+    import datetime as _dt
+    now = timezone.now()
+    rename_blocked = None
+    RENAME_METERS = 60
+    for a in Application.objects.filter(status__in=_REGISTERED_STATUSES).exclude(expires_at=None):
+        exp = a.expires_at
+        if isinstance(exp, _dt.datetime):
+            exp_dt = exp if timezone.is_aware(exp) else timezone.make_aware(exp)
+        else:  # a plain date
+            exp_dt = timezone.make_aware(_dt.datetime.combine(exp, _dt.time.max))
+        if exp_dt <= now:
+            continue  # already expired — a new name is allowed
+        same_name = normalize(a.proposed_street_name) == key
+        close = False
+        if lat is not None and a.latitude is not None:
+            close = _haversine_m(lat, lng, float(a.latitude), float(a.longitude)) <= RENAME_METERS
+        if same_name or close:
+            rename_blocked = {
+                'name': a.proposed_street_name,
+                'reference': a.reference_number,
+                'expires_at': a.expires_at,
+            }
+            break
+
     return {
         'verdict': verdict,
         'normalized': key,
         'name_matches': name_matches,
         'locality_matches': locality_matches,
         'nearby': nearby[:12],
+        'rename_blocked': rename_blocked,
     }

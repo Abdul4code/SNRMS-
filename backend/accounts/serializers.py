@@ -25,21 +25,38 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class RegisterSerializer(serializers.ModelSerializer):
+    verification_code = serializers.CharField(write_only=True, required=True)
+    phone = serializers.CharField(required=True, allow_blank=False)
+
+    def validate(self, attrs):
+        from accounts.models import EmailVerification
+        email = attrs.get('email', '')
+        code = attrs.get('verification_code', '')
+        if not EmailVerification.is_verified(email, code):
+            raise serializers.ValidationError({'verification_code': 'Invalid or expired verification code.'})
+        return attrs
     password = serializers.CharField(write_only=True, min_length=8)
 
     class Meta:
         model = User
-        fields = ['email', 'password', 'first_name', 'last_name', 'phone']
+        fields = ['email', 'password', 'first_name', 'last_name', 'phone', 'verification_code']
 
     def create(self, validated_data):
-        return User.objects.create_user(
+        from accounts.models import EmailVerification
+        code = validated_data.pop('verification_code', None)
+        user = User.objects.create_user(
             email=validated_data['email'],
             password=validated_data['password'],
             first_name=validated_data['first_name'],
             last_name=validated_data['last_name'],
-            phone=validated_data.get('phone', ''),
+            phone=validated_data['phone'],
             role=Role.APPLICANT,
         )
+        # Consume the verification code so it can't be reused.
+        EmailVerification.objects.filter(
+            email__iexact=validated_data['email'], code=code, consumed=False,
+        ).update(consumed=True)
+        return user
 
 
 class LoginSerializer(serializers.Serializer):

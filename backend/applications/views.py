@@ -74,7 +74,7 @@ def _auto_expire_certificates():
     )
     for app in due:
         try:
-            app.transition_to(ApplicationStatus.EXPIRED, actor=None, remarks='Certificate expired automatically.')
+            app.transition_to(ApplicationStatus.EXPIRED, actor=None, remarks='')
             notify_applicant(
                 app,
                 notification_type=_NT.APPLICATION_STATUS_CHANGE,
@@ -137,7 +137,63 @@ class ApplicationListCreateView(generics.ListCreateAPIView):
                 {'detail': 'Only applicants can create applications.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        return super().create(request, *args, **kwargs)
+        response = super().create(request, *args, **kwargs)
+        # Validate-existing-registration flow: check the picked location against the
+        # registry and flag the Street Naming Committee if it doesn't line up (#validate).
+        try:
+            if str(request.data.get('is_legacy', '')).lower() in ('true', '1') and response.status_code == 201:
+                self._validate_legacy_location(request, response.data)
+        except Exception:  # noqa: BLE001
+            pass
+        return response
+
+    def _validate_legacy_location(self, request, data):
+        import math
+        from config.models import BuildingSurvey
+        from accounts.models import User, Role as _Role
+        from notifications.models import Notification, NotificationType
+        app_id = data.get('id')
+        application = Application.objects.filter(pk=app_id).first()
+        if not application or application.latitude is None or application.longitude is None:
+            return
+        lat, lng = float(application.latitude), float(application.longitude)
+
+        def _m(la, lo):
+            return math.hypot((la - lat) * 111000, (lo - lng) * 111000 * math.cos(math.radians(lat)))
+
+        # nearest NAMED survey point to the submitted location
+        UNNAMED = {'', 'none', 'na', 'n/a', 'nil', 'null', 'no', 'nan', '-'}
+        best, best_name = 1e9, ''
+        for b in BuildingSurvey.objects.exclude(latitude=None).exclude(longitude=None):
+            raw = (b.existing_street_name or '').strip()
+            if raw.lower() in UNNAMED:
+                continue
+            d = _m(float(b.latitude), float(b.longitude))
+            if d < best:
+                best, best_name = d, raw
+
+        def _norm(x):
+            return ' '.join((x or '').strip().lower().split())
+
+        selected = _norm(application.proposed_street_name)
+        note = None
+        if best > 60 or not best_name:
+            note = (f'Validation flag: the street "{application.proposed_street_name}" selected by '
+                    f'{application.applicant.full_name or application.applicant.email} for validation '
+                    f'does not match any initially named street. Probably part of the old record.')
+        elif _norm(best_name) != selected:
+            note = (f'Validation flag: the name "{application.proposed_street_name}" the applicant wishes to '
+                    f'validate does not match the name already in the database at that location '
+                    f'("{best_name}").')
+        if note:
+            for u in User.objects.filter(role=_Role.NAMING_COMMITTEE, is_active=True):
+                Notification.objects.create(
+                    recipient=u,
+                    notification_type=NotificationType.APPLICATION_STATUS_CHANGE,
+                    title='Street validation needs review',
+                    message=note,
+                    application=application,
+                )
 
 
 # ---------------------------------------------------------------------------
@@ -378,7 +434,7 @@ class CommitteeReviewView(APIView):
                 application.transition_to(
                     ApplicationStatus.AWAITING_CHAIRMAN_APPROVAL,
                     actor=request.user,
-                    remarks='Auto-forwarded to chairman after committee approval.',
+                    remarks='',
                 )
                 notify_applicant(
                     application,
@@ -397,6 +453,8 @@ class CommitteeReviewView(APIView):
                     actor=request.user,
                     remarks=remarks,
                 )
+                from applications.services import release_signboard_number
+                release_signboard_number(application)
                 notify_applicant(
                     application,
                     notification_type=NotificationType.APPLICATION_REJECTED,
@@ -467,6 +525,10 @@ class ChairmanApprovalView(APIView):
                     remarks=remarks,
                 )
 
+                # Auto-issue the next signboard/pole number on approval (recycled pool).
+                from applications.services import allocate_signboard_number
+                allocate_signboard_number(application)
+
                 from decimal import Decimal as _Decimal
                 from payments.models import Payment as _Payment, PaymentStage as _PS, PaymentStatus as _PStatus
 
@@ -475,7 +537,7 @@ class ChairmanApprovalView(APIView):
                     application.transition_to(
                         ApplicationStatus.AWAITING_RENEWAL_PAYMENT,
                         actor=request.user,
-                        remarks='Legacy application — auto-forwarded to renewal payment after chairman approval.',
+                        remarks='',
                     )
                     from payments.services import calculate_renewal_fee
                     _renewal_fee = calculate_renewal_fee()
@@ -500,17 +562,36 @@ class ChairmanApprovalView(APIView):
                     application.transition_to(
                         ApplicationStatus.AWAITING_STAGE_C_PAYMENT,
                         actor=request.user,
-                        remarks='Auto-forwarded to Stage C payment after chairman approval.',
+                        remarks='',
                     )
                     from payments.services import get_stage_c_fee_breakdown, get_total_fee
                     _breakdown = get_stage_c_fee_breakdown(application.street_type_id)
                     _amount = get_total_fee(_breakdown) if _breakdown else _Decimal('0.00')
-                    _Payment.objects.create(
+                    if application.is_royalty_exempt:
+                        _amount = _Decimal('0.00')
+                    _stage_c = _Payment.objects.create(
                         application=application,
                         stage=_PS.STAGE_C,
                         status=_PStatus.PENDING,
                         amount_expected=_amount,
                     )
+                    if application.is_royalty_exempt:
+                        # Royalty pays only the application fee — Stage C is waived and
+                        # the certificate is issued without payment.
+                        try:
+                            from payments.services import confirm_stage_c_payment
+                            from applications.services import issue_certificate
+                            _stage_c.amount_submitted = _Decimal('0.00')
+                            _stage_c.save(update_fields=['amount_submitted'])
+                            application.transition_to(
+                                ApplicationStatus.AWAITING_STAGE_C_PAYMENT_CONFIRMATION,
+                                actor=request.user, remarks='')
+                            confirm_stage_c_payment(_stage_c, actor=request.user)
+                            application.refresh_from_db()
+                            issue_certificate(application, actor=request.user)
+                        except Exception:
+                            import logging
+                            logging.getLogger(__name__).exception('Royalty-exempt certificate issuance failed')
                     notify_applicant(
                         application,
                         notification_type=NotificationType.APPLICATION_APPROVED,
@@ -526,6 +607,8 @@ class ChairmanApprovalView(APIView):
                     actor=request.user,
                     remarks=remarks,
                 )
+                from applications.services import release_signboard_number
+                release_signboard_number(application)
                 notify_applicant(
                     application,
                     notification_type=NotificationType.APPLICATION_REJECTED,
@@ -596,20 +679,55 @@ class CertificateIssueView(APIView):
             application.certificate_file = certificate_file
             application.save(update_fields=['certificate_file', 'updated_at'])
 
-        notify_applicant(
-            application,
-            notification_type=NotificationType.CERTIFICATE_ISSUED,
-            title='Certificate Issued',
-            message=(
-                f'Your street naming certificate for application {application.reference_number} '
-                'has been issued. You can now download it from your application page.'
-            ),
-        )
+        # The committee chairman decides whether the applicant may download it now.
+        release = str(request.data.get('release', 'false')).lower() in ('1', 'true', 'yes', 'on')
+        application.certificate_released = release
+        application.save(update_fields=['certificate_released', 'updated_at'])
+
+        if release:
+            notify_applicant(
+                application,
+                notification_type=NotificationType.CERTIFICATE_ISSUED,
+                title='Certificate Issued',
+                message=(
+                    f'Your street naming certificate for application {application.reference_number} '
+                    'has been issued and is available to download from your application page.'
+                ),
+            )
 
         return Response(
             ApplicationDetailSerializer(application, context={'request': request}).data,
             status=status.HTTP_200_OK,
         )
+
+
+class CertificateReleaseView(APIView):
+    """POST /api/applications/<pk>/certificate-release/ {released: bool} — the
+    committee or LG chairman controls whether the applicant may download the
+    certificate. The certificate itself always stays in the database.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        if getattr(request.user, 'role', None) not in ('naming_committee', 'committee_chairman'):
+            return Response({'detail': 'Only the committee or LG chairman can release certificates.'},
+                            status=status.HTTP_403_FORBIDDEN)
+        application = get_object_or_404(Application, pk=pk, is_deleted=False)
+        if not application.certificate_file:
+            return Response({'detail': 'No certificate has been generated yet.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        released = str(request.data.get('released', 'true')).lower() in ('1', 'true', 'yes', 'on')
+        application.certificate_released = released
+        application.save(update_fields=['certificate_released', 'updated_at'])
+        if released:
+            notify_applicant(
+                application,
+                notification_type=NotificationType.CERTIFICATE_ISSUED,
+                title='Certificate Available',
+                message=(f'Your street naming certificate for application {application.reference_number} '
+                         'is now available to download from your application page.'),
+            )
+        return Response({'certificate_released': application.certificate_released})
 
 
 # ---------------------------------------------------------------------------
@@ -755,7 +873,7 @@ class DocumentResubmitView(APIView):
             application.transition_to(
                 ApplicationStatus.UNDER_NAMING_COMMITTEE_REVIEW,
                 actor=request.user,
-                remarks='Applicant resubmitted documents for review.',
+                remarks='',
             )
         except ValueError as exc:
             return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
@@ -817,12 +935,12 @@ class ApplicationRenewView(APIView):
             application.transition_to(
                 ApplicationStatus.RENEWAL_SUBMITTED,
                 actor=request.user,
-                remarks='Renewal submitted by applicant.',
+                remarks='',
             )
             application.transition_to(
                 ApplicationStatus.AWAITING_RENEWAL_PAYMENT,
                 actor=request.user,
-                remarks='Auto-forwarded to awaiting renewal payment.',
+                remarks='',
             )
         except ValueError as exc:
             return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
@@ -941,3 +1059,271 @@ class AdminApplicationRegistryView(APIView):
                 ],
             })
         return Response({'count': len(rows), 'results': rows})
+
+
+class RoyaltyExemptionView(APIView):
+    """POST /applications/<pk>/royalty-exemption/ — Chairman only (#meeting).
+
+    Grants/revokes royalty exemption. When exempt, the applicant pays ONLY the
+    application fee; the Stage C (certificate) fee is waived.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        if getattr(request.user, 'role', None) != 'committee_chairman':
+            return Response({'detail': 'Only the Local Government Chairman can grant royalty exemption.'},
+                            status=status.HTTP_403_FORBIDDEN)
+        application = get_object_or_404(Application, pk=pk)
+        application.is_royalty_exempt = bool(request.data.get('exempt', True))
+        application.save(update_fields=['is_royalty_exempt', 'updated_at'])
+        return Response({'is_royalty_exempt': application.is_royalty_exempt})
+
+
+class SignboardPoleView(APIView):
+    """PATCH /applications/<pk>/signboard/ — staff record signboard & pole numbers."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        if getattr(request.user, 'role', None) not in ('finance', 'naming_committee', 'committee_chairman'):
+            return Response({'detail': 'Staff only.'}, status=status.HTTP_403_FORBIDDEN)
+        application = get_object_or_404(Application, pk=pk)
+        application.signboard_number = request.data.get('signboard_number', application.signboard_number)
+        application.pole_number = request.data.get('pole_number', application.pole_number)
+        application.save(update_fields=['signboard_number', 'pole_number', 'updated_at'])
+        return Response({'signboard_number': application.signboard_number,
+                         'pole_number': application.pole_number})
+
+
+class ChairmanAuditView(APIView):
+    """GET /applications/audit/?from=YYYY-MM-DD&to=YYYY-MM-DD — LG Chairman audit (#7).
+
+    Returns application counts and payment totals (by category) within a period.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if getattr(request.user, 'role', None) != 'committee_chairman':
+            return Response({'detail': 'Local Government Chairman only.'}, status=status.HTTP_403_FORBIDDEN)
+        import datetime as _dt
+        from django.utils import timezone
+        from django.db.models import Count, Sum
+        from payments.models import Payment, PaymentStatus
+
+        def parse(d, default):
+            try:
+                return _dt.datetime.strptime(d, '%Y-%m-%d').date()
+            except (TypeError, ValueError):
+                return default
+        today = timezone.localdate()
+        d_from = parse(request.query_params.get('from'), today.replace(day=1))
+        d_to = parse(request.query_params.get('to'), today)
+        start = timezone.make_aware(_dt.datetime.combine(d_from, _dt.time.min))
+        end = timezone.make_aware(_dt.datetime.combine(d_to, _dt.time.max))
+
+        apps = Application.objects.filter(created_at__range=(start, end), is_deleted=False)
+        by_status = {row['status']: row['n'] for row in apps.values('status').annotate(n=Count('id'))}
+
+        # Certificates ISSUED within the period (by the actual issuance date, not by
+        # when the application was created) — anything issued outside the dates is ignored.
+        from applications.models import StatusHistory
+        certificates_issued = StatusHistory.objects.filter(
+            to_status='certificate_issued', created_at__range=(start, end),
+            application__is_deleted=False,
+        ).values('application').distinct().count()
+
+        pays = Payment.objects.filter(status=PaymentStatus.CONFIRMED, confirmed_at__range=(start, end))
+        by_stage = {}
+        for stage in ('stage_a', 'stage_c', 'renewal'):
+            agg = pays.filter(stage=stage).aggregate(n=Count('id'), total=Sum('amount_submitted'))
+            by_stage[stage] = {'count': agg['n'] or 0, 'total': float(agg['total'] or 0)}
+        grand_total = sum(v['total'] for v in by_stage.values())
+
+        return Response({
+            'from': d_from, 'to': d_to,
+            'total_applications': apps.count(),
+            'applications_by_status': by_status,
+            'certificates_issued': certificates_issued,
+            'payments_by_category': by_stage,
+            'total_revenue': grand_total,
+            'payments_confirmed_count': pays.count(),
+        })
+
+
+class ChairmanAuditReportView(APIView):
+    """GET /applications/audit/report/?from=&to= — downloadable PDF audit report (#7)."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if getattr(request.user, 'role', None) != 'committee_chairman':
+            return Response({'detail': 'Local Government Chairman only.'}, status=status.HTTP_403_FORBIDDEN)
+        import datetime as _dt, io, os
+        from django.utils import timezone
+        from django.http import FileResponse
+        from django.db.models import Count, Sum
+        from django.conf import settings
+        from payments.models import Payment, PaymentStatus
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import mm
+        from reportlab.lib import colors
+        from reportlab.pdfgen import canvas
+
+        def parse(d, default):
+            try:
+                return _dt.datetime.strptime(d, '%Y-%m-%d').date()
+            except (TypeError, ValueError):
+                return default
+        today = timezone.localdate()
+        d_from = parse(request.query_params.get('from'), today.replace(day=1))
+        d_to = parse(request.query_params.get('to'), today)
+        start = timezone.make_aware(_dt.datetime.combine(d_from, _dt.time.min))
+        end = timezone.make_aware(_dt.datetime.combine(d_to, _dt.time.max))
+
+        apps = Application.objects.filter(created_at__range=(start, end), is_deleted=False)
+        pays = Payment.objects.filter(status=PaymentStatus.CONFIRMED, confirmed_at__range=(start, end))
+        from applications.models import StatusHistory
+        certs_issued = StatusHistory.objects.filter(
+            to_status='certificate_issued', created_at__range=(start, end),
+            application__is_deleted=False,
+        ).values('application').distinct().count()
+        for stage, label in (('stage_a', 'Application Fee'), ('stage_c', 'Certificate Fee'), ('renewal', 'Renewal Fee')):
+            agg = pays.filter(stage=stage).aggregate(n=Count('id'), total=Sum('amount_submitted'))
+            by_stage[label] = (agg['n'] or 0, float(agg['total'] or 0))
+        grand = sum(v[1] for v in by_stage.values())
+        by_status = {row['status']: row['n'] for row in apps.values('status').annotate(n=Count('id'))}
+
+        buf = io.BytesIO()
+        c = canvas.Canvas(buf, pagesize=A4)
+        w, h = A4
+        green = colors.HexColor('#1F7A4D'); dark = colors.HexColor('#0f172a'); grey = colors.HexColor('#64748b')
+        logo = os.path.join(settings.BASE_DIR, 'config', 'data', 'lga_logo.png')
+        if os.path.exists(logo):
+            c.drawImage(logo, 22 * mm, h - 40 * mm, width=22 * mm, height=22 * mm, preserveAspectRatio=True, mask='auto')
+        c.setFillColor(dark); c.setFont('Helvetica-Bold', 15)
+        c.drawString(48 * mm, h - 24 * mm, 'IBEJU-LEKKI LOCAL GOVERNMENT AREA')
+        c.setFillColor(green); c.setFont('Helvetica-Bold', 11)
+        c.drawString(48 * mm, h - 30 * mm, 'Street Naming — Audit & Revenue Report')
+        c.setFillColor(grey); c.setFont('Helvetica', 9)
+        c.drawString(48 * mm, h - 35 * mm, f'Period: {d_from.strftime("%d %b %Y")} to {d_to.strftime("%d %b %Y")}')
+        c.setStrokeColor(green); c.setLineWidth(1.5); c.line(22 * mm, h - 44 * mm, w - 22 * mm, h - 44 * mm)
+
+        y = h - 58 * mm
+        def row(label, value, bold=False):
+            nonlocal y
+            c.setFillColor(grey); c.setFont('Helvetica', 10); c.drawString(26 * mm, y, label)
+            c.setFillColor(dark); c.setFont('Helvetica-Bold' if bold else 'Helvetica', 10)
+            c.drawRightString(w - 26 * mm, y, str(value)); y -= 8 * mm
+
+        c.setFillColor(dark); c.setFont('Helvetica-Bold', 12); c.drawString(24 * mm, y, 'Summary'); y -= 9 * mm
+        row('Total applications', apps.count())
+        row('Certificates issued', certs_issued)
+        row('Payments confirmed', pays.count())
+        row('Total revenue', f'NGN {grand:,.2f}', bold=True)
+        y -= 4 * mm
+        c.setFillColor(dark); c.setFont('Helvetica-Bold', 12); c.drawString(24 * mm, y, 'Revenue by category'); y -= 9 * mm
+        for label, (n, total) in by_stage.items():
+            row(f'{label} ({n})', f'NGN {total:,.2f}')
+        y -= 4 * mm
+        c.setFillColor(dark); c.setFont('Helvetica-Bold', 12); c.drawString(24 * mm, y, 'Applications by status'); y -= 9 * mm
+        for stat, n in by_status.items():
+            row(stat.replace('_', ' ').title(), n)
+
+        c.setFillColor(grey); c.setFont('Helvetica', 8)
+        c.drawString(24 * mm, 16 * mm, f'Generated {timezone.now().strftime("%d %b %Y %H:%M")} · Ibeju-Lekki LGA SNRMS')
+        c.showPage(); c.save(); buf.seek(0)
+        return FileResponse(buf, as_attachment=True,
+                            filename=f'audit_{d_from}_{d_to}.pdf', content_type='application/pdf')
+
+
+class ApplicationRepositoryView(APIView):
+    """GET /applications/<pk>/repository/ — the complete document repository for an
+    application, stored against the applicant. Aggregates everything submitted AND
+    generated (uploaded documents, issued correspondence, receipts, the certificate
+    and any legacy certificate) so it can be downloaded and re-downloaded anytime.
+    Accessible to staff and to the owning applicant.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        application = get_object_or_404(Application, pk=pk)
+        user = request.user
+        is_staff_role = getattr(user, 'role', None) in ('finance', 'naming_committee', 'committee_chairman') or user.is_staff
+        if not is_staff_role and application.applicant_id != user.id:
+            return Response({'detail': 'Not permitted.'}, status=status.HTTP_403_FORBIDDEN)
+
+        def _url(f):
+            if not f:
+                return None
+            try:
+                return request.build_absolute_uri(f.url)
+            except Exception:  # noqa: BLE001
+                return None
+
+        items = []
+        # 1) Documents uploaded by the applicant, and 2) issued by the Council
+        from documents.models import Document
+        for d in Document.objects.filter(application=application, is_deleted=False).order_by('created_at'):
+            issued = getattr(d, 'direction', 'submission') == 'issued'
+            items.append({
+                'category': 'Issued by Council' if issued else 'Submitted by applicant',
+                'title': d.title or d.get_document_type_display(),
+                'kind': d.document_type,
+                'filename': d.original_filename or '',
+                'download_url': _url(d.file),
+                'date': d.created_at,
+                'verified': d.is_verified,
+            })
+        # 3) The naming certificate — committee/LG chairman can always download;
+        #    the applicant sees it only once the chairman releases it.
+        if getattr(application, 'certificate_file', None):
+            if is_staff_role or application.certificate_released:
+                items.append({
+                    'category': 'Certificate',
+                    'title': 'Street Naming Certificate',
+                    'kind': 'certificate',
+                    'filename': '',
+                    'download_url': _url(application.certificate_file),
+                    'date': application.certificate_issued_at or application.updated_at,
+                    'verified': True,
+                    'released': application.certificate_released,
+                })
+        # 4) Legacy certificate submitted for validation
+        if getattr(application, 'legacy_certificate', None):
+            items.append({
+                'category': 'Submitted by applicant',
+                'title': 'Existing certificate (for validation)',
+                'kind': 'legacy_certificate',
+                'filename': '',
+                'download_url': _url(application.legacy_certificate),
+                'date': application.created_at,
+                'verified': True,
+            })
+        # 5) Payment receipts (generated)
+        from payments.models import Receipt
+        for r in application.receipts.all().order_by('issued_at'):
+            items.append({
+                'category': 'Receipt',
+                'title': f'Payment Receipt — {r.serial}',
+                'kind': f'receipt_{r.stage}',
+                'filename': f'{r.serial}.pdf',
+                'download_url': _url(r.pdf),
+                'serial': r.serial,
+                'amount': float(r.amount or 0),
+                'date': r.issued_at,
+                'verified': True,
+            })
+
+        applicant = application.applicant
+        return Response({
+            'application': {
+                'id': str(application.id),
+                'reference_number': application.reference_number or '',
+                'proposed_street_name': application.proposed_street_name,
+                'status': application.status,
+            },
+            'applicant': {
+                'name': (applicant.full_name if applicant else '') or (applicant.email if applicant else ''),
+                'email': applicant.email if applicant else '',
+            },
+            'count': len(items),
+            'items': items,
+        })

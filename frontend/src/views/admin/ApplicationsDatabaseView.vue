@@ -42,7 +42,12 @@
                   <span class="font-medium text-slate-800">{{ r.proposed_street_name }}</span>
                   <span class="text-xs text-slate-400 ml-1">{{ r.street_type }}</span>
                 </td>
-                <td class="px-4 py-3 text-slate-700">{{ r.applicant_name || '—' }}</td>
+                <td class="px-4 py-3">
+                  <RouterLink :to="`/staff/applications/${r.id}`"
+                              class="font-medium text-emerald-600 hover:text-emerald-700 hover:underline">
+                    {{ r.applicant_name || '—' }}
+                  </RouterLink>
+                </td>
                 <td class="px-4 py-3 text-slate-600 text-xs">{{ r.applicant_email }}</td>
                 <td class="px-4 py-3 text-slate-600 text-xs">{{ r.applicant_phone || '—' }}</td>
                 <td class="px-4 py-3 text-slate-600 text-xs">{{ r.locality || '—' }}</td>
@@ -68,6 +73,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { RouterLink } from 'vue-router'
 import { applicationApi } from '@/services/api'
 
 interface PayRef { stage: string; reference: string; status: string }

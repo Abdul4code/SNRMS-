@@ -73,7 +73,7 @@
               </div>
               <div class="col-span-2">
                 <p class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Account Name</p>
-                <p class="text-sm font-semibold text-slate-800 mt-0.5">Ibeju-Lekki LGA — Street Naming</p>
+                <p class="text-sm font-semibold text-slate-800 mt-0.5">Ibeju-Lekki Local Government Area — Street Naming</p>
               </div>
             </div>
           </div>
@@ -112,10 +112,19 @@
                   ₦{{ formatAmount(p.amount_submitted) }} submitted
                 </p>
               </div>
-              <span class="px-3 py-1 rounded-full text-xs font-bold flex-shrink-0"
-                    :class="paymentStatusClass(p.status)">
-                {{ paymentStatusLabel(p.status) }}
-              </span>
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <button v-if="p.status === 'confirmed' && p.receipt_serial"
+                        @click="downloadReceipt(p.receipt_serial)"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
+                        style="background:#059669">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                  Download Receipt
+                </button>
+                <span class="px-3 py-1 rounded-full text-xs font-bold"
+                      :class="paymentStatusClass(p.status)">
+                  {{ paymentStatusLabel(p.status) }}
+                </span>
+              </div>
             </li>
           </ul>
         </div>
@@ -127,11 +136,8 @@
             <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
           </svg>
           <div>
-            <p class="text-sm font-bold text-red-700">Payment Evidence Rejected</p>
-            <p v-if="rejectedPayment.finance_remarks" class="text-sm text-red-600 mt-0.5">
-              Reason: {{ rejectedPayment.finance_remarks }}
-            </p>
-            <p class="text-xs text-red-500 mt-1">Please re-submit with the correct details below.</p>
+            <p class="text-sm font-bold text-red-700">Payment Not Confirmed</p>
+            <p class="text-xs text-red-500 mt-1">The Council Treasurer could not confirm this payment. Please re-submit with the correct details below.</p>
           </div>
         </div>
 
@@ -209,6 +215,7 @@ import {
   InformationCircleIcon, ClockIcon, CheckCircleIcon,
 } from '@heroicons/vue/24/outline'
 import { applicationApi, paymentApi } from '@/services/api'
+import { receiptApi } from '@/services/api'
 
 interface FeeItem { component: string; label: string; amount: number }
 interface PaymentRecord {
@@ -220,6 +227,7 @@ interface PaymentRecord {
   amount_submitted?: number
   amount_expected: number
   finance_remarks?: string
+  receipt_serial?: string | null
 }
 
 const route = useRoute()
@@ -374,8 +382,8 @@ async function payOnline() {
   onlineBusy.value = true
   try {
     const { data } = await paymentApi.initializePayment(pendingPayment.value.id, window.location.href.split('?')[0])
-    if (data.mode === 'paystack' && data.authorization_url) {
-      // Redirect to Paystack checkout; on return, ?reference= is verified on mount.
+    if (data.authorization_url) {
+      // Redirect to Ibeju Pay hosted checkout; on return, ?reference= is verified on mount.
       window.location.href = data.authorization_url
       return
     }
@@ -394,7 +402,7 @@ async function payOnline() {
 
 onMounted(async () => {
   await loadData()
-  // If we returned from Paystack checkout, verify the transaction.
+  // If we returned from Ibeju Pay checkout, verify the transaction.
   const reference = (route.query.reference || route.query.trxref) as string | undefined
   if (reference) {
     onlineBusy.value = true
@@ -409,4 +417,8 @@ onMounted(async () => {
     }
   }
 })
+
+async function downloadReceipt(serial: string) {
+  try { await receiptApi.download(serial) } catch { /* ignore */ }
+}
 </script>

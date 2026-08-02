@@ -102,7 +102,7 @@ def submit_application(application: Application, actor) -> Application:
     application.transition_to(
         ApplicationStatus.SUBMITTED,
         actor=actor,
-        remarks='Application submitted by applicant.',
+        remarks='',
     )
 
     notify_applicant(
@@ -149,7 +149,7 @@ def submit_payment_reference(application: Application, actor) -> Payment:
     application.transition_to(
         ApplicationStatus.AWAITING_STAGE_A_PAYMENT,
         actor=actor,
-        remarks='Application moved to awaiting Stage A payment.',
+        remarks='',
     )
 
     notify_applicant(
@@ -174,7 +174,7 @@ def advance_to_committee_review(application: Application, actor) -> Application:
     application.transition_to(
         ApplicationStatus.UNDER_NAMING_COMMITTEE_REVIEW,
         actor=actor,
-        remarks='Stage A payment confirmed; forwarded to naming committee.',
+        remarks='',
     )
 
     notify_applicant(
@@ -210,6 +210,45 @@ def issue_certificate(application: Application, actor, expires_at=None) -> Appli
     application.expires_at = expires
     application.save(update_fields=['certificate_number', 'certificate_issued_at', 'expires_at', 'updated_at'])
 
+    # Auto-generate the certificate PDF and store it against the application so it is
+    # always in the database and downloadable by the committee / LG chairman.
+    try:
+        from applications.certificates import generate_certificate_pdf
+        generate_certificate_pdf(application)
+    except Exception:  # noqa: BLE001 — never block issuance on rendering
+        pass
+
+    # Add the newly-named street to the street registry so the registry count goes up
+    # (and the "in progress" count goes down) the moment the certificate is issued.
+    try:
+        from config.models import Street
+        import re as _re
+        raw = (application.proposed_street_name or '').strip()
+        key = _re.sub(r'\s+', ' ', raw).lower()
+        if key:
+            existing = (Street.objects.filter(normalized_key=key).first()
+                        or Street.objects.filter(name__iexact=raw).first())
+            if existing:
+                if existing.registration_status != Street.RegistrationStatus.REGISTERED:
+                    existing.registration_status = Street.RegistrationStatus.REGISTERED
+                    if application.latitude is not None and existing.latitude is None:
+                        existing.latitude = application.latitude
+                        existing.longitude = application.longitude
+                    existing.save(update_fields=['registration_status', 'latitude', 'longitude'])
+            else:
+                Street.objects.create(
+                    name=raw.title(), normalized_key=key,
+                    code=f'IBJ-ST-{Street.objects.count() + 1:04d}',
+                    street_type=application.street_type,
+                    ward=application.ward or '', locality=application.locality or '',
+                    building_count=0, name_variants=1,
+                    registration_status=Street.RegistrationStatus.REGISTERED,
+                    validation_status=Street.VALIDATION_REGISTRY,
+                    latitude=application.latitude, longitude=application.longitude,
+                )
+    except Exception:  # noqa: BLE001
+        pass
+
     application.transition_to(
         ApplicationStatus.CERTIFICATE_ISSUED,
         actor=actor,
@@ -244,3 +283,48 @@ def notify_applicant(
         message=message,
         application=application,
     )
+
+
+# ---------------------------------------------------------------------------
+# Signboard / pole auto-numbering (committee + chairman)
+# ---------------------------------------------------------------------------
+def _format_signboard(seq):
+    return f'SB-{seq:03d}'
+
+
+def _format_pole(seq):
+    return f'PL-{seq:03d}'
+
+
+def allocate_signboard_number(application):
+    """Issue the lowest available signboard/pole sequence number to an approved street.
+
+    Numbers are issued in approval order; a number released by a declined application
+    is recycled to the next approval, so the active set stays gap-free and consistent.
+    """
+    from applications.models import Application
+    if application.signboard_seq:
+        return application.signboard_seq
+    used = set(
+        Application.objects.exclude(pk=application.pk)
+        .exclude(signboard_seq__isnull=True)
+        .values_list('signboard_seq', flat=True)
+    )
+    seq = 1
+    while seq in used:
+        seq += 1
+    application.signboard_seq = seq
+    application.signboard_number = _format_signboard(seq)
+    application.pole_number = _format_pole(seq)
+    application.save(update_fields=['signboard_seq', 'signboard_number', 'pole_number', 'updated_at'])
+    return seq
+
+
+def release_signboard_number(application):
+    """Release a declined application's number back into the pool for reissue."""
+    if not application.signboard_seq and not application.signboard_number:
+        return
+    application.signboard_seq = None
+    application.signboard_number = ''
+    application.pole_number = ''
+    application.save(update_fields=['signboard_seq', 'signboard_number', 'pole_number', 'updated_at'])

@@ -9,6 +9,8 @@ class DocumentType(models.TextChoices):
     PASSPORT_PHOTOGRAPH = 'passport_photograph', 'Passport Photograph'
     ROYAL_FATHERS_RECOGNITION_LETTER = 'royal_fathers_recognition_letter', 'Royal Fathers Recognition Letter'
     SURVEY_PROPERTY_DOCUMENT = 'survey_property_document', 'Survey Property Document'
+    CDA_RECOMMENDATION_LETTER = 'cda_recommendation_letter', 'CDA / Landlord Association Recommendation Letter'
+    ADMIN_CORRESPONDENCE = 'admin_correspondence', 'Correspondence / Letter from the Council'
 
 
 def document_upload_path(instance, filename):
@@ -33,6 +35,10 @@ class Document(models.Model):
     is_verified = models.BooleanField(default=False)
     is_rejected = models.BooleanField(default=False)
     verification_note = models.TextField(blank=True)
+    direction = models.CharField(max_length=20, default='submission',
+                                 choices=[('submission', 'Applicant submission'),
+                                          ('issued', 'Issued to applicant by Council')])
+    title = models.CharField(max_length=200, blank=True, help_text='Label for Council-issued documents')
     is_deleted = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 

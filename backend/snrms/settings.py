@@ -130,14 +130,25 @@ CORS_ALLOWED_ORIGINS = [
 ]
 CORS_ALLOW_CREDENTIALS = True
 
+# Allow the committee second-tier token header through CORS (browsers strip
+# non-default custom request headers otherwise, which silently breaks the
+# committee console when the frontend and API are on different origins).
+from corsheaders.defaults import default_headers as _default_cors_headers  # noqa: E402
+CORS_ALLOW_HEADERS = list(_default_cors_headers) + ['x-committee-member']
+
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 
-# --- Payment gateway (Paystack) ---
-# Leave the keys blank for demo mode (applicants can simulate payment).
-# Add your Paystack TEST keys (sk_test_..., pk_test_...) to enable real sandbox checkout.
-PAYSTACK_SECRET_KEY = config('PAYSTACK_SECRET_KEY', default='')
-PAYSTACK_PUBLIC_KEY = config('PAYSTACK_PUBLIC_KEY', default='')
+# --- Payment gateway (Ibeju Pay) ---
+# Leave IBEJUPAY_SECRET_KEY blank for demo mode (applicants can simulate payment).
+# Add your Ibeju Pay keys to enable real checkout:
+#   IBEJUPAY_SECRET_KEY   -> sk_test_... / sk_live_...  (server-to-server API auth)
+#   IBEJUPAY_PUBLIC_KEY   -> pk_test_... / pk_live_...  (optional, client-side)
+#   IBEJUPAY_WEBHOOK_SECRET -> whsec_...  (verifies webhook signatures)
+IBEJUPAY_SECRET_KEY = config('IBEJUPAY_SECRET_KEY', default='')
+IBEJUPAY_PUBLIC_KEY = config('IBEJUPAY_PUBLIC_KEY', default='')
+IBEJUPAY_WEBHOOK_SECRET = config('IBEJUPAY_WEBHOOK_SECRET', default='')
+IBEJUPAY_BASE_URL = config('IBEJUPAY_BASE_URL', default='https://ibejupay.com/api/v1')
 PAYMENT_CALLBACK_URL = config('PAYMENT_CALLBACK_URL', default='http://localhost:5173/payment-callback')
 
 
@@ -173,3 +184,9 @@ else:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 DEFAULT_FROM_EMAIL = config(
     'DEFAULT_FROM_EMAIL', default='SNRMS Ibeju-Lekki <no-reply@ibeju-lekki.gov.ng>')
+
+# Public base URL that receipt QR codes point to (a verification page).
+RECEIPT_VERIFY_URL = config('RECEIPT_VERIFY_URL', default='http://localhost:5173/verify-receipt')
+
+# Google Maps / Street View (for street pictures on the map & applicant picker).
+GOOGLE_MAPS_API_KEY = config('GOOGLE_MAPS_API_KEY', default='')

@@ -4,17 +4,26 @@
       <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
         <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1.5">Street Registry</p>
         <h1 class="text-white text-2xl font-bold tracking-tight">Ibeju-Lekki Street Map</h1>
-        <p class="text-slate-400 text-sm mt-1">Surveyed buildings across the LGA — named in green, unnamed in amber.</p>
+        <p class="text-slate-400 text-sm mt-1">Named streets across Ibeju-Lekki Local Government Area. Choose a locality to zoom in.</p>
+
+        <!-- Locality selector — zooms the map to the chosen locality -->
+        <div class="mt-4 flex items-center gap-2">
+          <label class="text-xs font-semibold text-slate-300">Locality</label>
+          <div class="relative">
+            <select v-model="selectedLocality" @change="zoomToLocalitySel"
+                    class="appearance-none rounded-lg bg-white/10 text-white text-sm px-3 py-2 pr-8 border border-white/15 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              <option value="" style="color:#0f172a">Whole LGA</option>
+              <option v-for="l in localities" :key="l" :value="l" style="color:#0f172a">{{ l }}</option>
+            </select>
+            <ChevronDownIcon class="w-4 h-4 text-white/60 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+        </div>
       </div>
     </div>
 
     <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6">
       <!-- Registry metrics — ADMIN ONLY -->
-      <div v-if="isStaff && summary" class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="rounded-2xl p-5 bg-white border border-slate-200">
-          <p class="text-3xl font-bold tracking-tight text-slate-900">{{ summary.total_buildings.toLocaleString() }}</p>
-          <p class="text-xs text-slate-500 mt-1 font-semibold uppercase tracking-wide">Buildings</p>
-        </div>
+      <div v-if="isStaff && summary" class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div class="rounded-2xl p-5 bg-white border border-slate-200">
           <p class="text-3xl font-bold tracking-tight" style="color:#059669">{{ summary.named_streets.toLocaleString() }}</p>
           <p class="text-xs text-slate-500 mt-1 font-semibold uppercase tracking-wide">Named streets</p>
@@ -41,7 +50,7 @@
             <p class="text-xs">{{ error }}</p>
           </div>
           <div v-show="!loading && !error" ref="mapEl" class="h-[560px] w-full"></div>
-          <div v-if="!loading && !error" class="flex items-center gap-5 px-5 py-3 border-t border-slate-100 text-xs">
+          <div v-if="false" class="flex items-center gap-5 px-5 py-3 border-t border-slate-100 text-xs">
             <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full" style="background:#059669"></span><span class="text-slate-600 font-medium">Named</span></span>
             <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full" style="background:#d97706"></span><span class="text-slate-600 font-medium">Unnamed</span></span>
             <span class="text-slate-400 italic ml-auto">Click a dot for details</span>
@@ -82,16 +91,20 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { configApi } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
+import { ChevronDownIcon } from '@heroicons/vue/24/outline'
 
 interface Survey {
   kobo_id: number; latitude: number; longitude: number
   existing_street_name: string; is_named: boolean
   street_code: string; street_name: string
   proposed_auto_number: string; locality: string
+  photo_url?: string
 }
 interface Street {
   id: string; name: string; code: string; building_count: number
   name_variants: number; registration_status: string
+  latitude?: number | string | null; longitude?: number | string | null
+  locality?: string | null
 }
 interface Summary {
   total_buildings: number; named_streets: number
@@ -107,6 +120,26 @@ const summary = ref<Summary | null>(null)
 const loading = ref(true)
 const error = ref('')
 const search = ref('')
+const selectedLocality = ref('')
+const localities = computed(() => {
+  const set = new Set<string>()
+  for (const s of streets.value) { const l = (s.locality || '').trim(); if (l) set.add(l) }
+  return Array.from(set).sort((a, b) => a.localeCompare(b))
+})
+function zoomToLocalitySel() {
+  if (!map) return
+  const loc = selectedLocality.value.trim().toLowerCase()
+  if (!loc) { fitToLGA(); refreshStreetLabels(); return }
+  const pts: L.LatLngTuple[] = []
+  for (const s of streets.value) {
+    if ((s.locality || '').trim().toLowerCase() !== loc) continue
+    if (s.latitude != null && s.longitude != null) pts.push([Number(s.latitude), Number(s.longitude)])
+  }
+  if (pts.length) {
+    map.setMinZoom(0)
+    map.fitBounds(L.latLngBounds(pts).pad(0.3), { maxZoom: 16 })
+  }
+}
 const mapEl = ref<HTMLElement | null>(null)
 let map: L.Map | null = null
 const markers = new Map<number, L.CircleMarker>()
@@ -127,42 +160,37 @@ const filteredStreets = computed(() => {
 function popupHtml(s: Survey): string {
   const name = s.is_named ? (s.street_name || s.existing_street_name) : 'Unnamed street'
   const number = s.proposed_auto_number ? `No. ${s.proposed_auto_number}` : ''
-  return `<div style="font-size:12px;line-height:1.4"><strong>${name}</strong><br/>${s.street_code ? '<span style="color:#059669;font-family:monospace">' + s.street_code + '</span><br/>' : ''}${number ? number + '<br/>' : ''}<span style="color:#64748b">${s.locality || 'Ibeju-Lekki'}</span></div>`
+  const photo = s.photo_url
+    ? `<img src="${s.photo_url}" alt="street" style="width:180px;height:110px;object-fit:cover;border-radius:6px;margin-bottom:6px" onerror="this.style.display='none'"/><br/>`
+    : ''
+  return `<div style="font-size:12px;line-height:1.4">${photo}<strong>${name}</strong><br/>${s.street_code ? '<span style="color:#059669;font-family:monospace">' + s.street_code + '</span><br/>' : ''}${number ? number + '<br/>' : ''}<span style="color:#64748b">${s.locality || 'Ibeju-Lekki'}</span></div>`
 }
 
-function drawMarkers() {
+// Ibeju-Lekki LGA administrative extent — the map is always locked to this.
+let labelLayer: L.LayerGroup | null = null
+const LGA_BOUNDS = L.latLngBounds([[6.385, 3.63], [6.520, 4.10]])
+
+function fitToLGA() {
   if (!map) return
-  const canvas = L.canvas({ padding: 0.5 })
-  const pts: L.LatLngExpression[] = []
-  for (const s of surveys.value) {
-    const marker = L.circleMarker([s.latitude, s.longitude], {
-      renderer: canvas, radius: 4,
-      color: s.is_named ? NAMED : UNNAMED, fillColor: s.is_named ? NAMED : UNNAMED,
-      fillOpacity: 0.7, weight: 1,
-    }).bindPopup(popupHtml(s))
-    marker.addTo(map)
-    markers.set(s.kobo_id, marker)
-    pts.push([s.latitude, s.longitude])
-  }
-  if (pts.length) map.fitBounds(L.latLngBounds(pts as L.LatLngTuple[]).pad(0.05))
+  map.fitBounds(LGA_BOUNDS)
+  map.setMaxBounds(LGA_BOUNDS.pad(0.15))
+  map.setMinZoom(map.getZoom())
 }
 
 function zoomToStreet(code: string) {
   if (!map) return
-  const members = surveys.value.filter(s => s.street_code === code)
-  const pts = members.map(s => [s.latitude, s.longitude] as L.LatLngTuple)
-  if (!pts.length) return
-  map.fitBounds(L.latLngBounds(pts).pad(0.3), { maxZoom: 17 })
-  if (members[0]) markers.get(members[0].kobo_id)?.openPopup()
+  const st = streets.value.find(s => s.code === code) as unknown as { latitude?: number; longitude?: number } | undefined
+  if (st && st.latitude != null && st.longitude != null) {
+    map.setView([Number(st.latitude), Number(st.longitude)], 17)
+  }
 }
 
 onMounted(async () => {
   try {
-    const surveyRes = await configApi.getBuildingSurveys()
-    surveys.value = (surveyRes.data as Survey[]).filter(s => s.latitude != null && s.longitude != null && inBounds(Number(s.latitude), Number(s.longitude)))
+    const streetRes = await configApi.getStreets()
+    streets.value = streetRes.data as Street[]
     if (isStaff.value) {
-      const [streetRes, summaryRes] = await Promise.all([configApi.getStreets(), configApi.getStreetSummary()])
-      streets.value = streetRes.data as Street[]
+      const summaryRes = await configApi.getStreetSummary()
       summary.value = summaryRes.data as Summary
     }
   } catch (e: unknown) {
@@ -177,9 +205,46 @@ onMounted(async () => {
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors', maxZoom: 19,
   }).addTo(map)
-  map.setView([6.465, 3.665], 12)
-  drawMarkers()
+  fitToLGA()
+  labelLayer = L.layerGroup().addTo(map)
+  map.on('zoomend moveend', refreshStreetLabels)
+  refreshStreetLabels()
 })
+
+function refreshStreetLabels() {
+  if (!map || !labelLayer) return
+  labelLayer.clearLayers()
+  // Only show labels at street level to avoid clutter at the LGA-wide view.
+  if (map.getZoom() < 15) return
+  const bounds = map.getBounds()
+  for (const st of streets.value) {
+    const lat = st.latitude != null ? Number(st.latitude) : null
+    const lng = st.longitude != null ? Number(st.longitude) : null
+    if (lat == null || lng == null || Number.isNaN(lat) || Number.isNaN(lng) || !st.name) continue
+    if (!bounds.contains([lat, lng])) continue
+    L.marker([lat, lng], {
+      icon: L.divIcon({
+        className: 'street-label',
+        html: `<span>${st.name.replace(/</g, '&lt;')}</span>`,
+        iconSize: [0, 0],
+      }),
+      interactive: false, keyboard: false,
+    }).addTo(labelLayer)
+  }
+}
 
 onUnmounted(() => { map?.remove(); map = null })
 </script>
+
+<style>
+.street-label span {
+  display: inline-block;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 700;
+  color: #0f172a;
+  text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
+  pointer-events: none;
+}
+</style>

@@ -2,10 +2,14 @@ from django.urls import path
 
 from .views import (
     ApplicationPaymentsView,
+    OfficialSignatureView,
+    PendingConfirmationView,
+    ReceiptDownloadView,
+    ReceiptVerifyView,
     InitializePaymentView,
     VerifyPaymentView,
     SimulatePaymentView,
-    PaystackWebhookView,
+    IbejuPayWebhookView,
     ConfirmPaymentView,
     FeeBreakdownView,
     FeeConfigListView,
@@ -44,11 +48,17 @@ urlpatterns = [
         name='payment-confirm',
     ),
 
+    # Secure receipts (#13)
+    path('signature/', OfficialSignatureView.as_view(), name='official-signature'),
+    path('pending-confirmation/', PendingConfirmationView.as_view(), name='payment-pending-confirmation'),
+    path('receipts/verify/<str:serial>/', ReceiptVerifyView.as_view(), name='receipt-verify'),
+    path('receipts/<str:serial>/download/', ReceiptDownloadView.as_view(), name='receipt-download'),
+
     # Online payment gateway
     path('<uuid:pk>/initialize/', InitializePaymentView.as_view(), name='payment-initialize'),
     path('<uuid:pk>/simulate/', SimulatePaymentView.as_view(), name='payment-simulate'),
     path('verify/', VerifyPaymentView.as_view(), name='payment-verify'),
-    path('paystack/webhook/', PaystackWebhookView.as_view(), name='paystack-webhook'),
+    path('ibejupay/webhook/', IbejuPayWebhookView.as_view(), name='ibejupay-webhook'),
 
     # Payment stats (finance/chairman)
     path(

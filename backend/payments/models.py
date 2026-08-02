@@ -57,3 +57,56 @@ class Payment(models.Model):
 
     def __str__(self):
         return f'{self.stage} payment for {self.application.reference_number}'
+
+
+def signature_upload_path(instance, filename):
+    import os
+    return f'official/signature{os.path.splitext(filename)[1]}'
+
+
+class OfficialSignature(models.Model):
+    """The Council Treasurer's e-signature — uploaded ONCE and reused on all receipts.
+
+    Kept server-side and only ever embedded into verified receipts, never exposed
+    as a standalone file, so it can't be lifted and reused to forge a receipt.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    image = models.ImageField(upload_to=signature_upload_path)
+    signatory_name = models.CharField(max_length=150, default='Council Treasurer')
+    signatory_title = models.CharField(max_length=150, default='Council Treasurer, Ibeju-Lekki LGA')
+    uploaded_at = models.DateTimeField(auto_now=True)
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                                    on_delete=models.SET_NULL)
+
+    class Meta:
+        db_table = 'official_signature'
+
+    @classmethod
+    def current(cls):
+        return cls.objects.order_by('-uploaded_at').first()
+
+
+def receipt_upload_path(instance, filename):
+    return f'receipts/{instance.serial}.pdf'
+
+
+class Receipt(models.Model):
+    """An issued, tamper-evident payment receipt."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    serial = models.CharField(max_length=40, unique=True, db_index=True)
+    payment = models.OneToOneField('payments.Payment', on_delete=models.CASCADE, related_name='receipt')
+    application = models.ForeignKey('applications.Application', on_delete=models.CASCADE, related_name='receipts')
+    payer_name = models.CharField(max_length=200)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    stage = models.CharField(max_length=30)
+    reference = models.CharField(max_length=100, blank=True)
+    security_code = models.CharField(max_length=32, help_text='HMAC digest for anti-forgery verification')
+    pdf = models.FileField(upload_to=receipt_upload_path, null=True, blank=True)
+    issued_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'receipts'
+        ordering = ['-issued_at']
+
+    def __str__(self):
+        return self.serial

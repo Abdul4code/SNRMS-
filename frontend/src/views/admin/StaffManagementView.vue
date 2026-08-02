@@ -157,7 +157,7 @@
               <DialogPanel class="w-full max-w-md rounded-2xl shadow-2xl overflow-hidden" style="background: #fff">
                 <div class="px-6 py-5" style="border-bottom: 1px solid #f1f5f9">
                   <DialogTitle class="text-base font-bold text-slate-900">Add Staff Account</DialogTitle>
-                  <p class="text-xs text-slate-500 mt-0.5">Create a new staff login for Ibeju-Lekki LGA SNRMS</p>
+                  <p class="text-xs text-slate-500 mt-0.5">Create a new staff login for Ibeju-Lekki Local Government Area Street Naming Registration Management System</p>
                 </div>
 
                 <transition enter-active-class="transition duration-200 ease-out"

@@ -9,7 +9,7 @@
           Welcome back, {{ auth.user?.first_name || auth.user?.email }}
         </h1>
         <p class="text-slate-400 text-sm mt-1">
-          {{ roleLabel }} · Ibeju-Lekki LGA Street Names Registry
+          {{ roleLabel }} · Ibeju-Lekki Local Government Area Street Names Registry
         </p>
       </div>
     </div>
@@ -33,11 +33,7 @@
       <!-- Street registry metrics (all admin levels) -->
       <div v-if="registrySummary" class="rounded-2xl p-5" style="background:#fff;border:1px solid #e2e8f0;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
         <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Street Registry</p>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div>
-            <p class="text-3xl font-bold tracking-tight text-slate-900">{{ registrySummary.total_buildings.toLocaleString() }}</p>
-            <p class="text-xs text-slate-500 mt-1 font-semibold uppercase tracking-wide">Buildings</p>
-          </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <p class="text-3xl font-bold tracking-tight" style="color:#059669">{{ registrySummary.named_streets.toLocaleString() }}</p>
             <p class="text-xs text-slate-500 mt-1 font-semibold uppercase tracking-wide">Named streets</p>

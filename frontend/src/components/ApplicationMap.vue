@@ -32,7 +32,7 @@
           <span class="w-3 h-3 rounded-full flex-shrink-0" style="background: #059669; border: 1.5px solid #047857"></span>
           <span class="text-slate-700 font-medium">{{ streetName || 'Proposed street' }} ({{ matchedSurveys.length }})</span>
         </div>
-        <div v-if="otherSurveys.length" class="flex items-center gap-1.5">
+        <div v-if="otherSurveys.length && !hideOtherBuildings" class="flex items-center gap-1.5">
           <span class="w-3 h-3 rounded-full flex-shrink-0" style="background: #94a3b8; border: 1.5px solid #64748b"></span>
           <span class="text-slate-700 font-medium">Other buildings ({{ otherSurveys.length }})</span>
         </div>
@@ -40,7 +40,7 @@
           <span class="w-3 h-3 rounded-sm flex-shrink-0" style="background: #1d4ed8; border: 1.5px solid #1e40af"></span>
           <span class="text-slate-700 font-medium">Application pin</span>
         </div>
-        <div class="flex items-center gap-1.5 mt-0.5 pt-0.5" style="border-top: 1px solid #e2e8f0">
+        <div v-if="!hideOtherBuildings" class="flex items-center gap-1.5 mt-0.5 pt-0.5" style="border-top: 1px solid #e2e8f0">
           <span class="text-slate-400 italic">Click a building to view details</span>
         </div>
       </div>
@@ -49,6 +49,21 @@
     <div v-else class="flex flex-col items-center py-10 gap-2">
       <MapPinIcon class="w-8 h-8 text-slate-300" />
       <p class="text-sm text-slate-500">No location data available for this application.</p>
+    </div>
+
+    <!-- Street picture: satellite (always) + Google Street View (when key active) -->
+    <div v-if="showStreetPicture && coords" class="mt-3">
+      <button v-if="!picShown" type="button" @click="revealStreetPicture"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white" style="background:#0f172a">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+        Show street's picture
+      </button>
+      <div v-else>
+        <img v-if="picStreetView" :src="picStreetView" alt="Street view" class="w-full rounded-lg border border-slate-200 mb-2" style="max-height:220px;object-fit:cover" @error="picStreetView = ''" />
+        <div ref="picMapEl" class="w-full rounded-lg border border-slate-200 overflow-hidden" style="height:220px"></div>
+        <p class="text-[10px] text-slate-400 mt-0.5">{{ picStreetView ? 'Google Street View plus a satellite view of the exact spot.' : 'Satellite/aerial view of the exact spot.' }}</p>
+        <button type="button" @click="hideStreetPicture" class="mt-1 text-[11px] text-slate-400 underline">Hide picture</button>
+      </div>
     </div>
 
     <!-- Building detail panel — shown when a marker is clicked -->
@@ -401,6 +416,8 @@ const props = defineProps<{
   locationDescription?: string
   streetName?: string
   proposedStreetName?: string
+  hideOtherBuildings?: boolean
+  showStreetPicture?: boolean
 }>()
 
 const mapEl = ref<HTMLElement | null>(null)
@@ -408,6 +425,28 @@ const modalMapEl = ref<HTMLElement | null>(null)
 const showModal = ref(false)
 const allSurveys = ref<SurveyBuilding[]>([])
 const surveysLoading = ref(false)
+
+// Street picture (satellite always; Google Street View when a key is configured)
+const picShown = ref(false)
+const picStreetView = ref('')
+const picMapEl = ref<HTMLElement | null>(null)
+let picMap: L.Map | null = null
+let googleReady = false
+async function revealStreetPicture() {
+  const c = coords.value
+  if (!c) return
+  if (googleReady) picStreetView.value = configApi.streetViewUrl(c[0], c[1])
+  picShown.value = true
+  await nextTick()
+  if (picMap) { picMap.remove(); picMap = null }
+  if (!picMapEl.value) return
+  picMap = L.map(picMapEl.value, { attributionControl: false, scrollWheelZoom: false })
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }).addTo(picMap)
+  picMap.setView([c[0], c[1]], 18)
+  L.circleMarker([c[0], c[1]], { radius: 8, color: '#f59e0b', weight: 3, fillColor: '#f59e0b', fillOpacity: 0.5 }).addTo(picMap)
+  setTimeout(() => picMap?.invalidateSize(), 120)
+}
+function hideStreetPicture() { if (picMap) { picMap.remove(); picMap = null } picShown.value = false }
 const selectedBuilding = ref<SurveyBuilding | null>(null)
 const photoError = ref(false)
 
@@ -467,16 +506,18 @@ function selectBuilding(s: SurveyBuilding) {
 }
 
 function addSurveyMarkers(m: L.Map) {
-  // Grey circles for non-matching buildings
-  for (const s of otherSurveys.value) {
-    L.circleMarker([s.latitude, s.longitude], {
-      radius: 5,
-      fillColor: '#94a3b8',
-      color: '#64748b',
-      weight: 1,
-      opacity: 0.7,
-      fillOpacity: 0.55,
-    }).addTo(m).on('click', () => selectBuilding(s))
+  // Grey circles for non-matching buildings (suppressed when hideOtherBuildings)
+  if (!props.hideOtherBuildings) {
+    for (const s of otherSurveys.value) {
+      L.circleMarker([s.latitude, s.longitude], {
+        radius: 5,
+        fillColor: '#94a3b8',
+        color: '#64748b',
+        weight: 1,
+        opacity: 0.7,
+        fillOpacity: 0.55,
+      }).addTo(m).on('click', () => selectBuilding(s))
+    }
   }
 
   // Emerald circles for matched buildings
@@ -532,6 +573,7 @@ function initMap(el: HTMLElement, scrollWheel: boolean): L.Map {
 }
 
 onMounted(async () => {
+  configApi.publicSettings().then(r => { googleReady = !!r.data.google_maps_enabled }).catch(() => {})
   await loadSurveys()
   if (!mapEl.value || !hasMapData.value) return
   map = initMap(mapEl.value, false)

@@ -100,11 +100,13 @@ class BuildingSurveyMapSerializer(serializers.ModelSerializer):
 
 class StreetSerializer(serializers.ModelSerializer):
     street_type_name = serializers.CharField(source='street_type.name', default='', read_only=True)
+    validation_status_display = serializers.CharField(source='get_validation_status_display', read_only=True)
 
     class Meta:
         model = Street
         fields = [
             'id', 'name', 'code', 'street_type_name', 'ward', 'locality',
             'building_count', 'name_variants', 'registration_status',
-            'source', 'geometry',
+            'source', 'geometry', 'latitude', 'longitude',
+            'validation_status', 'validation_status_display',
         ]

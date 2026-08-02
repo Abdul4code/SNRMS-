@@ -46,4 +46,18 @@ class Command(BaseCommand):
             user.save()
             self.stdout.write(f'  {user.get_role_display()}: {email} (password: {DEMO_PASSWORD})')
 
+        
+        self.stdout.write(self.style.MIGRATE_HEADING('=== Seeding Street Naming Committee (7 members) ==='))
+        from applications.models import CommitteeMember
+        names = {1: 'Committee Chairman', 2: 'Committee Member 2', 3: 'Committee Member 3',
+                 4: 'Committee Member 4', 5: 'Committee Member 5', 6: 'Committee Member 6',
+                 7: 'Committee Member 7'}
+        for n in range(1, 8):
+            m, created = CommitteeMember.objects.get_or_create(number=n, defaults={'name': names[n]})
+            if created or not m.pin_hash:
+                m.name = names[n]
+                m.set_pin(f'{n}{n}{n}{n}')  # demo PINs: 1111, 2222, ... 7777
+                m.save()
+        self.stdout.write('  7 committee members ready (PINs 1111..7777, member 1 = chairman).')
+
         self.stdout.write(self.style.SUCCESS('Demo bootstrap complete. You can log in now.'))

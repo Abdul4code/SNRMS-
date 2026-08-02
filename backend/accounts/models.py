@@ -71,3 +71,24 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def is_committee_chairman(self):
         return self.role == Role.COMMITTEE_CHAIRMAN
+
+
+class EmailVerification(models.Model):
+    """A short-lived code emailed to verify an address before account creation (#2)."""
+    email = models.EmailField(db_index=True)
+    code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    consumed = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'email_verifications'
+        ordering = ['-created_at']
+
+    @classmethod
+    def is_verified(cls, email, code):
+        from django.utils import timezone
+        return cls.objects.filter(
+            email__iexact=(email or '').strip(), code=(code or '').strip(),
+            consumed=False, expires_at__gt=timezone.now(),
+        ).exists()

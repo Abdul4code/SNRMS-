@@ -112,7 +112,7 @@ class SubmitPaymentView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
-        # Payments are routed exclusively through the Paystack gateway. The manual
+        # Payments are routed exclusively through the Ibeju Pay gateway. The manual
         # teller/reference path is closed for applicants; staff may still record a
         # payment out-of-band if the council needs to (e.g. a verified bank transfer).
         if getattr(request.user, 'role', None) == 'applicant':
@@ -243,11 +243,11 @@ class ConfirmPaymentView(APIView):
         data = serializer.validated_data
 
         decision = data['status']
-        remarks = data.get('finance_remarks', '')
 
         try:
             if decision == PaymentStatus.REJECTED:
-                reject_payment(payment, actor=request.user, remarks=remarks)
+                # The Council Treasurer does not add remarks — only confirms or declines.
+                reject_payment(payment, actor=request.user, remarks='')
             else:
                 # decision == 'confirmed' — dispatch to the right stage handler
                 if payment.stage == PaymentStage.STAGE_A:
@@ -262,18 +262,48 @@ class ConfirmPaymentView(APIView):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
-                # Persist any finance_remarks even on confirmation
-                if remarks:
-                    payment.finance_remarks = remarks
-                    payment.save(update_fields=['finance_remarks'])
-
         except ValueError as exc:
             return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Issue the secure receipt now that the Council Treasurer has confirmed (#3/#13).
+        if payment.status == PaymentStatus.CONFIRMED:
+            try:
+                from .receipts import generate_receipt
+                generate_receipt(payment)
+            except Exception:  # noqa: BLE001 - never break confirmation on receipt error
+                import logging
+                logging.getLogger(__name__).exception('Receipt generation failed for %s', payment.id)
 
         return Response(
             PaymentSerializer(payment).data,
             status=status.HTTP_200_OK,
         )
+
+
+class PendingConfirmationView(APIView):
+    """GET /payments/pending-confirmation/ — payments the CT still needs to confirm (#8)."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not _is_finance_or_chairman(request.user):
+            return Response({'detail': 'Finance only.'}, status=status.HTTP_403_FORBIDDEN)
+        qs = (Payment.objects.filter(status=PaymentStatus.SUBMITTED)
+              .select_related('application', 'application__applicant').order_by('-submitted_at'))
+        rows = []
+        for p in qs:
+            app = p.application
+            rows.append({
+                'id': str(p.id),
+                'reference': p.payment_reference or '',
+                'stage': p.stage,
+                'amount': float(p.amount_submitted or p.amount_expected),
+                'submitted_at': p.submitted_at,
+                'street_name': app.proposed_street_name,
+                'application_ref': app.reference_number or str(app.id),
+                'applicant_name': f'{app.applicant.first_name} {app.applicant.last_name}'.strip() if app.applicant else '',
+                'applicant_email': app.applicant.email if app.applicant else '',
+            })
+        return Response({'count': len(rows), 'results': rows})
 
 
 # ---------------------------------------------------------------------------
@@ -329,6 +359,13 @@ class FeeBreakdownView(APIView):
             return Response({'stage': stage, 'breakdown': breakdown, 'total': total})
 
         elif stage == 'stage_c':
+            # The final (Stage C) amount is hidden from applicants until the
+            # Chairman approves the application and the Stage C payment is raised.
+            if getattr(request.user, 'role', None) in (None, 'applicant') or not request.user.is_authenticated:
+                return Response(
+                    {'detail': 'The Stage C amount becomes available after approval.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             street_type_id = request.query_params.get('street_type')
             if not street_type_id:
                 return Response(
@@ -447,7 +484,7 @@ class FeeConfigUpdateView(generics.RetrieveUpdateDestroyAPIView):
 
 
 # ---------------------------------------------------------------------------
-# Online payment gateway (Paystack) — with demo fallback
+# Online payment gateway (Ibeju Pay) — with demo fallback
 # ---------------------------------------------------------------------------
 from django.conf import settings as _settings  # noqa: E402
 from django.utils.decorators import method_decorator  # noqa: E402
@@ -477,11 +514,11 @@ class InitializePaymentView(APIView):
             result = gateway.initialize(payment, email=request.user.email, callback_url=callback)
         except Exception as exc:  # noqa: BLE001
             return Response({'detail': f'Gateway error: {exc}'}, status=status.HTTP_502_BAD_GATEWAY)
-        return Response({'mode': 'paystack', **result})
+        return Response({'mode': 'ibejupay', **result})
 
 
 class VerifyPaymentView(APIView):
-    """GET /payments/verify/?reference=... — verify a Paystack transaction and confirm."""
+    """GET /payments/verify/?reference=... — verify an Ibeju Pay transaction and confirm."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -521,13 +558,13 @@ class SimulatePaymentView(APIView):
 
 
 @method_decorator(csrf_exempt, name='dispatch')
-class PaystackWebhookView(APIView):
-    """POST /payments/paystack/webhook/ — Paystack calls this on payment events."""
+class IbejuPayWebhookView(APIView):
+    """POST /payments/ibejupay/webhook/ — Ibeju Pay calls this on payment events."""
     permission_classes = [AllowAny]
     authentication_classes = []
 
     def post(self, request):
-        signature = request.META.get('HTTP_X_PAYSTACK_SIGNATURE', '')
+        signature = request.META.get('HTTP_X_IBEJUPAY_SIGNATURE', '')
         if not gateway.is_configured() or not gateway.valid_signature(request.body, signature):
             return Response(status=status.HTTP_401_UNAUTHORIZED)
         event = request.data or {}
@@ -539,3 +576,92 @@ class PaystackWebhookView(APIView):
             except Payment.DoesNotExist:
                 pass
         return Response({'status': 'ok'})
+
+
+# ---------------------------------------------------------------------------
+# Secure receipts (#13)
+# ---------------------------------------------------------------------------
+from django.http import FileResponse, Http404  # noqa: E402
+from .models import OfficialSignature, Receipt  # noqa: E402
+from .receipts import generate_receipt, verify_code  # noqa: E402
+
+
+def _is_finance_or_chairman(user):
+    return getattr(user, 'role', None) in ('finance', 'committee_chairman')
+
+
+class OfficialSignatureView(APIView):
+    """GET/POST /payments/signature/ — the CT uploads their e-signature once."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        sig = OfficialSignature.current()
+        if not sig:
+            return Response({'uploaded': False})
+        return Response({'uploaded': True, 'signatory_name': sig.signatory_name,
+                         'signatory_title': sig.signatory_title, 'uploaded_at': sig.uploaded_at})
+
+    def post(self, request):
+        if not _is_finance_or_chairman(request.user):
+            return Response({'detail': 'Only the Council Treasurer can upload the signature.'},
+                            status=status.HTTP_403_FORBIDDEN)
+        image = request.FILES.get('image')
+        if not image:
+            return Response({'detail': 'A signature image is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        sig = OfficialSignature.current() or OfficialSignature()
+        sig.image = image
+        sig.signatory_name = request.data.get('signatory_name', sig.signatory_name or 'Council Treasurer')
+        sig.signatory_title = request.data.get('signatory_title', sig.signatory_title or 'Council Treasurer, Ibeju-Lekki LGA')
+        sig.uploaded_by = request.user
+        sig.save()
+        return Response({'status': 'saved', 'signatory_name': sig.signatory_name})
+
+
+class ReceiptDownloadView(APIView):
+    """GET /payments/receipts/<serial>/download/ — the receipt PDF (owner or staff)."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, serial):
+        receipt = get_object_or_404(Receipt, serial=serial)
+        user = request.user
+        is_owner = receipt.application.applicant_id == user.id
+        if not (is_owner or _is_finance_or_chairman(user) or getattr(user, 'role', None) == 'naming_committee'):
+            return Response({'detail': 'Not permitted.'}, status=status.HTTP_403_FORBIDDEN)
+        # The applicant can only download once the CT has confirmed the payment (#3).
+        if is_owner and receipt.payment.status != PaymentStatus.CONFIRMED:
+            return Response(
+                {'detail': 'The receipt will be available once the Council Treasurer confirms your payment.'},
+                status=status.HTTP_403_FORBIDDEN)
+        if not receipt.pdf:
+            generate_receipt(receipt.payment)
+            receipt.refresh_from_db()
+        return FileResponse(receipt.pdf.open('rb'), content_type='application/pdf',
+                            as_attachment=True, filename=f'{serial}.pdf')
+
+
+class ReceiptVerifyView(APIView):
+    """GET /payments/receipts/verify/<serial>/?code=... — PUBLIC authenticity check."""
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request, serial):
+        receipt = Receipt.objects.filter(serial=serial).select_related('application').first()
+        if not receipt:
+            return Response({'valid': False, 'reason': 'No receipt with this serial number.'},
+                            status=status.HTTP_404_NOT_FOUND)
+        code = request.query_params.get('code', '')
+        ok = verify_code(receipt.serial, receipt.amount, receipt.reference, receipt.payer_name, code) \
+            or code == receipt.security_code
+        if not ok:
+            return Response({'valid': False, 'reason': 'Security code does not match — this receipt is not authentic.'})
+        return Response({
+            'valid': True,
+            'serial': receipt.serial,
+            'payer_name': receipt.payer_name,
+            'amount': f'{float(receipt.amount):,.2f}',
+            'street_name': receipt.application.proposed_street_name,
+            'stage': receipt.stage,
+            'reference': receipt.reference,
+            'issued_at': receipt.issued_at,
+            'message': 'This is an authentic receipt issued by Ibeju-Lekki LGA.',
+        })

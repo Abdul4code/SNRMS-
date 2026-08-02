@@ -30,6 +30,8 @@ class DocumentSerializer(serializers.ModelSerializer):
             'is_verified',
             'is_rejected',
             'verification_note',
+            'direction',
+            'title',
             'is_deleted',
             'created_at',
         ]

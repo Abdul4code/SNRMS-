@@ -5,6 +5,7 @@ from .views import (
     LoginView,
     ProfileView,
     RegisterView,
+    RequestEmailCodeView,
     StaffDetailView,
     StaffListView,
     TokenRefreshView,
@@ -14,6 +15,7 @@ app_name = 'accounts'
 
 urlpatterns = [
     # Public auth
+    path('request-verification/', RequestEmailCodeView.as_view(), name='request-verification'),
     path('register/', RegisterView.as_view(), name='register'),
     path('login/', LoginView.as_view(), name='login'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),

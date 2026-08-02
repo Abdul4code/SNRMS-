@@ -1,6 +1,16 @@
+from applications.committee_views import (
+    CommitteeMembersView, VerifyMemberView, CommitteeQuorumReviewView,
+    SubmitMemberCommentView, ForwardRecommendationView, MarkSubmissionsViewedView,
+)
 from django.urls import path
 
 from .views import (
+    RoyaltyExemptionView,
+    ChairmanAuditView,
+    ChairmanAuditReportView,
+    ApplicationRepositoryView,
+    CertificateReleaseView,
+    SignboardPoleView,
     DuplicateCheckView,
     AdminApplicationRegistryView,
     ApplicationCompletionView,
@@ -23,7 +33,20 @@ urlpatterns = [
     # Collection
     path('', ApplicationListCreateView.as_view(), name='application-list-create'),
     path('check-duplicate/', DuplicateCheckView.as_view(), name='application-check-duplicate'),
+    path('committee/members/', CommitteeMembersView.as_view(), name='committee-members'),
+    path('committee/verify-member/', VerifyMemberView.as_view(), name='committee-verify-member'),
+    path('committee/<uuid:pk>/review/', CommitteeQuorumReviewView.as_view(), name='committee-review'),
+    path('committee/<uuid:pk>/comment/', SubmitMemberCommentView.as_view(), name='committee-comment'),
+    path('committee/<uuid:pk>/mark-viewed/', MarkSubmissionsViewedView.as_view(), name='committee-mark-viewed'),
+    path('committee/<uuid:pk>/forward/', ForwardRecommendationView.as_view(), name='committee-forward'),
+
     path('registry/', AdminApplicationRegistryView.as_view(), name='application-registry'),
+    path('audit/', ChairmanAuditView.as_view(), name='application-audit'),
+    path('audit/report/', ChairmanAuditReportView.as_view(), name='application-audit-report'),
+    path('<uuid:pk>/repository/', ApplicationRepositoryView.as_view(), name='application-repository'),
+    path('<uuid:pk>/certificate-release/', CertificateReleaseView.as_view(), name='certificate-release'),
+    path('<uuid:pk>/royalty-exemption/', RoyaltyExemptionView.as_view(), name='application-royalty-exemption'),
+    path('<uuid:pk>/signboard/', SignboardPoleView.as_view(), name='application-signboard'),
 
     # Single resource
     path('<uuid:pk>/', ApplicationDetailView.as_view(), name='application-detail'),

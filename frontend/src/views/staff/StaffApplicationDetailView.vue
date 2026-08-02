@@ -81,7 +81,7 @@
                   <dd class="text-slate-700">{{ application.ward_display || '—' }}</dd>
                 </div>
                 <div>
-                  <dt class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">LGA Area</dt>
+                  <dt class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Local Government Area Area</dt>
                   <dd class="text-slate-700">{{ application.lga_area || '—' }}</dd>
                 </div>
                 <div class="col-span-2">
@@ -108,6 +108,11 @@
                 />
                 <!-- External views + duplicate check -->
                 <div v-if="coords" class="mt-3 flex flex-wrap gap-2">
+                  <button v-if="!showPicture" type="button" @click="revealPicture"
+                          class="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white" style="background:#0f172a">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                    Show street's picture
+                  </button>
                   <a :href="streetViewUrl" target="_blank" rel="noopener"
                      class="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white" style="background:#059669">
                     Open Street View
@@ -117,6 +122,13 @@
                     Open in Google Maps
                   </a>
                   <span v-if="application.locality" class="inline-flex items-center text-xs text-slate-500 px-2">Locality: <span class="font-semibold text-slate-700 ml-1">{{ application.locality }}</span></span>
+                </div>
+                <div v-if="showPicture && coords" class="mt-3">
+                  <img v-if="pictureSrc" :src="pictureSrc" alt="Street picture"
+                       class="w-full rounded-lg border border-slate-200 mb-2" style="max-height:260px;object-fit:cover"
+                       @error="pictureSrc = ''" />
+                  <div ref="staffPicMapEl" class="w-full rounded-lg border border-slate-200 overflow-hidden" style="height:240px"></div>
+                  <button type="button" @click="hideStaffPicture" class="mt-1 text-[11px] text-slate-400 underline">Hide picture</button>
                 </div>
                 <!-- Duplicate check verdict for reviewers -->
                 <div v-if="dupReport" class="mt-3 rounded-xl p-3 text-xs"
@@ -206,7 +218,6 @@
                         <span v-if="p.payment_date"> · {{ formatDate(p.payment_date) }}</span>
                         <span v-if="p.amount_submitted" class="font-semibold text-slate-700"> · ₦{{ formatAmount(p.amount_submitted) }}</span>
                       </p>
-                      <p v-if="p.finance_remarks" class="text-xs text-slate-600 mt-1 italic">"{{ p.finance_remarks }}"</p>
                     </div>
                     <a v-if="p.receipt_file" :href="p.receipt_file" target="_blank"
                        class="text-xs font-semibold text-blue-600 hover:text-blue-700 flex-shrink-0">Receipt</a>
@@ -243,6 +254,9 @@
               </div>
             </div>
 
+            <!-- Full document repository — submitted + generated, downloadable anytime -->
+            <DocumentRepository v-if="application" :application-id="application.id" />
+
             <!-- Documents — hidden for finance and legacy apps -->
             <div v-if="!auth.isFinance && !application.is_legacy"
                  class="rounded-2xl overflow-hidden" style="background: #fff; border: 1px solid #e2e8f0">
@@ -265,8 +279,11 @@
                       :style="doc.is_verified ? 'color: #059669' : doc.is_rejected ? 'color: #dc2626' : 'color: #94a3b8'" />
                   </div>
                   <div class="flex-1 min-w-0">
-                    <p class="text-sm font-semibold text-slate-900 truncate">{{ doc.document_type_display || doc.document_type }}</p>
-                    <p class="text-xs mt-0.5"
+                    <p class="text-sm font-semibold text-slate-900 truncate">
+                      {{ doc.direction === 'issued' ? (doc.title || 'Council document') : (doc.document_type_display || doc.document_type) }}
+                    </p>
+                    <p v-if="doc.direction === 'issued'" class="text-[10px] font-semibold text-blue-600 uppercase tracking-wide">Issued to applicant</p>
+                    <p v-else class="text-xs mt-0.5"
                        :class="doc.is_verified ? 'text-emerald-600' : doc.is_rejected ? 'text-red-500' : 'text-slate-400'">
                       {{ doc.is_verified ? '✓ Verified' : doc.is_rejected ? '✗ Rejected' : 'Pending verification' }}
                     </p>
@@ -290,12 +307,64 @@
                   </div>
                 </li>
               </ul>
-            </div>
 
+              <!-- Issue a document to the applicant (#10/#11) -->
+              <div class="px-5 py-4 border-t border-slate-100 bg-slate-50/50">
+                <p class="text-xs font-bold text-slate-600 mb-2">Issue a document to the applicant</p>
+                <div class="flex flex-wrap items-center gap-2">
+                  <input v-model="issueTitle" placeholder="Document title (e.g. Approval letter)"
+                         class="flex-1 min-w-[180px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" />
+                  <input ref="issueFileInput" type="file" @change="onIssueFile" class="text-xs" />
+                  <button @click="issueDocument" :disabled="!issueFile || !issueTitle || issuing"
+                          class="rounded-lg px-3 py-2 text-sm font-semibold text-white disabled:opacity-60" style="background:#059669">
+                    {{ issuing ? 'Uploading…' : 'Upload & issue' }}
+                  </button>
+                </div>
+                <p v-if="issueNote" class="text-xs text-emerald-600 mt-1.5">{{ issueNote }}</p>
+              </div>
+            </div>
           </div>
 
           <!-- Right: action panels + history -->
           <div class="space-y-5">
+
+            <!-- Chairman: royalty exemption + signboard/pole -->
+            <div v-if="auth.isChairman || auth.isNamingCommittee"
+                 class="rounded-2xl overflow-hidden" style="background:#fff;border:1px solid #e2e8f0;box-shadow:0 2px 8px rgba(0,0,0,0.05)">
+              <div class="px-6 py-4" style="border-bottom:1px solid #f1f5f9">
+                <h2 class="text-sm font-bold text-slate-900">Registration details</h2>
+              </div>
+              <div class="p-5 space-y-4">
+                <div v-if="auth.isChairman" class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm font-semibold text-slate-800">Royalty exemption</p>
+                    <p class="text-xs text-slate-500">Royalty pays only the application fee — Stage C waived.</p>
+                  </div>
+                  <button @click="toggleRoyalty"
+                          class="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                          :style="application.is_royalty_exempt ? 'background:#dcfce7;color:#059669' : 'background:#f1f5f9;color:#64748b'">
+                    {{ application.is_royalty_exempt ? 'Exempt ✓' : 'Grant exemption' }}
+                  </button>
+                </div>
+                <div v-else-if="application.is_royalty_exempt" class="text-xs font-semibold text-emerald-600">Royalty exemption granted.</div>
+
+                <div>
+                  <p class="text-xs font-semibold text-slate-600 mb-1.5">Signboard &amp; pole numbers</p>
+                  <div v-if="application.signboard_number" class="grid grid-cols-2 gap-3">
+                    <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                      <p class="text-[10px] text-slate-400 uppercase tracking-wide">Signboard</p>
+                      <p class="text-sm font-bold text-slate-800 font-mono">{{ application.signboard_number }}</p>
+                    </div>
+                    <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                      <p class="text-[10px] text-slate-400 uppercase tracking-wide">Pole</p>
+                      <p class="text-sm font-bold text-slate-800 font-mono">{{ application.pole_number }}</p>
+                    </div>
+                  </div>
+                  <p v-else class="text-xs text-slate-400">Issued automatically when the Chairman approves the street name.</p>
+                </div>
+              </div>
+            </div>
+
 
             <!-- Finance: confirm payment evidence -->
             <div v-if="auth.isFinance && FINANCE_CONFIRM_STATUSES.includes(application.status)"
@@ -315,17 +384,8 @@
                     <option value="rejected">✗ Reject Payment</option>
                   </select>
                 </div>
-                <div>
-                  <label class="block text-sm font-semibold text-slate-700 mb-1.5">Remarks
-                    <span v-if="financeForm.decision === 'rejected'" class="text-red-500">*</span>
-                    <span v-else class="text-slate-400 font-normal text-xs">(optional)</span>
-                  </label>
-                  <textarea v-model="financeForm.finance_remarks" rows="3"
-                            :placeholder="financeForm.decision === 'rejected' ? 'Reason for rejection…' : 'Optional remarks…'"
-                            class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"/>
-                </div>
                 <button type="submit"
-                        :disabled="actionLoading || !financeForm.decision || (financeForm.decision === 'rejected' && !financeForm.finance_remarks)"
+                        :disabled="actionLoading || !financeForm.decision"
                         class="w-full py-2.5 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-60"
                         :style="financeForm.decision === 'rejected'
                           ? 'background: linear-gradient(135deg, #dc2626, #b91c1c)'
@@ -335,7 +395,7 @@
               </form>
             </div>
 
-            <!-- Naming committee: issue certificate -->
+            <!-- Naming committee: issue certificate (auto-generated) -->
             <div v-if="auth.isNamingCommittee && application.status === 'stage_c_confirmed'"
                  class="rounded-2xl overflow-hidden"
                  style="background: #fff; border: 1px solid #e2e8f0">
@@ -343,24 +403,56 @@
                 <h2 class="text-sm font-bold text-slate-900">Issue Certificate</h2>
               </div>
               <div class="p-5 space-y-4">
-                <p class="text-sm text-slate-600">Stage C payment confirmed. Upload the certificate and set its expiry date.</p>
-                <div>
-                  <label class="block text-sm font-semibold text-slate-700 mb-1.5">Certificate File <span class="text-red-500">*</span></label>
-                  <input type="file" accept=".pdf,.jpg,.jpeg,.png"
-                         @change="onCertFileChange"
-                         class="block w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" />
+                <p class="text-sm text-slate-600">Stage C payment confirmed. A certificate will be <span class="font-semibold">auto-generated</span> with the details below.</p>
+                <div class="grid grid-cols-2 gap-3 rounded-xl bg-slate-50 border border-slate-100 p-3 text-sm">
+                  <div><span class="text-xs text-slate-400 block">Signboard No.</span><span class="font-semibold text-slate-800">{{ application.signboard_number || 'Assigned on issue' }}</span></div>
+                  <div><span class="text-xs text-slate-400 block">Pole No.</span><span class="font-semibold text-slate-800">{{ application.pole_number || 'Assigned on issue' }}</span></div>
                 </div>
                 <div>
                   <label class="block text-sm font-semibold text-slate-700 mb-1.5">Expiry Date <span class="text-red-500">*</span></label>
                   <input type="date" v-model="certExpiresAt" :min="minExpiryDate"
                          class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent" />
                 </div>
-                <button :disabled="actionLoading || !certFile || !certExpiresAt"
+                <div>
+                  <label class="block text-sm font-semibold text-slate-700 mb-1.5">Custom certificate file <span class="font-normal text-slate-400">(optional)</span></label>
+                  <input type="file" accept=".pdf,.jpg,.jpeg,.png" @change="onCertFileChange"
+                         class="block w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" />
+                  <p class="mt-1 text-xs text-slate-400">Leave empty to use the auto-generated certificate. Upload only to use your own.</p>
+                </div>
+                <label class="flex items-center gap-2 text-sm text-slate-700">
+                  <input type="checkbox" v-model="certRelease" class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                  Release to applicant now <span class="text-xs text-slate-400">(they can download it; otherwise it stays with the committee)</span>
+                </label>
+                <button :disabled="actionLoading || !certExpiresAt"
                         class="w-full py-2.5 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-60"
                         style="background: linear-gradient(135deg, #059669, #047857)"
                         @click="handleIssueCertificate">
                   {{ actionLoading ? 'Processing…' : 'Issue Certificate' }}
                 </button>
+              </div>
+            </div>
+
+            <!-- Certificate already issued: download + release control (committee / LG chairman) -->
+            <div v-if="(auth.isNamingCommittee || auth.isChairman) && application.certificate_file && application.status === 'certificate_issued'"
+                 class="rounded-2xl overflow-hidden" style="background: #fff; border: 1px solid #e2e8f0">
+              <div class="px-5 py-4" style="border-bottom: 1px solid #f1f5f9">
+                <h2 class="text-sm font-bold text-slate-900">Certificate</h2>
+              </div>
+              <div class="p-5 space-y-3">
+                <a :href="application.certificate_file" target="_blank" rel="noopener"
+                   class="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white" style="background:#059669">
+                  Download certificate ({{ application.certificate_number }})
+                </a>
+                <!-- Release control is the committee's decision; the LG chairman only sees status -->
+                <label v-if="auth.isNamingCommittee" class="flex items-center gap-2 text-sm text-slate-700">
+                  <input type="checkbox" :checked="application.certificate_released" @change="toggleRelease"
+                         class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                  Released to applicant
+                  <span class="text-xs text-slate-400">{{ application.certificate_released ? '(applicant can download)' : '(held by committee)' }}</span>
+                </label>
+                <p v-else class="text-xs" :class="application.certificate_released ? 'text-emerald-600' : 'text-slate-400'">
+                  {{ application.certificate_released ? '✓ Released to the applicant' : 'Not yet released to the applicant (committee decision)' }}
+                </p>
               </div>
             </div>
 
@@ -434,6 +526,30 @@
                  style="background: #fff; border: 1px solid #e2e8f0">
               <div class="px-5 py-4" style="border-bottom: 1px solid #f1f5f9">
                 <h2 class="text-sm font-bold text-slate-900">Chairman Approval</h2>
+              </div>
+              <!-- Committee's recommendation + members' decision summary -->
+              <div v-if="committeeReview" class="px-5 py-4 bg-amber-50/50" style="border-bottom:1px solid #f1f5f9">
+                <p class="text-xs font-bold text-amber-800 uppercase tracking-wide mb-1.5">Street Naming Committee</p>
+                <p v-if="committeeReview.consolidated?.decision" class="text-sm text-slate-700">
+                  Committee decision:
+                  <span class="font-bold" :class="committeeReview.consolidated.decision === 'recommend' ? 'text-emerald-700' : 'text-red-700'">
+                    {{ committeeReview.consolidated.decision === 'recommend' ? 'Recommends approval' : 'Recommends rejection' }}
+                  </span>
+                </p>
+                <p v-if="committeeReview.consolidated?.overall_recommendation" class="text-sm text-slate-600 mt-1">
+                  "{{ committeeReview.consolidated.overall_recommendation }}"
+                </p>
+                <p v-if="committeeReview.decision_summary" class="text-xs text-slate-500 mt-2">
+                  Members' votes: {{ committeeReview.decision_summary.recommend }} recommend ·
+                  {{ committeeReview.decision_summary.reject }} reject ·
+                  {{ committeeReview.decision_summary.abstain }} abstain
+                  (of {{ committeeReview.decision_summary.total }} who commented)
+                </p>
+                <ul v-if="committeeReview.all_comments?.length" class="mt-2 space-y-1">
+                  <li v-for="c in committeeReview.all_comments" :key="c.member_number" class="text-xs text-slate-500">
+                    • Member {{ c.member_number }} ({{ c.member_name }}) — <span class="font-medium">{{ c.recommendation }}</span>
+                  </li>
+                </ul>
               </div>
               <form @submit.prevent="handleChairmanApproval" class="p-5 space-y-4" novalidate>
                 <div>
@@ -547,12 +663,15 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import LeafletLib from 'leaflet'
+import type * as LType from 'leaflet'
 import { useRoute, RouterLink } from 'vue-router'
 import { DocumentIcon, ChevronRightIcon, ClockIcon, CurrencyDollarIcon, BanknotesIcon, MapPinIcon } from '@heroicons/vue/24/outline'
-import { applicationApi, documentApi, paymentApi } from '@/services/api'
+import { applicationApi, documentApi, paymentApi, configApi, committeeApi } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import StatusBadge from '@/components/StatusBadge.vue'
 import ApplicationMap from '@/components/ApplicationMap.vue'
+import DocumentRepository from '@/components/DocumentRepository.vue'
 
 interface Applicant { id: string; email: string; full_name: string; phone?: string }
 interface Application {
@@ -574,11 +693,16 @@ interface Application {
   is_legacy?: boolean
   legacy_certificate_url?: string | null
   certificate_file?: string | null
+  certificate_released?: boolean
+  certificate_number?: string
   google_map_uploaded?: boolean
   signpost_installed?: boolean
+  is_royalty_exempt?: boolean
+  signboard_number?: string
+  pole_number?: string
 }
 
-interface Doc { id: string; document_type: string; document_type_display?: string; file?: string; file_url?: string; is_verified?: boolean; is_rejected?: boolean; verification_note?: string }
+interface Doc { id: string; document_type: string; document_type_display?: string; file?: string; file_url?: string; is_verified?: boolean; is_rejected?: boolean; verification_note?: string; direction?: string; title?: string }
 interface Payment {
   id: string
   payment_reference?: string
@@ -604,6 +728,7 @@ const FINANCE_CONFIRM_STATUSES = [
 const route = useRoute()
 const auth = useAuthStore()
 const application = ref<Application | null>(null)
+const committeeReview = ref<any>(null)
 const documents = ref<Doc[]>([])
 const payments = ref<Payment[]>([])
 const history = ref<HistoryEntry[]>([])
@@ -612,7 +737,7 @@ const actionLoading = ref(false)
 const actionError = ref('')
 const actionSuccess = ref('')
 
-const financeForm = ref({ decision: '', finance_remarks: '' })
+const financeForm = ref({ decision: '' })
 const committeeForm = ref({ decision: '', remarks: '' })
 
 // Location coordinates (from structured fields or parsed from the description)
@@ -627,12 +752,32 @@ const streetViewUrl = computed(() =>
   coords.value ? `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${coords.value.lat},${coords.value.lng}` : '#')
 const mapsUrl = computed(() =>
   coords.value ? `https://www.google.com/maps/search/?api=1&query=${coords.value.lat},${coords.value.lng}` : '#')
+const showPicture = ref(false)
+const pictureSrc = ref('')
+const staffPicMapEl = ref<HTMLElement | null>(null)
+let staffPicMap: LType.Map | null = null
+function revealPicture() {
+  if (!coords.value) return
+  pictureSrc.value = configApi.streetViewUrl(coords.value.lat, coords.value.lng)
+  showPicture.value = true
+  setTimeout(() => {
+    if (staffPicMap) { staffPicMap.remove(); staffPicMap = null }
+    if (!staffPicMapEl.value || !coords.value) return
+    staffPicMap = LeafletLib.map(staffPicMapEl.value, { attributionControl: false, scrollWheelZoom: false })
+    LeafletLib.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }).addTo(staffPicMap)
+    staffPicMap.setView([coords.value.lat, coords.value.lng], 18)
+    LeafletLib.circleMarker([coords.value.lat, coords.value.lng], { radius: 8, color: '#f59e0b', weight: 3, fillColor: '#f59e0b', fillOpacity: 0.5 }).addTo(staffPicMap)
+    setTimeout(() => staffPicMap?.invalidateSize(), 120)
+  }, 0)
+}
+function hideStaffPicture() { if (staffPicMap) { staffPicMap.remove(); staffPicMap = null } showPicture.value = false }
 
 interface DupMatch { code: string; name: string; locality: string; distance_m: number | null }
 const dupReport = ref<{ verdict: string; name_matches: DupMatch[] } | null>(null)
 const chairmanForm = ref({ decision: '', remarks: '' })
 const certFile = ref<File | null>(null)
 const certExpiresAt = ref('')
+const certRelease = ref(false)
 
 const minExpiryDate = computed(() => {
   const d = new Date()
@@ -697,6 +842,13 @@ async function load() {
     documents.value = Array.isArray(docRes.data) ? docRes.data : docRes.data.results ?? []
     payments.value = Array.isArray(payRes.data) ? payRes.data : payRes.data.results ?? []
     history.value = Array.isArray(histRes.data) ? histRes.data : histRes.data.results ?? []
+    // Committee's recommendation + members' decision summary (LG Chairman sees this).
+    if (auth.isChairman && application.value?.status === 'awaiting_chairman_approval') {
+      try {
+        const { data } = await committeeApi.review(route.params.id as string, '')
+        committeeReview.value = data
+      } catch { committeeReview.value = null }
+    }
     // Duplicate check for reviewers
     if (application.value) {
       const a = application.value as Application & { locality?: string }
@@ -725,12 +877,11 @@ async function handleConfirmPayment() {
     if (!payment) throw new Error('No submitted payment found. The applicant may not have provided payment evidence yet.')
     await paymentApi.confirmPayment(payment.id, {
       status: financeForm.value.decision,
-      finance_remarks: financeForm.value.finance_remarks,
     })
     actionSuccess.value = financeForm.value.decision === 'confirmed'
       ? 'Payment confirmed. Application forwarded to naming committee.'
       : 'Payment rejected. Applicant has been notified.'
-    financeForm.value = { decision: '', finance_remarks: '' }
+    financeForm.value = { decision: '' }
     await load()
   } catch (err: unknown) {
     const e = err as { response?: { data?: { detail?: string } }; message?: string }
@@ -741,23 +892,40 @@ async function handleConfirmPayment() {
 }
 
 async function handleIssueCertificate() {
-  if (!certFile.value || !certExpiresAt.value) return
+  if (!certExpiresAt.value) return
   actionError.value = ''
   actionLoading.value = true
   try {
     const formData = new FormData()
-    formData.append('certificate_file', certFile.value)
+    if (certFile.value) formData.append('certificate_file', certFile.value)  // optional override
     formData.append('expires_at', certExpiresAt.value)
+    formData.append('release', certRelease.value ? 'true' : 'false')
     await applicationApi.issueCertificate(application.value!.id, formData)
-    actionSuccess.value = 'Certificate issued and applicant notified.'
+    actionSuccess.value = certRelease.value
+      ? 'Certificate issued and released to the applicant.'
+      : 'Certificate issued and stored. Not yet released to the applicant.'
     certFile.value = null
     certExpiresAt.value = ''
+    certRelease.value = false
     await load()
   } catch (err: unknown) {
     const e = err as { response?: { data?: { detail?: string } } }
     actionError.value = e.response?.data?.detail || 'Failed to issue certificate.'
   } finally {
     actionLoading.value = false
+  }
+}
+
+async function toggleRelease(e: Event) {
+  const released = (e.target as HTMLInputElement).checked
+  actionError.value = ''
+  try {
+    await applicationApi.releaseCertificate(application.value!.id, released)
+    actionSuccess.value = released ? 'Certificate released to the applicant.' : 'Certificate held — applicant can no longer download.'
+    await load()
+  } catch (err: unknown) {
+    const e2 = err as { response?: { data?: { detail?: string } } }
+    actionError.value = e2.response?.data?.detail || 'Failed to update release status.'
   }
 }
 
@@ -851,6 +1019,36 @@ async function submitRejectDoc() {
   } finally {
     actionLoading.value = false
   }
+}
+
+
+// --- Documents issued to applicant, royalty exemption, signboard/pole ---
+const issueTitle = ref('')
+const issueFile = ref<File | null>(null)
+const issuing = ref(false)
+const issueNote = ref('')
+const issueFileInput = ref<HTMLInputElement | null>(null)
+function onIssueFile(e: Event) { issueFile.value = (e.target as HTMLInputElement).files?.[0] || null }
+async function issueDocument() {
+  if (!issueFile.value || !application.value) return
+  issuing.value = true; issueNote.value = ''
+  try {
+    const fd = new FormData()
+    fd.append('application_id', String(application.value.id))
+    fd.append('title', issueTitle.value)
+    fd.append('file', issueFile.value)
+    await documentApi.adminUpload(fd)
+    issueNote.value = 'Document issued to the applicant.'
+    issueTitle.value = ''; issueFile.value = null
+    if (issueFileInput.value) issueFileInput.value.value = ''
+    await load()
+  } catch { issueNote.value = 'Upload failed.' } finally { issuing.value = false }
+}
+
+async function toggleRoyalty() {
+  if (!application.value) return
+  const next = !application.value.is_royalty_exempt
+  try { await applicationApi.setRoyaltyExemption(String(application.value.id), next); application.value.is_royalty_exempt = next } catch { /* */ }
 }
 
 onMounted(load)

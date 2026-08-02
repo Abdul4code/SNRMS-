@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from accounts.serializers import UserSerializer
 from .models import Application, ApplicationStatus, StatusHistory, Ward
+from config.models import StreetType
 
 
 
@@ -130,6 +131,10 @@ class ApplicationDetailSerializer(serializers.ModelSerializer):
             'chairman_remarks',
             'certificate_number',
             'certificate_file',
+            'certificate_released',
+            'signboard_number',
+            'pole_number',
+            'is_royalty_exempt',
             'legacy_certificate_url',
             'certificate_issued_at',
             'expires_at',
@@ -171,6 +176,8 @@ class ApplicationDetailSerializer(serializers.ModelSerializer):
 
 class ApplicationCreateSerializer(serializers.ModelSerializer):
     legacy_certificate = serializers.FileField(required=False, allow_null=True)
+    street_type = serializers.PrimaryKeyRelatedField(
+        queryset=StreetType.objects.all(), required=False, allow_null=True)
 
     class Meta:
         model = Application
@@ -197,11 +204,20 @@ class ApplicationCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {'legacy_certificate': 'Please upload your existing certificate for legacy registration.'}
             )
+        if not attrs.get('is_legacy') and not attrs.get('street_type'):
+            raise serializers.ValidationError({'street_type': 'Street type is required.'})
         return attrs
 
     def create(self, validated_data):
+        from config.models import StreetType
         request = self.context.get('request')
         validated_data['applicant'] = request.user
+        # Validate-existing-registration flow may not carry a street type — default it.
+        if not validated_data.get('street_type'):
+            validated_data['street_type'] = (
+                StreetType.objects.filter(name__iexact='Street').first()
+                or StreetType.objects.first()
+            )
         return Application.objects.create(**validated_data)
 
 

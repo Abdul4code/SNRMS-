@@ -79,9 +79,13 @@ VALID_TRANSITIONS = {
 
 
 class Ward(models.TextChoices):
-    WARD_A = 'ward_a', 'Ward A - Central'
-    WARD_B = 'ward_b', 'Ward B - North'
-    WARD_C = 'ward_c', 'Ward C - South'
+    WARD_A = 'ward_a', 'Ward A (Ibeju 1)'
+    WARD_B = 'ward_b', 'Ward B (Ibeju 2)'
+    WARD_C1 = 'ward_c1', 'Ward C1 (Orimedu 1)'
+    WARD_C2 = 'ward_c2', 'Ward C2 (Orimedu 2)'
+    WARD_D = 'ward_d', 'Ward D (Orimedu 3)'
+    WARD_E = 'ward_e', 'Ward E (Iwerekun 1)'
+    WARD_F = 'ward_f', 'Ward F (Iwerekun 2)'
 
 
 class Application(models.Model):
@@ -108,8 +112,15 @@ class Application(models.Model):
     )
     committee_remarks = models.TextField(blank=True)
     chairman_remarks = models.TextField(blank=True)
+    signboard_seq = models.PositiveIntegerField(null=True, blank=True, db_index=True,
+        help_text='Auto-issued sequence number for signboard/pole; released and recycled on decline')
+    signboard_number = models.CharField(max_length=50, blank=True, help_text='Physical signboard number')
+    pole_number = models.CharField(max_length=50, blank=True, help_text='Pole number for the street sign')
+    is_royalty_exempt = models.BooleanField(default=False, help_text='Chairman-granted: royalty pays only the application fee (Stage C waived)')
     certificate_number = models.CharField(max_length=50, blank=True)
     certificate_file = models.FileField(upload_to='certificates/', null=True, blank=True)
+    certificate_released = models.BooleanField(default=False,
+        help_text='Whether the applicant may download the certificate. Committee/LG chairman can always download.')
     certificate_issued_at = models.DateTimeField(null=True, blank=True)
     expires_at = models.DateField(null=True, blank=True)
     is_legacy = models.BooleanField(default=False, help_text='Applicant had a manual certificate before digital registration')
@@ -174,3 +185,87 @@ class StatusHistory(models.Model):
     class Meta:
         db_table = 'status_history'
         ordering = ['-created_at']
+
+
+class CommitteeMember(models.Model):
+    """One of the 7 Street Naming Committee members. Member 1 is the chairman.
+
+    All members share the committee login, then verify as a specific member via a
+    second-tier PIN. PINs are stored hashed.
+    """
+    number = models.PositiveSmallIntegerField(unique=True)  # 1..7
+    name = models.CharField(max_length=150)
+    pin_hash = models.CharField(max_length=255)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = 'committee_members'
+        ordering = ['number']
+
+    @property
+    def is_chairman(self):
+        return self.number == 1
+
+    def set_pin(self, raw):
+        from django.contrib.auth.hashers import make_password
+        self.pin_hash = make_password(raw)
+
+    def check_pin(self, raw):
+        from django.contrib.auth.hashers import check_password
+        return check_password(raw, self.pin_hash)
+
+    def __str__(self):
+        return f'Member {self.number} — {self.name}'
+
+
+class CommitteeMemberComment(models.Model):
+    """A committee member's private, signed comment to the LG Chairman.
+
+    Private from other members; visible to the committee chairman and LG Chairman.
+    """
+    class Recommendation(models.TextChoices):
+        RECOMMEND = 'recommend', 'Recommend for approval'
+        NOT_RECOMMEND = 'not_recommend', 'Do not recommend'
+        ABSTAIN = 'abstain', 'Abstain / neutral'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    application = models.ForeignKey('applications.Application', on_delete=models.CASCADE,
+                                    related_name='committee_comments')
+    member = models.ForeignKey(CommitteeMember, on_delete=models.CASCADE, related_name='comments')
+    comment = models.TextField()
+    signature = models.CharField(max_length=150, help_text='Typed signature of the member')
+    recommendation = models.CharField(max_length=20, choices=Recommendation.choices,
+                                      default=Recommendation.RECOMMEND)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'committee_member_comments'
+        unique_together = ('application', 'member')
+        ordering = ['member__number']
+
+
+class CommitteeReview(models.Model):
+    """The committee chairman's consolidated output for an application."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    application = models.OneToOneField('applications.Application', on_delete=models.CASCADE,
+                                       related_name='committee_review')
+    general_comment_to_applicant = models.TextField(blank=True)
+    overall_recommendation = models.TextField(blank=True)
+    decision = models.CharField(max_length=20, default='recommend')
+    forwarded_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'committee_reviews'
+
+
+class CommitteeSubmissionReview(models.Model):
+    """Records that a committee member has viewed an application's submissions (#11)."""
+    application = models.ForeignKey('applications.Application', on_delete=models.CASCADE,
+                                    related_name='committee_submission_reviews')
+    member = models.ForeignKey(CommitteeMember, on_delete=models.CASCADE)
+    viewed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'committee_submission_reviews'
+        unique_together = ('application', 'member')

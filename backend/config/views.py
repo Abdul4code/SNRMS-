@@ -356,3 +356,94 @@ class StreetBuildingsView(ListAPIView):
 
     def get_queryset(self):
         return BuildingSurvey.objects.filter(street_id=self.kwargs['pk'])
+
+
+class LocalityWardView(APIView):
+    """GET /config/locality-wards/ — authoritative community -> ward mapping.
+
+    Loaded from the LGA's official community/ward list (config/data/illg_wards.json):
+    7 wards (Ibeju 1-2, Orimedu 1-3, Iwerekun 1-2) across 110 communities.
+    """
+    permission_classes = [AllowAny]
+    _cache = None
+
+    def get(self, request):
+        import json
+        import os
+        from django.conf import settings as dj_settings
+        if LocalityWardView._cache is None:
+            path = os.path.join(dj_settings.BASE_DIR, 'config', 'data', 'illg_wards.json')
+            with open(path, encoding='utf-8') as f:
+                data = json.load(f)
+            LocalityWardView._cache = data
+        data = LocalityWardView._cache
+        return Response({
+            'wards': data['ward_names'],
+            'community_to_ward': data['community_to_ward'],
+        })
+
+
+class CommunityListView(APIView):
+    """GET /config/communities/ — flat list of official community names (for pickers)."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        import json
+        import os
+        from django.conf import settings as dj_settings
+        path = os.path.join(dj_settings.BASE_DIR, 'config', 'data', 'illg_wards.json')
+        with open(path, encoding='utf-8') as f:
+            data = json.load(f)
+        return Response(sorted(data['community_to_ward'].keys()))
+
+
+class StreetViewProxyView(APIView):
+    """GET /config/streetview/?lat=&lng= — a Google Street View image at a location.
+
+    Keeps the Google Maps API key server-side. Returns the street-level photo so an
+    <img> tag can display it. 404 if no key is configured or no imagery exists.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        key = getattr(settings, 'GOOGLE_MAPS_API_KEY', '')
+        if not key:
+            raise Http404
+        try:
+            lat = float(request.query_params.get('lat'))
+            lng = float(request.query_params.get('lng'))
+        except (TypeError, ValueError):
+            raise Http404
+        size = request.query_params.get('size', '640x360')
+        heading = request.query_params.get('heading', '')
+        # First check metadata so we can 404 cleanly when there's no imagery.
+        meta = (f'https://maps.googleapis.com/maps/api/streetview/metadata'
+                f'?location={lat},{lng}&key={key}')
+        try:
+            with urllib.request.urlopen(meta, timeout=10) as m:
+                import json as _json
+                status_ok = _json.loads(m.read()).get('status') == 'OK'
+        except Exception:
+            status_ok = True  # if metadata fails, still try the image
+        if not status_ok:
+            raise Http404
+        img = (f'https://maps.googleapis.com/maps/api/streetview'
+               f'?size={size}&location={lat},{lng}&fov=80&key={key}')
+        if heading:
+            img += f'&heading={heading}'
+        try:
+            with urllib.request.urlopen(img, timeout=15) as resp:
+                return HttpResponse(resp.read(),
+                                    content_type=resp.headers.get('Content-Type', 'image/jpeg'))
+        except Exception:
+            raise Http404
+
+
+class PublicSettingsView(APIView):
+    """GET /config/public-settings/ — non-secret flags the frontend needs."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response({
+            'google_maps_enabled': bool(getattr(settings, 'GOOGLE_MAPS_API_KEY', '')),
+        })

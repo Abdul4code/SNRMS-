@@ -1,9 +1,16 @@
-"""Paystack payment gateway integration (with a safe demo fallback).
+"""Ibeju Pay payment gateway integration (with a safe demo fallback).
 
-If PAYSTACK_SECRET_KEY is configured, real (test or live) Paystack checkout is
+If IBEJUPAY_SECRET_KEY is configured, real (test or live) Ibeju Pay checkout is
 used. If not, the app runs in "demo" mode: the applicant can simulate a
-successful payment so the flow can be shown end-to-end without a Paystack
+successful payment so the flow can be shown end-to-end without an Ibeju Pay
 account. Switching to real payments is just adding the keys — no code change.
+
+API reference: https://ibejupay.com/developers
+  POST {base}/transactions/initialize  -> { data: { authorization_url, reference, ... } }
+  GET  {base}/transactions/verify/{reference} -> { data: { status, amount, ... } }
+  Webhook: header X-IbejuPay-Signature = hex HMAC-SHA512(raw_body, whsec_ secret),
+           body { event: "charge.success", data: { reference, amount, status } }
+  Amounts are in kobo (naira * 100).
 """
 import hashlib
 import hmac
@@ -22,7 +29,8 @@ from .services import (
     confirm_stage_c_payment,
 )
 
-PAYSTACK_BASE = 'https://api.paystack.co'
+def _base_url() -> str:
+    return getattr(settings, 'IBEJUPAY_BASE_URL', 'https://ibejupay.com/api/v1').rstrip('/')
 
 # Application state that must precede confirmation, per stage.
 _AWAITING = {
@@ -47,7 +55,7 @@ _CONFIRM = {
 
 
 def is_configured() -> bool:
-    return bool(getattr(settings, 'PAYSTACK_SECRET_KEY', ''))
+    return bool(getattr(settings, 'IBEJUPAY_SECRET_KEY', ''))
 
 
 def _system_actor() -> User:
@@ -67,17 +75,20 @@ def new_reference(payment: Payment) -> str:
 
 
 def initialize(payment: Payment, email: str, callback_url: str) -> dict:
-    """Start a Paystack transaction. Returns dict with authorization_url + reference."""
+    """Start an Ibeju Pay transaction. Returns dict with authorization_url + reference."""
     reference = new_reference(payment)
     payment.payment_reference = reference
     payment.save(update_fields=['payment_reference', 'updated_at'])
 
     resp = requests.post(
-        f'{PAYSTACK_BASE}/transaction/initialize',
-        headers={'Authorization': f'Bearer {settings.PAYSTACK_SECRET_KEY}'},
+        f'{_base_url()}/transactions/initialize',
+        headers={
+            'Authorization': f'Bearer {settings.IBEJUPAY_SECRET_KEY}',
+            'Content-Type': 'application/json',
+        },
         json={
             'email': email,
-            'amount': int(float(payment.amount_expected) * 100),  # kobo
+            'amount': int(round(float(payment.amount_expected) * 100)),  # kobo
             'reference': reference,
             'callback_url': callback_url,
             'metadata': {'payment_id': str(payment.id), 'stage': payment.stage},
@@ -85,32 +96,44 @@ def initialize(payment: Payment, email: str, callback_url: str) -> dict:
         timeout=20,
     )
     resp.raise_for_status()
-    body = resp.json()
+    data = resp.json().get('data', {})
     return {
-        'authorization_url': body['data']['authorization_url'],
-        'reference': reference,
+        'authorization_url': data['authorization_url'],
+        'reference': data.get('reference', reference),
     }
 
 
 def verify(reference: str) -> dict:
-    """Verify a transaction with Paystack. Returns {'success': bool, 'amount': float}."""
+    """Verify a transaction with Ibeju Pay. Returns {'success': bool, 'amount': float}.
+
+    The authoritative status/amount live under `data` (data.status == 'success',
+    data.amount in kobo); we fall back to top-level fields defensively.
+    """
     resp = requests.get(
-        f'{PAYSTACK_BASE}/transaction/verify/{reference}',
-        headers={'Authorization': f'Bearer {settings.PAYSTACK_SECRET_KEY}'},
+        f'{_base_url()}/transactions/verify/{reference}',
+        headers={'Authorization': f'Bearer {settings.IBEJUPAY_SECRET_KEY}'},
         timeout=20,
     )
     resp.raise_for_status()
-    data = resp.json().get('data', {})
+    body = resp.json()
+    data = body.get('data') or {}
+    status_str = data.get('status') or body.get('status')
+    amount_kobo = data.get('amount')
+    if amount_kobo is None:
+        amount_kobo = body.get('amount') or 0
     return {
-        'success': data.get('status') == 'success',
-        'amount': (data.get('amount') or 0) / 100,
+        'success': status_str == 'success',
+        'amount': (amount_kobo or 0) / 100,
     }
 
 
 def valid_signature(raw_body: bytes, signature: str) -> bool:
-    expected = hmac.new(
-        settings.PAYSTACK_SECRET_KEY.encode(), raw_body, hashlib.sha512
-    ).hexdigest()
+    """Verify the X-IbejuPay-Signature header: hex HMAC-SHA512 of the raw body,
+    keyed with the webhook signing secret (whsec_...)."""
+    secret = getattr(settings, 'IBEJUPAY_WEBHOOK_SECRET', '')
+    if not secret:
+        return False
+    expected = hmac.new(secret.encode(), raw_body, hashlib.sha512).hexdigest()
     return hmac.compare_digest(expected, signature or '')
 
 
@@ -144,8 +167,9 @@ def mark_paid(payment: Payment, amount: float | None = None) -> Payment:
             awaiting_confirm, actor=actor, remarks='Online payment received.'
         )
 
-    # Confirm and auto-advance.
-    _CONFIRM[payment.stage](payment, actor=actor)
+    # Payment is received but NOT auto-confirmed. The Council Treasurer must
+    # confirm it (upon the bank/gateway alert), which then issues the receipt and
+    # advances the application. Notify the CT that a payment awaits confirmation.
     _notify_admins(payment)
     return payment
 
@@ -158,9 +182,10 @@ def _notify_admins(payment: Payment) -> None:
     app = payment.application
     applicant = app.applicant
     stage_label = payment.get_stage_display() if hasattr(payment, 'get_stage_display') else payment.stage
-    title = f'Online payment received — {payment.payment_reference}'
+    title = f'Payment awaiting your confirmation — {payment.payment_reference}'
     message = (
-        f'An online payment has been confirmed through the payment gateway.\n\n'
+        f'An online payment has been received through the payment gateway and is '
+        f'awaiting your confirmation.\n\n'
         f'Payment reference : {payment.payment_reference}\n'
         f'Amount            : NGN {float(payment.amount_submitted or payment.amount_expected):,.2f}\n'
         f'Stage             : {stage_label}\n'
@@ -168,7 +193,7 @@ def _notify_admins(payment: Payment) -> None:
         f'Application ref   : {app.reference_number or app.id}\n'
         f'Applicant         : {applicant.first_name} {applicant.last_name} '
         f'<{applicant.email}>\n\n'
-        f'The application has been advanced automatically. No manual confirmation is needed.\n\n'
+        f'Please review and confirm this payment in your portal to issue the receipt and advance the application.\n\n'
         f'Ibeju-Lekki Local Government — Street Naming & Registration.'
     )
     admins = User.objects.filter(

@@ -63,10 +63,10 @@
         <div>
           <!-- Logo + wordmark -->
           <div class="flex items-center gap-4 mb-12">
-            <img src="@/assets/logo.png" alt="Ibeju-Lekki LGA Seal"
+            <img src="@/assets/logo.png" alt="Ibeju-Lekki Local Government Area Seal"
                  class="w-24 h-24 object-contain drop-shadow-xl flex-shrink-0"/>
             <div>
-              <h1 class="text-white font-bold text-2xl tracking-wide leading-none">SNRMS</h1>
+              <h1 class="text-white font-bold text-base tracking-wide leading-tight">Street Naming Registration Management System</h1>
               <p class="text-emerald-400 text-xs font-medium tracking-widest uppercase mt-1">Official Portal</p>
             </div>
           </div>
@@ -81,7 +81,7 @@
             </h2>
             <p class="text-slate-200 mt-5 text-base leading-relaxed">
               Register an account to begin your street naming
-              application with the Ibeju-Lekki LGA authority.
+              application with the Ibeju-Lekki Local Government Area authority.
             </p>
           </div>
 
@@ -111,7 +111,6 @@
             </div>
             <div>
               <p class="text-slate-300 text-xs font-semibold">Ibeju-Lekki Local Government Area</p>
-              <p class="text-slate-400 text-xs">Lagos State, Federal Republic of Nigeria</p>
             </div>
           </div>
         </div>
@@ -141,10 +140,10 @@
 
         <!-- Dark header — compact, logo centered -->
         <div class="flex-none flex flex-col items-center justify-center pt-8 pb-4 px-6">
-          <img src="@/assets/logo.png" alt="Ibeju-Lekki LGA Seal"
+          <img src="@/assets/logo.png" alt="Ibeju-Lekki Local Government Area Seal"
                class="w-20 h-20 object-contain mx-auto"
                style="filter: drop-shadow(0 8px 24px rgba(0,0,0,0.55))"/>
-          <h1 class="text-white text-2xl font-bold tracking-wide mt-2 leading-none">SNRMS</h1>
+          <h1 class="text-white text-lg font-bold tracking-wide mt-2 leading-tight">Street Naming Registration Management System</h1>
           <p class="text-emerald-400 text-[11px] font-bold tracking-[0.2em] uppercase mt-1">Official Portal</p>
         </div>
 
@@ -173,12 +172,12 @@
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="block text-xs font-semibold text-slate-700 mb-1">First name</label>
-                <input v-model="form.first_name" type="text" required placeholder="John"
+                <input v-model="form.first_name" type="text" required placeholder="First name"
                        class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all"/>
               </div>
               <div>
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Last name</label>
-                <input v-model="form.last_name" type="text" required placeholder="Doe"
+                <input v-model="form.last_name" type="text" required placeholder="Last name"
                        class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all"/>
               </div>
             </div>
@@ -197,14 +196,14 @@
             </div>
             <!-- Phone -->
             <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">Phone number <span class="text-slate-400 font-normal">(optional)</span></label>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Phone number <span class="text-red-500">*</span></label>
               <div class="relative">
                 <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                   <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"/>
                   </svg>
                 </div>
-                <input v-model="form.phone" type="tel" placeholder="+234 800 000 0000"
+                <input v-model="form.phone" type="tel" required placeholder="+234 800 000 0000"
                        class="block w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all"/>
               </div>
             </div>
@@ -267,7 +266,7 @@
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                 </svg>
-                <span>{{ loading ? 'Creating account…' : 'Create account' }}</span>
+                <span>{{ sendingCode ? 'Sending code…' : 'Continue' }}</span>
                 <svg v-if="!loading" class="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/>
                 </svg>
@@ -297,7 +296,7 @@
 
           <div class="mb-7">
             <p class="text-xs font-bold text-emerald-600 tracking-widest uppercase mb-2">
-              Ibeju-Lekki LGA · New Application
+              Ibeju-Lekki Local Government Area · New Application
             </p>
             <h2 class="text-slate-900 text-3xl font-bold tracking-tight leading-tight">Create account</h2>
             <p class="text-slate-500 mt-2 text-sm leading-relaxed">
@@ -322,12 +321,12 @@
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="block text-sm font-semibold text-slate-700 mb-1.5">First name</label>
-                <input v-model="form.first_name" type="text" required placeholder="John"
+                <input v-model="form.first_name" type="text" required placeholder="First name"
                        class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all"/>
               </div>
               <div>
                 <label class="block text-sm font-semibold text-slate-700 mb-1.5">Last name</label>
-                <input v-model="form.last_name" type="text" required placeholder="Doe"
+                <input v-model="form.last_name" type="text" required placeholder="Last name"
                        class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all"/>
               </div>
             </div>
@@ -347,7 +346,7 @@
             <!-- Phone -->
             <div>
               <label class="block text-sm font-semibold text-slate-700 mb-1.5">
-                Phone number <span class="text-slate-400 font-normal text-xs">(optional)</span>
+                Phone number <span class="text-red-500">*</span>
               </label>
               <div class="relative">
                 <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -355,7 +354,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"/>
                   </svg>
                 </div>
-                <input v-model="form.phone" type="tel" placeholder="+234 800 000 0000"
+                <input v-model="form.phone" type="tel" required placeholder="+234 800 000 0000"
                        class="block w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition-all"/>
               </div>
             </div>
@@ -419,7 +418,7 @@
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                 </svg>
-                <span>{{ loading ? 'Creating account…' : 'Create account' }}</span>
+                <span>{{ sendingCode ? 'Sending code…' : 'Continue' }}</span>
                 <svg v-if="!loading" class="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/>
                 </svg>
@@ -444,12 +443,31 @@
     </div>
 
   </div>
+  <!-- Email verification code overlay (#2) -->
+  <div v-if="codeSent" class="fixed inset-0 z-50 flex items-center justify-center px-4" style="background:rgba(15,23,42,0.6)">
+    <div class="w-full max-w-sm rounded-2xl bg-white p-6">
+      <h2 class="text-lg font-bold text-slate-900 mb-1">Verify your email</h2>
+      <p class="text-sm text-slate-500 mb-4">We sent a 6-digit code to <strong>{{ form.email }}</strong>. Enter it to finish creating your account.</p>
+      <input v-model="verificationCode" inputmode="numeric" maxlength="6" placeholder="______"
+             class="w-full text-center tracking-[0.5em] text-xl font-bold rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 mb-3" />
+      <p v-if="errorMessage" class="text-xs text-red-500 mb-2">{{ errorMessage }}</p>
+      <button @click="handleRegister" :disabled="loading || verificationCode.length < 6"
+              class="w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60" style="background:#059669">
+        {{ loading ? 'Creating account…' : 'Verify & create account' }}
+      </button>
+      <div class="flex items-center justify-between mt-3">
+        <button @click="codeSent = false" class="text-xs text-slate-400 hover:text-slate-600">← Back</button>
+        <button @click="resendCode" :disabled="sendingCode" class="text-xs text-emerald-600 hover:text-emerald-700">{{ sendingCode ? 'Sending…' : 'Resend code' }}</button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { authApi } from '@/services/api'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -518,13 +536,32 @@ const strengthTextColor = computed(() => {
   return 'text-emerald-600'
 })
 
+const codeSent = ref(false)
+const verificationCode = ref('')
+const sendingCode = ref(false)
+
 async function handleRegister() {
   errorMessage.value = ''
   if (form.value.password !== form.value.confirm_password) return
+  // Step 1 — request an email verification code before creating the account (#2).
+  if (!codeSent.value) {
+    sendingCode.value = true
+    try {
+      await authApi.requestVerification(form.value.email)
+      codeSent.value = true
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } }
+      errorMessage.value = e.response?.data?.detail || 'Could not send a verification code.'
+    } finally {
+      sendingCode.value = false
+    }
+    return
+  }
+  // Step 2 — submit with the code.
   loading.value = true
   try {
     const { confirm_password: _, ...payload } = form.value
-    await auth.register(payload)
+    await auth.register({ ...payload, verification_code: verificationCode.value })
     await auth.login(form.value.email, form.value.password)
     router.push('/applications')
   } catch (err: unknown) {
@@ -536,5 +573,12 @@ async function handleRegister() {
   } finally {
     loading.value = false
   }
+}
+
+async function resendCode() {
+  errorMessage.value = ''
+  sendingCode.value = true
+  try { await authApi.requestVerification(form.value.email) } catch { /* ignore */ }
+  finally { sendingCode.value = false }
 }
 </script>

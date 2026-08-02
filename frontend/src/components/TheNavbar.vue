@@ -7,46 +7,57 @@
       <div class="flex items-center justify-between">
 
         <!-- Logo + wordmark -->
-        <div class="flex items-center gap-7">
-          <RouterLink to="/" class="flex items-center gap-1 flex-shrink-0">
-            <img src="@/assets/logo.png" alt="Ibeju-Lekki LGA"
-                 class="w-20 h-20 object-contain"
+        <div class="flex items-center gap-3 min-w-0">
+          <RouterLink to="/" class="flex items-center gap-2 flex-shrink-0 min-w-0">
+            <img src="@/assets/logo.png" alt="Ibeju-Lekki Local Government Area"
+                 class="w-11 h-11 object-contain flex-shrink-0"
                  style="filter: drop-shadow(0 2px 8px rgba(0,0,0,0.6))"/>
-            <div class="leading-tight">
-              <span class="text-white font-bold text-base tracking-wide block">SNRMS</span>
-              <span class="text-emerald-400 text-[11px] tracking-widest uppercase block" style="margin-top:-2px">Ibeju-Lekki LGA</span>
+            <div class="leading-tight min-w-0 hidden sm:block max-w-[190px] 2xl:max-w-none">
+              <span class="text-white font-bold text-[13px] tracking-wide block leading-tight truncate 2xl:whitespace-normal">Street Naming Registration Management System</span>
+              <span class="text-emerald-400 text-[10px] tracking-widest uppercase block truncate" style="margin-top:-2px">Ibeju-Lekki Local Government Area</span>
             </div>
           </RouterLink>
 
           <!-- Desktop nav links -->
-          <div class="hidden md:flex items-center gap-0.5">
+          <div class="hidden lg:flex items-center gap-0.5 min-w-0 flex-1 justify-start overflow-x-auto mx-2 snrms-nav-scroll">
             <template v-if="auth.isApplicant">
               <NavLink to="/applications">My Applications</NavLink>
+              <NavLink to="/applications/new">New Application</NavLink>
+              <NavLink to="/applications/new?mode=legacy">Validate Existing</NavLink>
+              <NavLink to="/applications?tab=renew">Renew Expired</NavLink>
             </template>
-            <template v-if="auth.isStaff">
+            <template v-if="auth.isStaff && !auth.isNamingCommittee">
               <NavLink to="/staff/dashboard">Dashboard</NavLink>
               <NavLink to="/staff/applications">Applications</NavLink>
             </template>
-            <template v-if="auth.isChairman">
-              <NavLink to="/admin/staff">Staff</NavLink>
-            </template>
-            <template v-if="auth.isNamingCommittee">
-              <NavLink to="/admin/street-types">Street Types</NavLink>
-              <NavLink to="/admin/renewal-settings">Renewal Settings</NavLink>
-            </template>
-            <template v-if="auth.isNamingCommittee || auth.isChairman">
-              <NavLink to="/admin/streets">Manage Streets</NavLink>
-            </template>
+            <!-- Chairman: primary items stay visible; admin/config grouped under a menu -->
+            <Menu v-if="auth.isChairman" as="div" class="relative flex-shrink-0">
+              <MenuButton class="px-3 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-white/5 transition-colors whitespace-nowrap inline-flex items-center gap-1">
+                Manage
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+              </MenuButton>
+              <MenuItems class="absolute left-0 mt-2 w-52 rounded-xl shadow-xl ring-1 ring-black/10 focus:outline-none z-50 overflow-hidden bg-white py-1">
+                <MenuItem v-slot="{ active }"><RouterLink to="/admin/staff" :class="['block px-4 py-2 text-sm', active ? 'bg-slate-50 text-emerald-700' : 'text-slate-700']">Staff</RouterLink></MenuItem>
+                <MenuItem v-slot="{ active }"><RouterLink to="/admin/streets" :class="['block px-4 py-2 text-sm', active ? 'bg-slate-50 text-emerald-700' : 'text-slate-700']">Manage Streets</RouterLink></MenuItem>
+                <MenuItem v-slot="{ active }"><RouterLink to="/admin/street-types" :class="['block px-4 py-2 text-sm', active ? 'bg-slate-50 text-emerald-700' : 'text-slate-700']">Street Types</RouterLink></MenuItem>
+                <MenuItem v-slot="{ active }"><RouterLink to="/admin/renewal-settings" :class="['block px-4 py-2 text-sm', active ? 'bg-slate-50 text-emerald-700' : 'text-slate-700']">Renewal Settings</RouterLink></MenuItem>
+                <MenuItem v-slot="{ active }"><RouterLink to="/admin/applications-database" :class="['block px-4 py-2 text-sm', active ? 'bg-slate-50 text-emerald-700' : 'text-slate-700']">Database</RouterLink></MenuItem>
+              </MenuItems>
+            </Menu>
+            <NavLink v-if="auth.isChairman" to="/admin/audit">Audit</NavLink>
+            <NavLink v-if="auth.isNamingCommittee" to="/committee/console">Committee Console</NavLink>
+            <NavLink v-if="auth.isFinance" to="/admin/confirm-payments">Confirm Payments</NavLink>
+            <NavLink v-if="auth.isFinance" to="/admin/official-signature">Signature</NavLink>
             <template v-if="auth.isFinance">
               <NavLink to="/admin/fees">Fee Config</NavLink>
             </template>
-            <NavLink v-if="auth.isStaff" to="/admin/applications-database">Database</NavLink>
+            <NavLink v-if="auth.isFinance" to="/admin/applications-database">Database</NavLink>
             <NavLink to="/registry">Street Map</NavLink>
           </div>
         </div>
 
         <!-- Right: bell + user menu -->
-        <div class="hidden md:flex items-center gap-1">
+        <div class="hidden lg:flex items-center gap-1 flex-shrink-0">
           <!-- Notification bell -->
           <RouterLink to="/notifications"
                       class="relative p-2 rounded-lg transition-colors"
@@ -67,10 +78,10 @@
                    style="background: linear-gradient(135deg, #059669, #047857)">
                 {{ initials }}
               </div>
-              <span class="text-sm font-medium">{{ auth.user?.full_name || auth.user?.email }}</span>
-              <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+              <span class="text-sm font-medium hidden 2xl:inline max-w-[130px] truncate">{{ auth.user?.full_name || auth.user?.email }}</span>
+              <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0"
                     style="background: rgba(5,150,105,0.2); color: #34d399; border: 1px solid rgba(52,211,153,0.3)">
-                {{ roleLabel }}
+                {{ roleLabelShort }}
               </span>
               <ChevronDownIcon class="w-3.5 h-3.5 opacity-50" />
             </MenuButton>
@@ -117,7 +128,7 @@
         </div>
 
         <!-- Mobile: bell + hamburger -->
-        <div class="md:hidden flex items-center gap-1">
+        <div class="lg:hidden flex items-center gap-1">
           <RouterLink to="/notifications" class="relative p-2 rounded-lg" style="color: rgba(255,255,255,0.5)">
             <BellIcon class="w-5 h-5" />
             <span v-if="notificationStore.unreadCount > 0"
@@ -144,7 +155,7 @@
                 leave-from-class="opacity-100 translate-y-0"
                 leave-to-class="opacity-0 -translate-y-2">
       <div v-if="mobileOpen"
-           class="md:hidden pb-4"
+           class="lg:hidden pb-4"
            style="border-top: 1px solid rgba(255,255,255,0.07)">
 
         <!-- User identity strip -->
@@ -221,6 +232,15 @@ const roleLabel = computed(() => {
     finance: 'Council Treasurer',
     naming_committee: 'Street Naming Committee',
     committee_chairman: 'Local Government Chairman',
+  }
+  return map[auth.user?.role ?? ''] ?? auth.user?.role ?? ''
+})
+const roleLabelShort = computed(() => {
+  const map: Record<string, string> = {
+    applicant: 'Applicant',
+    finance: 'Treasurer',
+    naming_committee: 'Committee',
+    committee_chairman: 'Chairman',
   }
   return map[auth.user?.role ?? ''] ?? auth.user?.role ?? ''
 })

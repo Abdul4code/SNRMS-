@@ -6,11 +6,13 @@ from .views import (
     DocumentRejectView,
     DocumentUploadView,
     DocumentVerifyView,
+    AdminDocumentUploadView,
 )
 
 urlpatterns = [
     path('', DocumentListView.as_view(), name='document-list'),
     path('upload/', DocumentUploadView.as_view(), name='document-upload'),
+    path('admin-upload/', AdminDocumentUploadView.as_view(), name='admin-document-upload'),
     path('<uuid:pk>/', DocumentDetailView.as_view(), name='document-detail'),
     path('<uuid:pk>/verify/', DocumentVerifyView.as_view(), name='document-verify'),
     path('<uuid:pk>/reject/', DocumentRejectView.as_view(), name='document-reject'),

@@ -86,12 +86,12 @@
             <div class="flex-shrink-0">
               <img
                 src="@/assets/logo.png"
-                alt="Ibeju-Lekki LGA Seal"
+                alt="Ibeju-Lekki Local Government Area Seal"
                 class="w-24 h-24 object-contain drop-shadow-xl"
               />
             </div>
             <div>
-              <h1 class="text-white font-bold text-2xl tracking-wide leading-none">SNRMS</h1>
+              <h1 class="text-white font-bold text-base tracking-wide leading-tight">Street Naming Registration Management System</h1>
               <p class="text-emerald-400 text-xs font-medium tracking-widest uppercase mt-1">Official Portal</p>
             </div>
           </div>
@@ -106,7 +106,7 @@
             </h2>
             <p class="text-slate-200 mt-5 text-base leading-relaxed">
               The authoritative platform for street naming registration,
-              review, and certification across Ibeju-Lekki LGA.
+              review, and certification across Ibeju-Lekki Local Government Area.
             </p>
           </div>
 
@@ -123,7 +123,7 @@
               </div>
               <div>
                 <p class="text-white text-sm font-semibold">{{ item.label }}</p>
-                <p class="text-slate-300 text-xs mt-0.5 leading-snug">{{ item.desc }}</p>
+                <p v-if="item.desc" class="text-slate-300 text-xs mt-0.5 leading-snug">{{ item.desc }}</p>
               </div>
             </div>
           </div>
@@ -140,7 +140,6 @@
             </div>
             <div>
               <p class="text-slate-300 text-xs font-semibold">Ibeju-Lekki Local Government Area</p>
-              <p class="text-slate-400 text-xs">Lagos State, Federal Republic of Nigeria</p>
             </div>
           </div>
         </div>
@@ -176,11 +175,11 @@
         <div class="flex-none flex flex-col items-center justify-center pt-10 pb-6 px-6">
           <img
             src="@/assets/logo.png"
-            alt="Ibeju-Lekki LGA Seal"
+            alt="Ibeju-Lekki Local Government Area Seal"
             class="w-36 h-36 object-contain mx-auto"
             style="filter: drop-shadow(0 8px 24px rgba(0,0,0,0.55))"
           />
-          <h1 class="text-white text-3xl font-bold tracking-wide mt-2 leading-none">SNRMS</h1>
+          <h1 class="text-white text-xl font-bold tracking-wide mt-2 leading-tight">Street Naming Registration Management System</h1>
           <p class="text-emerald-400 text-[11px] font-bold tracking-[0.2em] uppercase mt-1.5">Official Portal</p>
           <p class="text-slate-400 text-xs mt-2 text-center leading-relaxed">
             Street Names Registration &amp; Management<br/>Ibeju-Lekki Local Government Area
@@ -266,7 +265,7 @@
           <!-- Divider + register -->
           <div class="my-4 flex items-center gap-4">
             <div class="flex-1 h-px bg-slate-200"></div>
-            <span class="text-xs text-slate-400 font-medium">New to SNRMS?</span>
+            <span class="text-xs text-slate-400 font-medium">New to Street Naming Registration Management System?</span>
             <div class="flex-1 h-px bg-slate-200"></div>
           </div>
           <RouterLink to="/register"
@@ -289,7 +288,7 @@
           <!-- Desktop heading -->
           <div class="mb-8">
             <p class="text-xs font-bold text-emerald-600 tracking-widest uppercase mb-2">
-              Ibeju-Lekki LGA · Official Streets Portal
+              Ibeju-Lekki Local Government Area · Official Streets Portal
             </p>
             <h2 class="text-slate-900 text-3xl font-bold tracking-tight leading-tight">Welcome back</h2>
             <p class="text-slate-500 mt-2.5 text-sm leading-relaxed">
@@ -365,7 +364,7 @@
 
           <div class="my-6 flex items-center gap-4">
             <div class="flex-1 h-px bg-slate-200"></div>
-            <span class="text-xs text-slate-400 font-medium">New to SNRMS?</span>
+            <span class="text-xs text-slate-400 font-medium">New to Street Naming Registration Management System?</span>
             <div class="flex-1 h-px bg-slate-200"></div>
           </div>
           <RouterLink to="/register"
@@ -406,14 +405,14 @@ const features = [
   },
   {
     label: 'Multi-level Review & Approval',
-    desc: 'Structured committee review, chairman sign-off, and Finance confirmation in one place.',
+    desc: '',
     path: 'M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z',
     bgColor: 'rgba(16,185,129,0.15)',
     iconColor: '#6ee7b7',
   },
   {
     label: 'Official Certificate Issuance',
-    desc: 'Receive a certified street name registration recognised by the LGA.',
+    desc: 'Receive a certified street name registration recognised by the Local Government Area.',
     path: 'M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75',
     bgColor: 'rgba(217,119,6,0.18)',
     iconColor: '#fbbf24',

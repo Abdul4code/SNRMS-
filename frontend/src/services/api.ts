@@ -87,6 +87,7 @@ api.interceptors.response.use(
 
 // ─── Auth API ───────────────────────────────────────────────────────────────
 export const authApi = {
+  requestVerification: (email: string) => api.post('/auth/request-verification/', { email }),
   login: (email: string, password: string) =>
     api.post('/auth/login/', { email, password }),
   register: (data: Record<string, unknown>) =>
@@ -109,6 +110,8 @@ export const authApi = {
 
 // ─── Application API ─────────────────────────────────────────────────────────
 export const applicationApi = {
+  repository: (id: number | string) => api.get(`/applications/${id}/repository/`),
+  releaseCertificate: (id: number | string, released: boolean) => api.post(`/applications/${id}/certificate-release/`, { released }),
   list: (params?: Record<string, unknown>) =>
     api.get('/applications/', { params }),
   get: (id: number | string) =>
@@ -121,6 +124,11 @@ export const applicationApi = {
     api.post('/applications/check-duplicate/', data),
   getRegistry: (params?: Record<string, unknown>) =>
     api.get('/applications/registry/', { params }),
+  audit: (params: Record<string, unknown>) => api.get('/applications/audit/', { params }),
+  setRoyaltyExemption: (id: string, exempt: boolean) =>
+    api.post(`/applications/${id}/royalty-exemption/`, { exempt }),
+  setSignboard: (id: string, data: Record<string, unknown>) =>
+    api.post(`/applications/${id}/signboard/`, data),
   update: (id: number | string, data: Record<string, unknown>) =>
     api.patch(`/applications/${id}/`, data),
   submit: (id: number | string) =>
@@ -161,10 +169,17 @@ export const documentApi = {
     api.post(`/documents/${id}/verify/`, data),
   reject: (id: number | string, data: Record<string, unknown>) =>
     api.post(`/documents/${id}/reject/`, data),
+  adminUpload: (formData: FormData) =>
+    api.post('/documents/admin-upload/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
 }
 
 // ─── Payment API ─────────────────────────────────────────────────────────────
 export const paymentApi = {
+  pendingConfirmation: () => api.get('/payments/pending-confirmation/'),
+  confirm: (paymentId: string, data: Record<string, unknown>) =>
+    api.post(`/payments/${paymentId}/confirm/`, data),
   listForApplication: (appId: number | string) =>
     api.get(`/payments/applications/${appId}/payments/`),
   getBreakdown: (stage: string, streetTypeId?: number | string) =>
@@ -208,6 +223,8 @@ export const notificationApi = {
 
 // ─── Config API ──────────────────────────────────────────────────────────────
 export const configApi = {
+  streetViewUrl: (lat: number, lng: number) => `${api.defaults.baseURL}/config/streetview/?lat=${lat}&lng=${lng}`,
+  publicSettings: () => api.get('/config/public-settings/'),
   listStreetTypes: () =>
     api.get('/config/street-types/'),
   createStreetType: (data: Record<string, unknown>) =>
@@ -220,6 +237,8 @@ export const configApi = {
     api.get('/config/streets/', { params }),
   getStreetSummary: () =>
     api.get('/config/streets/summary/'),
+  getLocalityWards: () =>
+    api.get('/config/locality-wards/'),
   getStreetBuildings: (id: string) =>
     api.get(`/config/streets/${id}/buildings/`),
   mergeStreets: (targetId: string, sourceIds: string[]) =>
@@ -235,3 +254,33 @@ export const configApi = {
 }
 
 export default api
+
+// Street Naming Committee (second-tier quorum workflow)
+export const committeeApi = {
+  members: () => api.get('/applications/committee/members/'),
+  verifyMember: (number: number, pin: string) =>
+    api.post('/applications/committee/verify-member/', { number, pin }),
+  review: (appId: string, token: string) =>
+    api.get(`/applications/committee/${appId}/review/`, { headers: { 'X-Committee-Member': token }, params: { member_token: token } }),
+  markViewed: (appId: string, token: string) =>
+    api.post(`/applications/committee/${appId}/mark-viewed/`, { member_token: token }, { headers: { 'X-Committee-Member': token } }),
+  comment: (appId: string, token: string, data: Record<string, unknown>) =>
+    api.post(`/applications/committee/${appId}/comment/`, { ...data, member_token: token }, { headers: { 'X-Committee-Member': token } }),
+  forward: (appId: string, token: string, data: Record<string, unknown>) =>
+    api.post(`/applications/committee/${appId}/forward/`, { ...data, member_token: token }, { headers: { 'X-Committee-Member': token } }),
+}
+
+// Secure receipts (#13)
+export const receiptApi = {
+  getSignature: () => api.get('/payments/signature/'),
+  uploadSignature: (form: FormData) =>
+    api.post('/payments/signature/', form, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  download: async (serial: string) => {
+    const res = await api.get(`/payments/receipts/${serial}/download/`, { responseType: 'blob' })
+    const url = URL.createObjectURL(res.data as Blob)
+    const a = document.createElement('a'); a.href = url; a.download = `${serial}.pdf`; a.click()
+    URL.revokeObjectURL(url)
+  },
+  verify: (serial: string, code: string) =>
+    api.get(`/payments/receipts/verify/${serial}/`, { params: { code } }),
+}

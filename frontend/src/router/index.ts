@@ -72,6 +72,36 @@ const router = createRouter({
       meta: { requiresAuth: true, roles: ['finance', 'naming_committee', 'committee_chairman'] },
     },
     {
+      path: '/verify-receipt/:serial',
+      name: 'verify-receipt',
+      component: () => import('@/views/VerifyReceiptView.vue'),
+      meta: { public: true },
+    },
+    {
+      path: '/admin/confirm-payments',
+      name: 'confirm-payments',
+      component: () => import('@/views/admin/PaymentConfirmationView.vue'),
+      meta: { requiresAuth: true, roles: ['finance', 'committee_chairman'] },
+    },
+    {
+      path: '/admin/audit',
+      name: 'chairman-audit',
+      component: () => import('@/views/admin/ChairmanAuditView.vue'),
+      meta: { requiresAuth: true, roles: ['committee_chairman'] },
+    },
+    {
+      path: '/admin/official-signature',
+      name: 'official-signature',
+      component: () => import('@/views/admin/SignatureUploadView.vue'),
+      meta: { requiresAuth: true, roles: ['finance', 'committee_chairman'] },
+    },
+    {
+      path: '/committee/console',
+      name: 'committee-console',
+      component: () => import('@/views/committee/CommitteeConsoleView.vue'),
+      meta: { requiresAuth: true, roles: ['naming_committee', 'committee_chairman'] },
+    },
+    {
       path: '/admin/streets',
       name: 'manage-streets',
       component: () => import('@/views/admin/StreetManagementView.vue'),
@@ -195,8 +225,10 @@ function getRoleDefault(role?: string): string {
   switch (role) {
     case 'applicant':
       return '/applications'
-    case 'finance':
     case 'naming_committee':
+      // The committee's home is the members' console — sign in as a member there.
+      return '/committee/console'
+    case 'finance':
     case 'committee_chairman':
       return '/staff/dashboard'
     default:

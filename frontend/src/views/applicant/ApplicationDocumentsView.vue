@@ -268,6 +268,7 @@ const REQUIRED_DOCS = [
   { type: 'passport_photograph', label: 'Passport Photograph' },
   { type: 'royal_fathers_recognition_letter', label: 'Royal Fathers Recognition Letter' },
   { type: 'survey_property_document', label: 'Survey Property Document' },
+  { type: 'cda_recommendation_letter', label: 'Letter from the CDA (Community Development Association)' },
 ]
 
 const route = useRoute()

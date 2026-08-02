@@ -207,6 +207,18 @@ class Street(models.Model):
         max_length=20, default=SOURCE_SURVEY,
         choices=[(SOURCE_SURVEY, 'Auto (from survey points)'), (SOURCE_DIGITISED, 'Digitised (ground-truth)')],
     )
+    # Provenance / regularisation status for cleanup tracking (#4).
+    VALIDATION_GOOGLE = 'google'        # picked from Google Earth
+    VALIDATION_SURVEY = 'survey'        # extracted from the field survey
+    VALIDATION_REGISTRY = 'registry'    # collected from the old registry
+    validation_status = models.CharField(
+        max_length=20, default=VALIDATION_SURVEY, db_index=True,
+        choices=[
+            (VALIDATION_GOOGLE, 'Validation urgently required'),
+            (VALIDATION_SURVEY, 'Needs regularization'),
+            (VALIDATION_REGISTRY, 'Collected from old registry'),
+        ],
+    )
     registration_status = models.CharField(
         max_length=20, choices=RegistrationStatus.choices,
         default=RegistrationStatus.SURVEYED,

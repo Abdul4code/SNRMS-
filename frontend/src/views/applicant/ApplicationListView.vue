@@ -23,6 +23,36 @@
 
     <div class="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
 
+      <!-- ── Three main activities ───────────────────────────────────── -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <RouterLink to="/applications/new"
+                    class="group rounded-2xl p-5 bg-white border border-slate-200 hover:border-emerald-300 hover:shadow-md transition-all">
+          <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(5,150,105,0.12)">
+            <PlusIcon class="w-6 h-6" style="color:#059669" />
+          </div>
+          <p class="text-sm font-bold text-slate-900">Start New Application</p>
+          <p class="text-xs text-slate-500 mt-1">Register a brand-new street name.</p>
+        </RouterLink>
+
+        <RouterLink to="/applications/new?mode=legacy"
+                    class="group rounded-2xl p-5 bg-white border border-slate-200 hover:border-amber-300 hover:shadow-md transition-all">
+          <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(217,119,6,0.12)">
+            <ShieldCheckIcon class="w-6 h-6" style="color:#d97706" />
+          </div>
+          <p class="text-sm font-bold text-slate-900">Validate Existing Registration</p>
+          <p class="text-xs text-slate-500 mt-1">Enter a street name already registered so it's recognised.</p>
+        </RouterLink>
+
+        <RouterLink to="/applications?tab=renew"
+                    class="group rounded-2xl p-5 bg-white border border-slate-200 hover:border-sky-300 hover:shadow-md transition-all">
+          <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(2,132,199,0.12)">
+            <ArrowPathIcon class="w-6 h-6" style="color:#0284c7" />
+          </div>
+          <p class="text-sm font-bold text-slate-900">Renew Expired Registration</p>
+          <p class="text-xs text-slate-500 mt-1">Renew a certificate that has expired.</p>
+        </RouterLink>
+      </div>
+
       <!-- Loading -->
       <div v-if="loading" class="flex flex-col items-center justify-center py-20 gap-3">
         <div class="w-10 h-10 rounded-full border-2 border-slate-200 border-t-emerald-500 animate-spin"></div>
@@ -103,7 +133,7 @@
             {{ filters.status ? 'No applications with this status' : 'No applications yet' }}
           </h3>
           <p class="text-sm text-slate-500 mb-6 max-w-xs mx-auto">
-            {{ filters.status ? 'Try clearing the filter to see all applications.' : 'Submit your first street name registration application with Ibeju-Lekki LGA.' }}
+            {{ filters.status ? 'Try clearing the filter to see all applications.' : 'Submit your first street name registration application with Ibeju-Lekki Local Government Area.' }}
           </p>
           <RouterLink v-if="!filters.status" to="/applications/new"
                       class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white"
@@ -208,8 +238,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { RouterLink } from 'vue-router'
-import { PlusIcon, DocumentTextIcon, XMarkIcon, ChevronRightIcon, ArrowRightIcon } from '@heroicons/vue/24/outline'
+import { PlusIcon, DocumentTextIcon, XMarkIcon, ChevronRightIcon, ArrowRightIcon, ShieldCheckIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
 import { applicationApi, documentApi } from '@/services/api'
 import StatusBadge from '@/components/StatusBadge.vue'
 
@@ -399,5 +430,9 @@ function formatDate(d: string) {
   return new Date(d).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-onMounted(loadApplications)
+onMounted(async () => {
+  await loadApplications()
+  // "Renew expired registration" deep-links here with ?tab=renew — show expired ones.
+  if (useRoute().query.tab === 'renew') { filters.value.status = 'expired' }
+})
 </script>

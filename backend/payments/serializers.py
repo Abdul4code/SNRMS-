@@ -23,6 +23,11 @@ class PaymentSerializer(serializers.ModelSerializer):
     confirmed_by = _ConfirmedBySerializer(read_only=True)
     submitted_by_id = serializers.UUIDField(source='submitted_by.id', read_only=True, allow_null=True)
     submitted_by_name = serializers.CharField(source='submitted_by.full_name', read_only=True, allow_null=True)
+    receipt_serial = serializers.SerializerMethodField()
+
+    def get_receipt_serial(self, obj):
+        r = getattr(obj, 'receipt', None)
+        return r.serial if r else None
 
     class Meta:
         model = Payment
@@ -37,6 +42,7 @@ class PaymentSerializer(serializers.ModelSerializer):
             'bank_name',
             'payment_date',
             'receipt_file',
+            'receipt_serial',
             'confirmed_by',
             'confirmed_at',
             'finance_remarks',

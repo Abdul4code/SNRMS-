@@ -218,7 +218,9 @@
               </div>
               <div class="p-5 space-y-4">
                 <p class="text-sm font-medium" style="color: #047857">
-                  Your certificate has been issued. You can download it below.
+                  Your street name has been officially registered as a certified street name registration
+                  recognised by <strong>Ibeju-Lekki</strong> Local Government Area. Your certificate will be
+                  issued to you physically by the Local Government — please visit the Council to collect it.
                 </p>
                 <div v-if="application.expires_at" class="flex items-center gap-2 text-sm">
                   <span class="text-slate-500">Expires:</span>
@@ -231,13 +233,6 @@
                     {{ application.status === 'expired' ? 'Expired' : 'Expiring soon' }}
                   </span>
                 </div>
-                <a v-if="application.certificate_file"
-                   :href="application.certificate_file" target="_blank"
-                   class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
-                   style="background: linear-gradient(135deg, #059669, #047857)">
-                  <DocumentIcon class="w-4 h-4" />
-                  Download Certificate
-                </a>
                 <!-- Completion status -->
                 <div class="space-y-2 pt-1">
                   <p class="text-xs font-semibold uppercase tracking-wider" style="color: #6b7280">Completion Status</p>
@@ -266,6 +261,9 @@
                 </div>
               </div>
             </div>
+
+            <!-- Full document repository — everything on file, downloadable anytime -->
+            <DocumentRepository v-if="application" :application-id="application.id" class="mt-6" />
 
           </div>
 
@@ -316,6 +314,7 @@ import { useRoute, RouterLink, useRouter } from 'vue-router'
 import { DocumentIcon, ChevronRightIcon, ClockIcon } from '@heroicons/vue/24/outline'
 import { applicationApi, documentApi } from '@/services/api'
 import StatusBadge from '@/components/StatusBadge.vue'
+import DocumentRepository from '@/components/DocumentRepository.vue'
 
 const REQUIRED_DOC_TYPES = [
   'nin_verification_slip',
