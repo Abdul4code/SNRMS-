@@ -59,24 +59,6 @@
               </tfoot>
             </table>
           </div>
-          <!-- Bank account info strip -->
-          <div class="mx-5 mb-5 rounded-xl p-4" style="background: #f8fafc; border: 1px solid #e2e8f0">
-            <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Payment Account Details</p>
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <p class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Bank</p>
-                <p class="text-sm font-semibold text-slate-800 mt-0.5">Zenith Bank</p>
-              </div>
-              <div>
-                <p class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Account No.</p>
-                <p class="text-sm font-mono font-semibold text-slate-800 mt-0.5">1234567890</p>
-              </div>
-              <div class="col-span-2">
-                <p class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Account Name</p>
-                <p class="text-sm font-semibold text-slate-800 mt-0.5">Ibeju-Lekki Local Government Area — Street Naming</p>
-              </div>
-            </div>
-          </div>
         </div>
 
         <!-- No fees available yet -->
