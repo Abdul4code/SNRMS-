@@ -38,12 +38,8 @@ class DocumentSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_file_url(self, instance):
-        if not instance.file:
-            return None
-        request = self.context.get('request')
-        if request is not None:
-            return request.build_absolute_uri(instance.file.url)
-        return instance.file.url
+        from snrms.media_access import signed_media_url
+        return signed_media_url(instance.file, self.context.get('request'))
 
 
 class DocumentUploadSerializer(serializers.ModelSerializer):

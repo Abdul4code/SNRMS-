@@ -1250,13 +1250,11 @@ class ApplicationRepositoryView(APIView):
         if not is_staff_role and application.applicant_id != user.id:
             return Response({'detail': 'Not permitted.'}, status=status.HTTP_403_FORBIDDEN)
 
+        from snrms.media_access import signed_media_url
+
         def _url(f):
-            if not f:
-                return None
-            try:
-                return request.build_absolute_uri(f.url)
-            except Exception:  # noqa: BLE001
-                return None
+            # Short-lived signed link; public /media is closed in production.
+            return signed_media_url(f, request)
 
         items = []
         # 1) Documents uploaded by the applicant, and 2) issued by the Council

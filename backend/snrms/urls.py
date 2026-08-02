@@ -1,7 +1,9 @@
 from django.contrib import admin
-from django.urls import path, include, re_path
+from django.urls import path, include
 from django.conf import settings
-from django.views.static import serve as serve_media
+from django.conf.urls.static import static
+
+from .media_access import serve_signed_media
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -12,12 +14,12 @@ urlpatterns = [
     path('api/notifications/', include('notifications.urls')),
     path('api/config/', include('config.urls')),
     path('api/audit/', include('audit.urls')),
+    # Protected media: only reachable with a valid, unexpired signed token that
+    # authenticated endpoints mint. Public /media is intentionally NOT served in
+    # production, so uploaded PII cannot be fetched by URL alone.
+    path('media-download/', serve_signed_media, name='media-download'),
 ]
 
-# Serve uploaded media (documents, receipts, certificates) from the mounted
-# volume. Django's static() helper only works when DEBUG=True; on Fly the app
-# runs with DEBUG=False and there is no separate file server, so we serve media
-# through this view in all environments.
-urlpatterns += [
-    re_path(r'^media/(?P<path>.*)$', serve_media, {'document_root': settings.MEDIA_ROOT}),
-]
+# Raw /media is served only in local development (DEBUG=True) for convenience.
+# In production it is closed; files are reached exclusively via signed links.
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

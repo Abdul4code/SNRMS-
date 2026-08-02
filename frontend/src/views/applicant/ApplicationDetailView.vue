@@ -195,7 +195,7 @@
                       </p>
                     </div>
                   </div>
-                  <a v-if="doc.file" :href="doc.file" target="_blank"
+                  <a v-if="doc.file_url" :href="doc.file_url" target="_blank"
                      class="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex-shrink-0 ml-3">
                     View
                   </a>
@@ -343,7 +343,7 @@ interface Application {
   google_map_uploaded?: boolean
   signpost_installed?: boolean
 }
-interface Document { id: number; document_type: string; document_type_display?: string; file?: string; is_verified?: boolean }
+interface Document { id: number; document_type: string; document_type_display?: string; file?: string; file_url?: string; is_verified?: boolean }
 interface HistoryEntry { new_status?: string; status?: string; created_at?: string; timestamp?: string; remarks?: string; comment?: string }
 
 const PAYMENT_STATUSES = ['awaiting_stage_a_payment', 'awaiting_stage_c_payment', 'awaiting_renewal_payment']
