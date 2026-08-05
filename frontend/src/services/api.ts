@@ -122,6 +122,8 @@ export const applicationApi = {
     }),
   checkDuplicate: (data: Record<string, unknown>) =>
     api.post('/applications/check-duplicate/', data),
+  streetAvailability: (lat: number | string, lng: number | string) =>
+    api.get('/applications/street-availability/', { params: { lat, lng } }),
   getRegistry: (params?: Record<string, unknown>) =>
     api.get('/applications/registry/', { params }),
   audit: (params: Record<string, unknown>) => api.get('/applications/audit/', { params }),

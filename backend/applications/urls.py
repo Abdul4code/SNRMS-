@@ -25,6 +25,7 @@ from .views import (
     CommitteeReviewView,
     DocumentResubmitView,
     RequestPaymentView,
+    StreetAvailabilityView,
 )
 
 app_name = 'applications'
@@ -32,6 +33,7 @@ app_name = 'applications'
 urlpatterns = [
     # Collection
     path('', ApplicationListCreateView.as_view(), name='application-list-create'),
+    path('street-availability/', StreetAvailabilityView.as_view(), name='application-street-availability'),
     path('check-duplicate/', DuplicateCheckView.as_view(), name='application-check-duplicate'),
     path('committee/members/', CommitteeMembersView.as_view(), name='committee-members'),
     path('committee/verify-member/', VerifyMemberView.as_view(), name='committee-verify-member'),

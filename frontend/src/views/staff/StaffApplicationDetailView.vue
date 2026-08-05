@@ -395,15 +395,15 @@
               </form>
             </div>
 
-            <!-- Naming committee: issue certificate (auto-generated) -->
-            <div v-if="auth.isNamingCommittee && application.status === 'stage_c_confirmed'"
+            <!-- LG Chairman: generate the street name certificate (auto-generated with the chairman's signature) -->
+            <div v-if="auth.isChairman && application.status === 'stage_c_confirmed'"
                  class="rounded-2xl overflow-hidden"
                  style="background: #fff; border: 1px solid #e2e8f0">
               <div class="px-5 py-4" style="border-bottom: 1px solid #f1f5f9">
-                <h2 class="text-sm font-bold text-slate-900">Issue Certificate</h2>
+                <h2 class="text-sm font-bold text-slate-900">Generate street name certificate</h2>
               </div>
               <div class="p-5 space-y-4">
-                <p class="text-sm text-slate-600">Stage C payment confirmed. A certificate will be <span class="font-semibold">auto-generated</span> with the details below.</p>
+                <p class="text-sm text-slate-600">Final payment confirmed. The certificate is <span class="font-semibold">auto-generated</span> with the street name, pole number and your uploaded signature.</p>
                 <div class="grid grid-cols-2 gap-3 rounded-xl bg-slate-50 border border-slate-100 p-3 text-sm">
                   <div><span class="text-xs text-slate-400 block">Signboard No.</span><span class="font-semibold text-slate-800">{{ application.signboard_number || 'Assigned on issue' }}</span></div>
                   <div><span class="text-xs text-slate-400 block">Pole No.</span><span class="font-semibold text-slate-800">{{ application.pole_number || 'Assigned on issue' }}</span></div>
@@ -419,15 +419,12 @@
                          class="block w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" />
                   <p class="mt-1 text-xs text-slate-400">Leave empty to use the auto-generated certificate. Upload only to use your own.</p>
                 </div>
-                <label class="flex items-center gap-2 text-sm text-slate-700">
-                  <input type="checkbox" v-model="certRelease" class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
-                  Release to applicant now <span class="text-xs text-slate-400">(they can download it; otherwise it stays with the committee)</span>
-                </label>
+                <p class="text-xs text-slate-400">After generating, you can send the digital copy to the applicant with one click.</p>
                 <button :disabled="actionLoading || !certExpiresAt"
                         class="w-full py-2.5 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-60"
                         style="background: linear-gradient(135deg, #059669, #047857)"
                         @click="handleIssueCertificate">
-                  {{ actionLoading ? 'Processing…' : 'Issue Certificate' }}
+                  {{ actionLoading ? 'Processing…' : 'Generate certificate' }}
                 </button>
               </div>
             </div>
@@ -443,15 +440,16 @@
                    class="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white" style="background:#059669">
                   Download certificate ({{ application.certificate_number }})
                 </a>
-                <!-- Release control is the committee's decision; the LG chairman only sees status -->
-                <label v-if="auth.isNamingCommittee" class="flex items-center gap-2 text-sm text-slate-700">
-                  <input type="checkbox" :checked="application.certificate_released" @change="toggleRelease"
-                         class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
-                  Released to applicant
-                  <span class="text-xs text-slate-400">{{ application.certificate_released ? '(applicant can download)' : '(held by committee)' }}</span>
-                </label>
+                <!-- The LG Chairman sends the digital copy to the applicant -->
+                <div v-if="auth.isChairman">
+                  <button v-if="!application.certificate_released" @click="sendToApplicant" :disabled="actionLoading"
+                          class="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:opacity-60" style="background:#0f172a">
+                    {{ actionLoading ? 'Sending…' : 'Send certificate to applicant' }}
+                  </button>
+                  <p v-else class="text-xs text-emerald-600">✓ Sent to the applicant — they can download it.</p>
+                </div>
                 <p v-else class="text-xs" :class="application.certificate_released ? 'text-emerald-600' : 'text-slate-400'">
-                  {{ application.certificate_released ? '✓ Released to the applicant' : 'Not yet released to the applicant (committee decision)' }}
+                  {{ application.certificate_released ? '✓ Released to the applicant' : 'Not yet released to the applicant' }}
                 </p>
               </div>
             </div>
@@ -916,16 +914,18 @@ async function handleIssueCertificate() {
   }
 }
 
-async function toggleRelease(e: Event) {
-  const released = (e.target as HTMLInputElement).checked
+async function sendToApplicant() {
   actionError.value = ''
+  actionLoading.value = true
   try {
-    await applicationApi.releaseCertificate(application.value!.id, released)
-    actionSuccess.value = released ? 'Certificate released to the applicant.' : 'Certificate held — applicant can no longer download.'
+    await applicationApi.releaseCertificate(application.value!.id, true)
+    actionSuccess.value = 'Certificate sent to the applicant — they can now download it.'
     await load()
   } catch (err: unknown) {
-    const e2 = err as { response?: { data?: { detail?: string } } }
-    actionError.value = e2.response?.data?.detail || 'Failed to update release status.'
+    const e = err as { response?: { data?: { detail?: string } } }
+    actionError.value = e.response?.data?.detail || 'Failed to send certificate.'
+  } finally {
+    actionLoading.value = false
   }
 }
 

@@ -397,13 +397,28 @@ class CommunityListView(APIView):
         return Response(sorted(data['community_to_ward'].keys()))
 
 
-class StreetViewProxyView(APIView):
-    """GET /config/streetview/?lat=&lng= — a Google Street View image at a location.
+def _bearing(lat1, lng1, lat2, lng2):
+    """Compass bearing (degrees) from point 1 toward point 2."""
+    import math
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dl = math.radians(lng2 - lng1)
+    y = math.sin(dl) * math.cos(p2)
+    x = math.cos(p1) * math.sin(p2) - math.sin(p1) * math.cos(p2) * math.cos(dl)
+    return (math.degrees(math.atan2(y, x)) + 360) % 360
 
-    Keeps the Google Maps API key server-side. Returns the street-level photo so an
-    <img> tag can display it. 404 if no key is configured or no imagery exists.
+
+class StreetViewProxyView(APIView):
+    """GET /config/streetview/?lat=&lng= — a Google Street View image of a location.
+
+    Keeps the Google Maps API key server-side. Returns the actual street-level
+    photo so an <img> tag can display it. Because Street View coverage in
+    Ibeju-Lekki is sparse, we search for the nearest *outdoor* panorama within
+    ~1 km and aim the camera back toward the selected spot — so it shows the
+    street rather than 404-ing (which would leave only the satellite fallback).
+    404 only when no key is configured or no street imagery exists nearby.
     """
     permission_classes = [AllowAny]
+    SEARCH_RADIUS_M = 1000
 
     def get(self, request):
         key = getattr(settings, 'GOOGLE_MAPS_API_KEY', '')
@@ -415,21 +430,33 @@ class StreetViewProxyView(APIView):
         except (TypeError, ValueError):
             raise Http404
         size = request.query_params.get('size', '640x360')
-        heading = request.query_params.get('heading', '')
-        # First check metadata so we can 404 cleanly when there's no imagery.
+        radius = self.SEARCH_RADIUS_M
+
+        # Find the nearest outdoor street panorama; 404 cleanly if there's none.
+        pano_lat = pano_lng = None
         meta = (f'https://maps.googleapis.com/maps/api/streetview/metadata'
-                f'?location={lat},{lng}&key={key}')
+                f'?location={lat},{lng}&radius={radius}&source=outdoor&key={key}')
         try:
+            import json as _json
             with urllib.request.urlopen(meta, timeout=10) as m:
-                import json as _json
-                status_ok = _json.loads(m.read()).get('status') == 'OK'
+                data = _json.loads(m.read())
+            if data.get('status') != 'OK':
+                raise Http404
+            loc = data.get('location') or {}
+            pano_lat, pano_lng = loc.get('lat'), loc.get('lng')
+        except Http404:
+            raise
         except Exception:
-            status_ok = True  # if metadata fails, still try the image
-        if not status_ok:
-            raise Http404
+            pass  # metadata call failed — still attempt the image below
+
+        # Aim the camera from the panorama toward the selected point.
+        heading = request.query_params.get('heading', '')
+        if not heading and pano_lat is not None and pano_lng is not None:
+            heading = f'{_bearing(pano_lat, pano_lng, lat, lng):.0f}'
+
         img = (f'https://maps.googleapis.com/maps/api/streetview'
-               f'?size={size}&location={lat},{lng}&fov=80&key={key}')
-        if heading:
+               f'?size={size}&location={lat},{lng}&radius={radius}&source=outdoor&fov=80&key={key}')
+        if heading != '':
             img += f'&heading={heading}'
         try:
             with urllib.request.urlopen(img, timeout=15) as resp:

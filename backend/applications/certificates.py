@@ -78,11 +78,21 @@ def generate_certificate_pdf(application):
     field('ISSUED', issued, left + 180 * mm)
     field('VALID UNTIL', expires, left + 235 * mm)
 
+    # Chairman's uploaded e-signature, embedded above the signature line.
+    try:
+        from payments.models import OfficialSignature
+        sig = OfficialSignature.current()
+        if sig and sig.image and os.path.exists(sig.image.path):
+            c.drawImage(sig.image.path, w - 85 * mm, 33 * mm, width=40 * mm, height=16 * mm,
+                        preserveAspectRatio=True, mask='auto')
+    except Exception:
+        pass
+
     # Signature line
     c.setStrokeColor(dark); c.setLineWidth(0.7)
     c.line(w - 95 * mm, 32 * mm, w - 35 * mm, 32 * mm)
     c.setFillColor(grey); c.setFont('Helvetica', 9)
-    c.drawCentredString(w - 65 * mm, 27 * mm, 'Chairman, Street Naming Committee')
+    c.drawCentredString(w - 65 * mm, 27 * mm, 'Chairman, Ibeju-Lekki Local Government')
 
     c.setFillColor(grey); c.setFont('Helvetica-Oblique', 7)
     c.drawCentredString(w / 2, 18 * mm,

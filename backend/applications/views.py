@@ -89,6 +89,65 @@ def _auto_expire_certificates():
             pass
 
 
+# Statuses in which a street is actively being pursued — a new applicant may not
+# register the same street while one of these applications is open.
+ACTIVE_CONSIDERATION_STATUSES = [
+    ApplicationStatus.SUBMITTED,
+    ApplicationStatus.AWAITING_STAGE_A_PAYMENT,
+    ApplicationStatus.AWAITING_STAGE_A_PAYMENT_CONFIRMATION,
+    ApplicationStatus.STAGE_A_CONFIRMED,
+    ApplicationStatus.UNDER_NAMING_COMMITTEE_REVIEW,
+    ApplicationStatus.APPROVED_BY_COMMITTEE,
+    ApplicationStatus.AWAITING_CHAIRMAN_APPROVAL,
+    ApplicationStatus.APPROVED_BY_CHAIRMAN,
+    ApplicationStatus.AWAITING_STAGE_C_PAYMENT,
+    ApplicationStatus.AWAITING_STAGE_C_PAYMENT_CONFIRMATION,
+    ApplicationStatus.STAGE_C_CONFIRMED,
+    ApplicationStatus.AWAITING_DOCUMENT_RESUBMISSION,
+]
+
+# Two selections within this distance are treated as the same street.
+STREET_LOCK_RADIUS_M = 75
+
+
+def street_under_consideration(lat, lng, exclude_id=None):
+    """Return an open application near (lat,lng), or None. Proximity-based: a
+    point within STREET_LOCK_RADIUS_M of an active application's location is
+    treated as the same street already under consideration."""
+    import math
+    qs = (Application.objects
+          .filter(status__in=ACTIVE_CONSIDERATION_STATUSES, is_deleted=False, is_legacy=False)
+          .exclude(latitude=None).exclude(longitude=None))
+    if exclude_id:
+        qs = qs.exclude(pk=exclude_id)
+    cos_lat = math.cos(math.radians(lat))
+    for a in qs:
+        d = math.hypot((float(a.latitude) - lat) * 111000,
+                       (float(a.longitude) - lng) * 111000 * cos_lat)
+        if d <= STREET_LOCK_RADIUS_M:
+            return a
+    return None
+
+
+class StreetAvailabilityView(APIView):
+    """GET /api/applications/street-availability/?lat=&lng= — can this street be
+    registered, or is another applicant already pursuing it?"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            lat = float(request.query_params.get('lat'))
+            lng = float(request.query_params.get('lng'))
+        except (TypeError, ValueError):
+            return Response({'available': True})
+        if street_under_consideration(lat, lng):
+            return Response({
+                'available': False,
+                'reason': 'This street is already being considered for registration by another applicant.',
+            })
+        return Response({'available': True})
+
+
 class ApplicationListCreateView(generics.ListCreateAPIView):
     """
     GET  /api/applications/        — list applications
@@ -137,6 +196,20 @@ class ApplicationListCreateView(generics.ListCreateAPIView):
                 {'detail': 'Only applicants can create applications.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
+        # Lock a street once another applicant is already pursuing it. Legacy
+        # (validate-existing) applications are for already-named streets, so skip.
+        is_legacy = str(request.data.get('is_legacy', '')).lower() in ('true', '1')
+        if not is_legacy:
+            try:
+                lat = float(request.data.get('latitude'))
+                lng = float(request.data.get('longitude'))
+            except (TypeError, ValueError):
+                lat = lng = None
+            if lat is not None and lng is not None and street_under_consideration(lat, lng):
+                return Response(
+                    {'detail': 'This street is already being considered for registration by another applicant.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
         response = super().create(request, *args, **kwargs)
         # Validate-existing-registration flow: check the picked location against the
         # registry and flag the Street Naming Committee if it doesn't line up (#validate).
@@ -632,14 +705,18 @@ class ChairmanApprovalView(APIView):
 # ---------------------------------------------------------------------------
 
 class CertificateIssueView(APIView):
-    """POST /api/applications/<pk>/issue-certificate/ — naming committee only."""
+    """POST /api/applications/<pk>/issue-certificate/ — LG chairman only.
+
+    Certificate generation is the chairman's responsibility; the naming
+    committee only reviews and forwards its recommendation.
+    """
     permission_classes = [IsAuthenticated]
     parser_classes_override = None  # accept multipart
 
     def post(self, request, pk):
-        if request.user.role != Role.NAMING_COMMITTEE:
+        if request.user.role != Role.COMMITTEE_CHAIRMAN:
             return Response(
-                {'detail': 'Only naming committee members can issue certificates.'},
+                {'detail': 'Only the Local Government Chairman can generate certificates.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -709,8 +786,8 @@ class CertificateReleaseView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
-        if getattr(request.user, 'role', None) not in ('naming_committee', 'committee_chairman'):
-            return Response({'detail': 'Only the committee or LG chairman can release certificates.'},
+        if getattr(request.user, 'role', None) != 'committee_chairman':
+            return Response({'detail': 'Only the LG Chairman can send certificates to the applicant.'},
                             status=status.HTTP_403_FORBIDDEN)
         application = get_object_or_404(Application, pk=pk, is_deleted=False)
         if not application.certificate_file:

@@ -51,41 +51,8 @@
           <p v-if="apps.length === 0" class="text-sm text-slate-400 text-center py-8">No applications awaiting committee review.</p>
         </div>
 
-        <!-- Certificates to issue — Committee Chairman only, after CT confirms Stage C -->
-        <div v-if="!activeApp && member.is_chairman" class="rounded-2xl bg-white border border-slate-200 mt-4">
-          <div class="px-4 py-3 border-b border-slate-100">
-            <p class="text-sm font-bold text-slate-900">Certificates to issue ({{ certApps.length }})</p>
-            <p class="text-xs text-slate-400">Stage C payment confirmed — issue the final certificate.</p>
-          </div>
-          <div v-for="a in certApps" :key="a.id" class="px-4 py-3 border-b border-slate-50 last:border-0">
-            <div class="flex items-center justify-between mb-2">
-              <span><span class="font-medium text-slate-800">{{ a.proposed_street_name }}</span>
-                <span class="text-xs text-slate-400 ml-2">{{ a.reference_number }}</span></span>
-            </div>
-            <div class="flex flex-wrap items-end gap-2">
-              <div>
-                <label class="block text-[11px] text-slate-500 mb-0.5">Expiry date</label>
-                <input type="date" v-model="certExpiry[a.id]" :min="minExpiry"
-                       class="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs" />
-              </div>
-              <label class="flex items-center gap-1.5 text-xs text-slate-600 pb-1.5">
-                <input type="checkbox" v-model="certReleaseFlag[a.id]" class="rounded border-slate-300 text-emerald-600" />
-                Release to applicant
-              </label>
-              <label class="text-xs text-slate-500 pb-1.5">
-                <span class="underline cursor-pointer">Upload own file (optional)</span>
-                <input type="file" accept=".pdf,.jpg,.jpeg,.png" class="hidden" @change="onCertFile(a.id, $event)" />
-                <span v-if="certFiles[a.id]" class="text-emerald-600 ml-1">✓ {{ certFiles[a.id]?.name }}</span>
-              </label>
-              <button :disabled="!certExpiry[a.id] || certBusy === a.id" @click="issueCert(a)"
-                      class="rounded-lg px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50" style="background:#059669">
-                {{ certBusy === a.id ? 'Issuing…' : 'Issue Certificate' }}
-              </button>
-            </div>
-          </div>
-          <p v-if="certApps.length === 0" class="text-sm text-slate-400 text-center py-6">No certificates awaiting issue.</p>
-          <p v-if="certMsg" class="text-xs text-emerald-600 px-4 pb-3">{{ certMsg }}</p>
-        </div>
+        <!-- Certificate issuance moved to the LG Chairman. The committee only
+             reviews and forwards its recommendation. -->
 
         <!-- Review a single application -->
         <div v-else class="space-y-4">
@@ -279,39 +246,6 @@ async function loadApps() {
     const { data } = await applicationApi.list({ status: 'under_naming_committee_review' })
     apps.value = (data.results ?? data) as AppRow[]
   } catch { apps.value = [] }
-  if (member.value?.is_chairman) {
-    try {
-      const { data } = await applicationApi.list({ status: 'stage_c_confirmed' })
-      certApps.value = (data.results ?? data) as AppRow[]
-    } catch { certApps.value = [] }
-  }
-}
-
-const certApps = ref<AppRow[]>([])
-const certExpiry = ref<Record<string, string>>({})
-const certReleaseFlag = ref<Record<string, boolean>>({})
-const certFiles = ref<Record<string, File | null>>({})
-const certBusy = ref('')
-const certMsg = ref('')
-const minExpiry = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
-function onCertFile(id: string, e: Event) {
-  const f = (e.target as HTMLInputElement).files?.[0] || null
-  certFiles.value = { ...certFiles.value, [id]: f }
-}
-async function issueCert(a: AppRow) {
-  if (!certExpiry.value[a.id]) return
-  certBusy.value = a.id; certMsg.value = ''
-  try {
-    const fd = new FormData()
-    fd.append('expires_at', certExpiry.value[a.id]!)
-    fd.append('release', certReleaseFlag.value[a.id] ? 'true' : 'false')
-    const f = certFiles.value[a.id]
-    if (f) fd.append('certificate_file', f)
-    await applicationApi.issueCertificate(a.id, fd)
-    certMsg.value = `Certificate issued for ${a.proposed_street_name}. It is now in the street registry.`
-    await loadApps()
-  } catch { certMsg.value = 'Could not issue the certificate. Please try again.' }
-  finally { certBusy.value = '' }
 }
 
 async function openApp(a: AppRow) {

@@ -223,6 +223,11 @@
                 <template v-if="recognized.is_named">This location is on <strong>{{ recognized.name }}</strong>, which already has a name. Applications are for streets that are not yet named — please pick an amber (unnamed) street.</template>
                 <template v-else>You've selected an unnamed street<template v-if="recognized.locality"> in {{ recognized.locality }}</template>. Give it a name below.</template>
               </p>
+              <!-- Item 1: street already being pursued by another applicant -->
+              <div v-if="streetTaken" class="mt-2 rounded-lg border border-red-200 bg-red-50 p-2.5">
+                <p class="text-xs font-bold text-red-700">⚠ This street is taken</p>
+                <p class="text-[11px] text-red-600 mt-0.5">{{ streetTaken }}</p>
+              </div>
               <p class="text-[11px] font-mono text-slate-500 mt-1">{{ geoCoords.lat }}, {{ geoCoords.lng }}</p>
               <!-- #5: Show street's picture on demand so the applicant can confirm the location -->
               <div class="mt-2">
@@ -241,7 +246,39 @@
                   <p class="text-[10px] text-slate-400 mt-0.5">
                     {{ streetViewSrc ? 'Google Street View plus a satellite view of the exact spot.' : 'Satellite/aerial view of the exact spot you selected.' }}
                   </p>
-                  <button type="button" @click="hidePicture" class="mt-1 text-[11px] text-slate-400 underline">Hide picture</button>
+                  <div class="flex items-center gap-3 mt-1.5">
+                    <button type="button" @click="streetViewOpen = true"
+                       class="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 hover:text-blue-800">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                      Open in Google Street View
+                    </button>
+                    <button type="button" @click="hidePicture" class="text-[11px] text-slate-400 underline">Hide picture</button>
+                  </div>
+
+                  <!-- Interactive Street View, shown inline in a modal (no redirect) -->
+                  <Teleport to="body">
+                    <div v-if="streetViewOpen" class="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+                         style="background:rgba(15,23,42,0.72)" @click.self="streetViewOpen = false">
+                      <div class="bg-white rounded-2xl overflow-hidden w-full max-w-3xl flex flex-col"
+                           style="box-shadow:0 20px 60px rgba(0,0,0,0.35); max-height:90vh">
+                        <div class="flex items-center justify-between px-4 py-3 flex-shrink-0" style="border-bottom:1px solid #f1f5f9">
+                          <div>
+                            <p class="text-sm font-bold text-slate-900">Street View</p>
+                            <p class="text-[11px] font-mono text-slate-400">{{ geoCoords.lat }}, {{ geoCoords.lng }}</p>
+                          </div>
+                          <button type="button" @click="streetViewOpen = false" class="text-slate-400 hover:text-slate-600 p-1">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                          </button>
+                        </div>
+                        <iframe v-if="streetViewEmbedUrl" :src="streetViewEmbedUrl" class="w-full" style="height:60vh; border:0"
+                                loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe>
+                        <div class="px-4 py-2 flex-shrink-0 text-right" style="border-top:1px solid #f1f5f9">
+                          <a :href="`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${geoCoords.lat},${geoCoords.lng}`"
+                             target="_blank" rel="noopener" class="text-[11px] text-blue-600 hover:underline">Open full screen in Google Maps ↗</a>
+                        </div>
+                      </div>
+                    </div>
+                  </Teleport>
                 </div>
               </div>
             </div>
@@ -276,7 +313,7 @@
             <button type="submit"
                     :disabled="submitting || !form.locality || !form.ward || geoState !== 'success'
                       || (isLegacy ? (!form.registry_street_id || !legacyCertFile)
-                                   : (!form.proposed_street_name || !form.street_type || dup?.verdict === 'duplicate' || !!dup?.rename_blocked))"
+                                   : (!form.proposed_street_name || !form.street_type || dup?.verdict === 'duplicate' || !!dup?.rename_blocked || !!streetTaken))"
                     class="flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold text-white transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
                     style="background: linear-gradient(135deg, #059669, #047857); box-shadow: 0 4px 16px rgba(5,150,105,0.3)">
               <svg v-if="submitting" class="animate-spin w-4 h-4 opacity-80" viewBox="0 0 24 24" fill="none">
@@ -413,6 +450,19 @@ const geoCoords = ref({ lat: '', lng: '', accuracy: '' })
 const streetViewSrc = ref('')
 const googleEnabled = ref(false)
 const showPicture = ref(false)
+
+// Interactive Street View shown inline in a modal (no page redirect).
+// Uses Google's official Embed API when VITE_GOOGLE_MAPS_KEY is set; otherwise
+// falls back to the keyless Street View embed so it still works without a key.
+const streetViewOpen = ref(false)
+const GMAPS_EMBED_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY || ''
+const streetViewEmbedUrl = computed(() => {
+  const lat = geoCoords.value.lat, lng = geoCoords.value.lng
+  if (!lat || !lng) return ''
+  return GMAPS_EMBED_KEY
+    ? `https://www.google.com/maps/embed/v1/streetview?key=${GMAPS_EMBED_KEY}&location=${lat},${lng}&fov=80`
+    : `https://maps.google.com/maps?q=&layer=c&cbll=${lat},${lng}&cbp=11,0,0,0,0&output=svembed`
+})
 const pictureMapEl = ref<HTMLElement | null>(null)
 let pictureMap: L.Map | null = null
 function revealPicture() {
@@ -527,6 +577,7 @@ interface PickPoint { lat: number; lng: number; is_named: boolean; street_name: 
 const pickerMapEl = ref<HTMLElement | null>(null)
 const pickerLoading = ref(true)
 const recognized = ref<{ is_named: boolean; name: string; locality: string; photo_url: string } | null>(null)
+const streetTaken = ref('')  // set when another applicant is already pursuing this street (item 1)
 let pickerMap: L.Map | null = null
 let streetLabelLayer: L.LayerGroup | null = null
 let pendingZoomLocality = ""
@@ -556,6 +607,17 @@ function selectAt(lat: number, lng: number) {
   streetViewSrc.value = ''
   form.value.location_description = `${lat.toFixed(6)},${lng.toFixed(6)}`
   geoState.value = 'success'
+  // Item 1: is this street already being pursued by another applicant?
+  streetTaken.value = ''
+  if (!isLegacy.value) {
+    applicationApi.streetAvailability(lat.toFixed(6), lng.toFixed(6))
+      .then(({ data }) => {
+        if (data && data.available === false) {
+          streetTaken.value = data.reason || 'This street is already being considered for registration by another applicant.'
+        }
+      })
+      .catch(() => {})
+  }
   if (pickerMap) {
     if (clickMarker) clickMarker.remove()
     clickMarker = L.circleMarker([lat, lng], { radius: 8, color: '#0f172a', weight: 2, fillColor: '#38bdf8', fillOpacity: 0.9 }).addTo(pickerMap)
@@ -750,6 +812,7 @@ watch(() => route.fullPath, async () => {
   form.value = { proposed_street_name: '', street_type: '', ward: '', locality: '', location_description: '', registry_street_id: '' }
   geoCoords.value = { lat: '', lng: '', accuracy: '' }
   recognized.value = null
+  streetTaken.value = ''
   validateNote.value = null
   streetViewSrc.value = ''
   if (pictureMap) { pictureMap.remove(); pictureMap = null }

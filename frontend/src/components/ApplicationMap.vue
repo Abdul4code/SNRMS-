@@ -163,7 +163,7 @@
 
             <!-- Street View link -->
             <a
-              :href="`https://maps.google.com/?cbll=${selectedBuilding.latitude},${selectedBuilding.longitude}&cbp=12,0,,0,5&layer=c`"
+              :href="`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${selectedBuilding.latitude},${selectedBuilding.longitude}`"
               target="_blank"
               rel="noopener"
               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold self-start transition-all hover:scale-105"
@@ -343,7 +343,7 @@
                       <!-- Actions -->
                       <div class="flex flex-col gap-2 mt-auto">
                         <a
-                          :href="`https://maps.google.com/?cbll=${selectedBuilding.latitude},${selectedBuilding.longitude}&cbp=12,0,,0,5&layer=c`"
+                          :href="`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${selectedBuilding.latitude},${selectedBuilding.longitude}`"
                           target="_blank"
                           rel="noopener"
                           class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all hover:opacity-90"
