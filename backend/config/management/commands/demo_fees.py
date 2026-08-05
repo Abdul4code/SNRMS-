@@ -76,6 +76,12 @@ class Command(BaseCommand):
         renewal = FeeConfiguration.objects.filter(component=FeeComponent.RENEWAL_FEE).first()
         if renewal:
             self.stdout.write(f'  Renewal total: N{renewal.amount}')
+
+        # Re-price outstanding pending payments so they match the new demo fees.
+        from payments.services import resync_pending_payment_amounts
+        n = resync_pending_payment_amounts()
+        self.stdout.write(f'  Re-priced {n} pending payment(s) to the demo amounts.')
+
         self.stdout.write(self.style.SUCCESS(
             'Demo fees set. Every payable stage is above the gateway minimum. '
             'Run "reset_fees" to restore the official schedule.'))

@@ -119,6 +119,29 @@ def calculate_renewal_fee() -> dict:
     }
 
 
+def resync_pending_payment_amounts():
+    """Recompute amount_expected for every PENDING payment from the current fee
+    schedule. Used by the demo_fees / reset_fees commands so payments already
+    created keep matching the fees just applied. Returns the number updated."""
+    from .models import Payment, PaymentStage, PaymentStatus
+    updated = 0
+    for p in Payment.objects.filter(status=PaymentStatus.PENDING).select_related('application'):
+        if p.stage == PaymentStage.STAGE_A:
+            total = get_total_fee(get_stage_a_fee_breakdown())
+        elif p.stage == PaymentStage.STAGE_C:
+            total = get_total_fee(get_stage_c_fee_breakdown(p.application.street_type_id))
+        elif p.stage == PaymentStage.RENEWAL:
+            r = calculate_renewal_fee()
+            total = r['amount'] if r else None
+        else:
+            total = None
+        if total is not None and p.amount_expected != total:
+            p.amount_expected = total
+            p.save(update_fields=['amount_expected', 'updated_at'])
+            updated += 1
+    return updated
+
+
 # ---------------------------------------------------------------------------
 # Notification helper
 # ---------------------------------------------------------------------------

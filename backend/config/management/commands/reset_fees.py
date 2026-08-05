@@ -35,4 +35,9 @@ class Command(BaseCommand):
             ).update(amount=amount, is_active=True)
             self.stdout.write(f'  street_name_fee[{st.name}] -> {amount:,} ({n} row)')
 
+        # Re-price outstanding pending payments back to the official amounts.
+        from payments.services import resync_pending_payment_amounts
+        n = resync_pending_payment_amounts()
+        self.stdout.write(f'Re-priced {n} pending payment(s) to the official amounts.')
+
         self.stdout.write(self.style.SUCCESS('Fees restored to the official schedule.'))
