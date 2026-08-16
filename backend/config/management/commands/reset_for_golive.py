@@ -8,13 +8,19 @@ created while testing are removed.
     python manage.py reset_for_golive --dry-run     # always run this first
     python manage.py reset_for_golive --yes         # actually delete
 
-Kept: street types, fee configuration, fee policy, renewal settings, the street
-registry, the building survey, legacy applications and the import account,
-staff accounts, and the Treasurer's signature.
+No staff account is ever deleted. Finance, naming committee, chairman and
+superuser accounts always survive — the council's back office has to work the
+moment the system opens, and there is no flag to remove them. Only public
+applicant accounts are cleared.
+
+Kept: every staff account, street types, fee configuration, fee policy, renewal
+settings, the street registry, the building survey, legacy applications and the
+import account, and the Treasurer's signature.
 
 Removed: non-legacy applications and everything cascading from them (payments,
 receipts, documents, status history, committee reviews, notifications), plus
-applicant accounts left owning nothing and any outstanding verification codes.
+public applicant accounts left owning nothing and any outstanding verification
+codes.
 """
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
@@ -41,8 +47,6 @@ class Command(BaseCommand):
         parser.add_argument('--purge-legacy', action='store_true',
                             help='DESTRUCTIVE: also delete the digitised old registry. '
                                  'Only use on a database that has no real imports.')
-        parser.add_argument('--purge-staff', action='store_true',
-                            help='Also delete staff accounts that are not superusers.')
         parser.add_argument('--reassign-legacy', action='store_true',
                             help='Move legacy applications owned by ordinary users to the '
                                  'import account, so those accounts can be removed too.')
@@ -122,7 +126,10 @@ class Command(BaseCommand):
         self.stdout.write(f'    receipts                 : {Receipt.objects.filter(application__in=doomed_apps).count()}')
         self.stdout.write(f'    documents                : {Document.objects.filter(application__in=doomed_apps).count()}')
         self.stdout.write(f'    verification codes       : {EmailVerification.objects.count()}')
-        self.stdout.write(f'    accounts                 : {len(self._removable_users(options))}')
+        removable = self._removable_users(options)
+        self.stdout.write(f'    applicant accounts       : {len(removable)}')
+        for u in removable:
+            self.stdout.write(f'        {u.email}')
         self.stdout.write('')
         self.stdout.write('  WILL KEEP')
         self.stdout.write(f'    legacy registry apps     : {kept_legacy}')
@@ -130,22 +137,30 @@ class Command(BaseCommand):
         self.stdout.write(f'    building surveys         : {BuildingSurvey.objects.count()}')
         self.stdout.write(f'    street types             : {StreetType.objects.count()}')
         self.stdout.write(f'    fee rows                 : {FeeConfiguration.objects.count()}')
-        kept_users = User.objects.exclude(
-            id__in=[u.id for u in self._removable_users(options)])
-        self.stdout.write(f'    accounts                 : {kept_users.count()}')
+        kept_users = User.objects.exclude(id__in=[u.id for u in removable])
+        self.stdout.write(f'    accounts (all staff)     : {kept_users.count()}')
         for u in kept_users.order_by('role', 'email'):
             self.stdout.write(f'        {u.email}  ({u.role}{", superuser" if u.is_superuser else ""})')
 
     # -- users -------------------------------------------------------------
 
     def _removable_users(self, options):
-        """Accounts safe to delete: never superusers, never the import account,
-        and never anyone still owning an application (applicant is PROTECTed)."""
+        """Public applicant accounts only.
+
+        Staff accounts (finance, naming committee, chairman) and superusers are
+        never removed — the council's back office has to survive go-live, and
+        rebuilding it by hand is how people get locked out of their own system.
+        The legacy import account stays too: it owns the digitised registry.
+        An applicant still holding an application is also kept, because
+        Application.applicant is PROTECTed.
+        """
         removable = []
         for user in User.objects.all():
-            if user.is_superuser or user.email == LEGACY_APPLICANT_EMAIL:
+            if user.is_superuser or user.is_staff:
                 continue
-            if user.role in STAFF_ROLES and not options['purge_staff']:
+            if user.email == LEGACY_APPLICANT_EMAIL:
+                continue
+            if user.role in STAFF_ROLES:
                 continue
             still_owns = Application.objects.filter(applicant=user)
             if not options['purge_legacy']:

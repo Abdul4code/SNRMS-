@@ -8,9 +8,12 @@ so going live is not a sequence someone can perform half of.
     python manage.py go_live            # report what would happen, change nothing
     python manage.py go_live --yes      # do it
 
-The real LGA records survive: the digitised old registry, the street registry,
-the building survey, street types, fee configuration and staff accounts. Only
-applications and accounts created while testing are removed. See
+No staff account is ever deleted — finance, naming committee, chairman and
+superuser accounts always survive, and there is no flag to remove them. Only
+public applicant accounts are cleared.
+
+The real LGA records survive too: the digitised old registry, the street
+registry, the building survey, street types and fee configuration. See
 reset_for_golive for the full keep/delete breakdown.
 """
 from django.core.management import call_command
@@ -51,6 +54,16 @@ class Command(BaseCommand):
             self.stdout.write('  Schema already up to date (nothing to apply).')
 
         # 2. Test data ------------------------------------------------------
+        # Snapshot the back office first so we can prove nothing was lost.
+        from accounts.models import User
+        staff_before = set(
+            User.objects.filter(is_staff=True).values_list('email', flat=True)
+        ) | set(
+            User.objects.filter(is_superuser=True).values_list('email', flat=True)
+        ) | set(
+            User.objects.exclude(role='applicant').values_list('email', flat=True)
+        )
+
         self.stdout.write(self.style.MIGRATE_HEADING('\n[2/3] Clearing test data'))
         reset_args = ['reset_for_golive']
         if write:
@@ -74,9 +87,9 @@ class Command(BaseCommand):
         self.stdout.write(self.style.MIGRATE_HEADING('\n[3/3] Applying the official fee schedule'))
         call_command('sync_fee_schedule', '--apply-base')
 
-        self._verify()
+        self._verify(staff_before)
 
-    def _verify(self):
+    def _verify(self, staff_before=frozenset()):
         """Assert the end state is what going live is supposed to mean."""
         from accounts.models import User
         from applications.models import Application
@@ -93,6 +106,10 @@ class Command(BaseCommand):
             problems.append(f'{Payment.objects.count()} payment(s) still present')
         if not User.objects.filter(is_superuser=True).exists():
             problems.append('no superuser remains — you would be locked out of the admin')
+        lost_staff = staff_before - set(User.objects.values_list('email', flat=True))
+        if lost_staff:
+            problems.append(f'staff account(s) removed, which must never happen: '
+                            f'{", ".join(sorted(lost_staff))}')
         if not Street.objects.exists():
             problems.append('street registry is empty — real data may have been lost')
         if not BuildingSurvey.objects.exists():
