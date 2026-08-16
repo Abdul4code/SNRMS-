@@ -41,8 +41,13 @@ class Command(BaseCommand):
         if dry_run:
             self.stdout.write(self.style.WARNING('DRY RUN — nothing will be written.\n'))
 
+        # On a dry run --apply-base writes nothing, so deriving from the stored
+        # amounts would preview the fees we are about to replace. Derive from
+        # the schedule we would have written instead, or the preview lies in
+        # exactly the case it is needed for.
+        pending_base = {}
         if options['apply_base']:
-            self._apply_base_schedule(dry_run)
+            pending_base = self._apply_base_schedule(dry_run)
 
         rows = []
         changed = 0
@@ -51,12 +56,13 @@ class Command(BaseCommand):
                 component=FeeComponent.STREET_NAME_FEE,
                 street_type=street_type, is_active=True,
             ).first()
-            if base_cfg is None:
+            base = pending_base.get(street_type.pk)
+            if base is None and base_cfg is None:
                 self.stdout.write(self.style.WARNING(
                     f'  {street_type.name}: no street_name_fee configured — skipped'))
                 continue
-
-            base = base_cfg.amount
+            if base is None:
+                base = base_cfg.amount
             derived = {
                 FeeComponent.REVALIDATION_FEE: policy.revalidation_fee_for(base),
                 FeeComponent.RENEWAL_FEE: policy.renewal_fee_for(base),
@@ -99,23 +105,29 @@ class Command(BaseCommand):
             f'\nWrote {len(rows) * 2} derived fee rows; {repriced} pending payment(s) repriced.'))
 
     def _apply_base_schedule(self, dry_run):
+        """Write the official base schedule. Returns {street_type_pk: amount}."""
+        from decimal import Decimal
+
         from .seed_data import DEFAULT_STREET_NAME_FEE, STREET_NAME_FEE_OVERRIDES
 
         self.stdout.write(self.style.MIGRATE_HEADING('=== Applying base street-name schedule ==='))
+        applied = {}
         for street_type in StreetType.objects.order_by('name'):
-            amount = STREET_NAME_FEE_OVERRIDES.get(street_type.name, DEFAULT_STREET_NAME_FEE)
+            amount = Decimal(STREET_NAME_FEE_OVERRIDES.get(street_type.name, DEFAULT_STREET_NAME_FEE))
+            applied[street_type.pk] = amount
             existing = FeeConfiguration.objects.filter(
                 component=FeeComponent.STREET_NAME_FEE, street_type=street_type).first()
             if existing and existing.amount == amount:
                 continue
             was = f'{existing.amount:,.0f}' if existing else 'unset'
-            self.stdout.write(f'  {street_type.name}: {was} -> {amount:,}')
+            self.stdout.write(f'  {street_type.name}: {was} -> {amount:,.0f}')
             if not dry_run:
                 FeeConfiguration.objects.update_or_create(
                     component=FeeComponent.STREET_NAME_FEE, street_type=street_type,
                     defaults={'amount': amount, 'is_active': True},
                 )
         self.stdout.write('')
+        return applied
 
     def _print_table(self, rows):
         if not rows:
