@@ -130,7 +130,44 @@ python manage.py shell -c "from accounts.models import User, Role; email='admin@
 
 # Seed street types and default fee configurations
 python manage.py seed_data
+
+# Confirm email delivery is configured (sends one real message)
+python manage.py send_test_email you@example.com
 ```
+
+## Email
+
+Registration codes, password resets and workflow notices are sent through
+**SendGrid**, using its HTTPS API rather than SMTP — Fly.io restricts outbound
+SMTP ports, and the API returns a usable error when a message is rejected.
+
+| `SENDGRID_API_KEY` | `EMAIL_HOST` | Backend used |
+| --- | --- | --- |
+| set | — | SendGrid (production) |
+| unset | set | plain SMTP (self-hosted fallback) |
+| unset | unset | console — codes print to the server log |
+
+Development needs no mail account: leave both unset and the verification code
+appears in the runserver output.
+
+To set it up in production:
+
+1. SendGrid → **Settings → API Keys** → create a key with **Mail Send** access only.
+2. SendGrid → **Settings → Sender Authentication** → verify the `DEFAULT_FROM_EMAIL`
+   address, or authenticate the whole domain. SendGrid rejects mail from any
+   unverified sender.
+3. Set the secrets and confirm with `send_test_email`:
+
+```bash
+fly secrets set -a snrms-backend \
+  SENDGRID_API_KEY='SG.xxxx' \
+  DEFAULT_FROM_EMAIL='SNRMS Ibeju-Lekki <admin@snrms.com>'
+
+fly ssh console -a snrms-backend -C 'python manage.py send_test_email you@example.com'
+```
+
+All sending goes through `notifications/mailer.py`; failures are logged rather
+than raised, so a mail outage can never break a registration or an approval.
 
 ## Project Structure
 
