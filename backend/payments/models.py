@@ -6,6 +6,9 @@ from django.conf import settings
 class PaymentStage(models.TextChoices):
     STAGE_A = 'stage_a', 'Stage A - Application Processing'
     STAGE_C = 'stage_c', 'Stage C - Approval & Certificate'
+    # Charged instead of Stage C when an already-named street is brought onto the
+    # register (a legacy application) — a share of the full street-name fee.
+    REVALIDATION = 'revalidation', 'Revalidation'
     RENEWAL = 'renewal', 'Renewal'
 
 

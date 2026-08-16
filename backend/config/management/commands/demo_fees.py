@@ -25,8 +25,9 @@ STAGE_A_COMPONENTS = {
 }
 # Fees that must each clear the minimum on their own (single-fee or dominant-fee stages).
 STANDALONE_COMPONENTS = {
-    FeeComponent.STREET_NAME_FEE,   # dominates the Stage C payment
-    FeeComponent.RENEWAL_FEE,       # the whole Renewal payment
+    FeeComponent.STREET_NAME_FEE,     # dominates the Stage C payment
+    FeeComponent.REVALIDATION_FEE,    # the whole Revalidation payment
+    FeeComponent.RENEWAL_FEE,         # the whole Renewal payment
 }
 
 

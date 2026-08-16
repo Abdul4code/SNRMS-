@@ -606,19 +606,21 @@ class ChairmanApprovalView(APIView):
                 from payments.models import Payment as _Payment, PaymentStage as _PS, PaymentStatus as _PStatus
 
                 if application.is_legacy:
-                    # Legacy: skip Stage C entirely, go straight to renewal payment
+                    # Legacy: the street is already named, so Stage C is skipped
+                    # and a revalidation fee is charged instead — a share of the
+                    # street-name fee rather than the full schedule.
                     application.transition_to(
                         ApplicationStatus.AWAITING_RENEWAL_PAYMENT,
                         actor=request.user,
                         remarks='',
                     )
-                    from payments.services import calculate_renewal_fee
-                    _renewal_fee = calculate_renewal_fee()
+                    from payments.services import calculate_revalidation_fee
+                    _reval_fee = calculate_revalidation_fee(application.street_type_id)
                     _Payment.objects.create(
                         application=application,
-                        stage=_PS.RENEWAL,
+                        stage=_PS.REVALIDATION,
                         status=_PStatus.PENDING,
-                        amount_expected=_renewal_fee['amount'] if _renewal_fee else _Decimal('0.00'),
+                        amount_expected=_reval_fee['amount'] if _reval_fee else _Decimal('0.00'),
                     )
                     notify_applicant(
                         application,
@@ -627,7 +629,7 @@ class ChairmanApprovalView(APIView):
                         message=(
                             f'Your application {application.reference_number} has been approved '
                             'by the chairman. As a legacy registration, please proceed with the '
-                            'renewal payment to complete your digital registration.'
+                            'revalidation payment to complete your digital registration.'
                         ),
                     )
                 else:
@@ -1025,7 +1027,7 @@ class ApplicationRenewView(APIView):
         from decimal import Decimal as _Decimal
         from payments.models import Payment as _Payment, PaymentStage as _PS, PaymentStatus as _PStatus
         from payments.services import calculate_renewal_fee
-        renewal_fee = calculate_renewal_fee()
+        renewal_fee = calculate_renewal_fee(application.street_type_id)
         amount = renewal_fee['amount'] if renewal_fee else _Decimal('0.00')
         _Payment.objects.create(
             application=application,

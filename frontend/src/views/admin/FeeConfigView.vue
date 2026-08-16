@@ -260,18 +260,21 @@ const FEE_COMPONENTS = [
   { value: 'street_name_fee',          label: 'Street Name Fee',           stage: 'stage_c' },
   { value: 'signpost_installation_fee', label: 'Signpost Installation Fee', stage: 'stage_c' },
   { value: 'map_upload_fee',           label: 'Map Upload Fee',            stage: 'stage_c' },
+  { value: 'revalidation_fee',         label: 'Revalidation Fee',          stage: 'revalidation' },
   { value: 'renewal_fee',              label: 'Renewal Fee',               stage: 'renewal' },
 ]
 
 const STAGE_LABELS: Record<string, string> = {
   stage_a: 'Stage A',
   stage_c: 'Stage C',
+  revalidation: 'Revalidation',
   renewal:  'Renewal',
 }
 
 function stageBadgeClass(stage: string | null) {
   if (stage === 'stage_a') return 'bg-emerald-100 text-emerald-700'
   if (stage === 'stage_c') return 'bg-blue-100 text-blue-700'
+  if (stage === 'revalidation') return 'bg-violet-100 text-violet-700'
   if (stage === 'renewal')  return 'bg-amber-100 text-amber-700'
   return 'bg-slate-100 text-slate-500'
 }

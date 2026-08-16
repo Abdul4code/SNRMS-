@@ -21,7 +21,9 @@ from .serializers import (
 )
 from .services import (
     calculate_renewal_fee,
+    calculate_revalidation_fee,
     confirm_renewal_payment,
+    confirm_revalidation_payment,
     confirm_stage_a_payment,
     confirm_stage_c_payment,
     get_stage_a_fee_breakdown,
@@ -254,6 +256,8 @@ class ConfirmPaymentView(APIView):
                     confirm_stage_a_payment(payment, actor=request.user)
                 elif payment.stage == PaymentStage.STAGE_C:
                     confirm_stage_c_payment(payment, actor=request.user)
+                elif payment.stage == PaymentStage.REVALIDATION:
+                    confirm_revalidation_payment(payment, actor=request.user)
                 elif payment.stage == PaymentStage.RENEWAL:
                     confirm_renewal_payment(payment, actor=request.user)
                 else:
@@ -376,11 +380,18 @@ class FeeBreakdownView(APIView):
             total = get_total_fee(breakdown)
             return Response({'stage': stage, 'breakdown': breakdown, 'total': total})
 
-        elif stage == 'renewal':
-            fee = calculate_renewal_fee()
+        elif stage in ('revalidation', 'renewal'):
+            # Both are a share of the street-name fee, so they need the street
+            # type; it stays optional for backwards compatibility, falling back
+            # to any street-type-agnostic row that is still configured.
+            street_type_id = request.query_params.get('street_type')
+            if stage == 'revalidation':
+                fee = calculate_revalidation_fee(street_type_id)
+            else:
+                fee = calculate_renewal_fee(street_type_id)
             if fee is None:
                 return Response(
-                    {'detail': 'No active renewal fee configuration found.'},
+                    {'detail': f'No active {stage} fee configuration found.'},
                     status=status.HTTP_404_NOT_FOUND,
                 )
             breakdown = [fee]
@@ -392,7 +403,7 @@ class FeeBreakdownView(APIView):
                 {
                     'detail': (
                         'stage query parameter is required. '
-                        'Valid values: stage_a, stage_c, renewal.'
+                        'Valid values: stage_a, stage_c, revalidation, renewal.'
                     )
                 },
                 status=status.HTTP_400_BAD_REQUEST,

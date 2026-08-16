@@ -101,15 +101,37 @@ def get_total_fee(components_list: list):
     return sum((item['amount'] for item in components_list), Decimal('0.00'))
 
 
-def calculate_renewal_fee() -> dict:
+def _derived_fee(component, street_type_id, percent_getter) -> dict:
+    """Return {component, label, amount} for a fee derived from the street-name fee.
+
+    Prefers the stored FeeConfiguration row for this street type, so Finance can
+    override an individual type. Falls back to computing the share from the base
+    street-name fee, then to the legacy street-type-agnostic row (which is what
+    existed before these fees varied per type).
     """
-    Return {component, label, amount} for the active renewal fee configuration.
-    Returns None if no active renewal fee is configured.
-    """
-    cfg = FeeConfiguration.objects.filter(
-        component=FeeComponent.RENEWAL_FEE,
-        is_active=True,
-    ).first()
+    cfg = None
+    if street_type_id:
+        cfg = FeeConfiguration.objects.filter(
+            component=component, street_type_id=street_type_id, is_active=True,
+        ).first()
+    if cfg is None and street_type_id:
+        base = FeeConfiguration.objects.filter(
+            component=FeeComponent.STREET_NAME_FEE,
+            street_type_id=street_type_id,
+            is_active=True,
+        ).first()
+        if base is not None:
+            from config.models import FeePolicy
+            amount = percent_getter(FeePolicy.get(), base.amount)
+            return {
+                'component': component,
+                'label': FeeComponent(component).label,
+                'amount': amount,
+            }
+    if cfg is None:
+        cfg = FeeConfiguration.objects.filter(
+            component=component, street_type__isnull=True, is_active=True,
+        ).first()
     if cfg is None:
         return None
     return {
@@ -117,6 +139,29 @@ def calculate_renewal_fee() -> dict:
         'label': cfg.get_component_display(),
         'amount': cfg.amount,
     }
+
+
+def calculate_revalidation_fee(street_type_id=None) -> dict:
+    """Revalidation fee for a street type — a share of its street-name fee.
+
+    Charged when an already-named street is brought onto the digital register,
+    in place of the full Stage C schedule.
+    """
+    return _derived_fee(
+        FeeComponent.REVALIDATION_FEE, street_type_id,
+        lambda policy, base: policy.revalidation_fee_for(base),
+    )
+
+
+def calculate_renewal_fee(street_type_id=None) -> dict:
+    """
+    Return {component, label, amount} for the renewal fee of a street type.
+    Returns None if no renewal fee can be resolved.
+    """
+    return _derived_fee(
+        FeeComponent.RENEWAL_FEE, street_type_id,
+        lambda policy, base: policy.renewal_fee_for(base),
+    )
 
 
 def resync_pending_payment_amounts():
@@ -130,8 +175,11 @@ def resync_pending_payment_amounts():
             total = get_total_fee(get_stage_a_fee_breakdown())
         elif p.stage == PaymentStage.STAGE_C:
             total = get_total_fee(get_stage_c_fee_breakdown(p.application.street_type_id))
+        elif p.stage == PaymentStage.REVALIDATION:
+            r = calculate_revalidation_fee(p.application.street_type_id)
+            total = r['amount'] if r else None
         elif p.stage == PaymentStage.RENEWAL:
-            r = calculate_renewal_fee()
+            r = calculate_renewal_fee(p.application.street_type_id)
             total = r['amount'] if r else None
         else:
             total = None
@@ -235,11 +283,46 @@ def confirm_stage_c_payment(payment: Payment, actor) -> Payment:
     return payment
 
 
+def confirm_revalidation_payment(payment: Payment, actor) -> Payment:
+    """Confirm a revalidation payment for a legacy (already-named) street.
+
+    Shares the renewal machinery — both extend the expiry date and land the
+    application in ``renewed`` — but the applicant is told their existing street
+    name has been brought onto the register, not that it was renewed.
+    """
+    return _confirm_term_payment(
+        payment, actor, kind='revalidation',
+        confirm_remark='Revalidation payment confirmed by finance.',
+        renewed_remark='Street name revalidated after payment confirmation.',
+        title='Revalidation Payment Confirmed',
+        body=(
+            'Your revalidation payment for application {ref} has been confirmed. '
+            'Your existing street name is now on the digital register and is '
+            'valid until {expiry}.'
+        ),
+    )
+
+
 def confirm_renewal_payment(payment: Payment, actor) -> Payment:
     """
     Mark the renewal payment as confirmed, transition the application through
     renewal_payment_confirmed → renewed, and notify the applicant.
     """
+    return _confirm_term_payment(
+        payment, actor, kind='renewal',
+        confirm_remark='Renewal payment confirmed by finance.',
+        renewed_remark='Application renewed after payment confirmation.',
+        title='Renewal Payment Confirmed',
+        body=(
+            'Your renewal payment for application {ref} has been confirmed. '
+            'Your registration has been successfully renewed until {expiry}.'
+        ),
+    )
+
+
+def _confirm_term_payment(payment: Payment, actor, kind, confirm_remark,
+                          renewed_remark, title, body) -> Payment:
+    """Shared body for the revalidation and renewal confirmations."""
     now = timezone.now()
     payment.status = PaymentStatus.CONFIRMED
     payment.confirmed_by = actor
@@ -266,24 +349,23 @@ def confirm_renewal_payment(payment: Payment, actor) -> Payment:
     application.transition_to(
         ApplicationStatus.RENEWAL_PAYMENT_CONFIRMED,
         actor=actor,
-        remarks='Renewal payment confirmed by finance.',
+        remarks=confirm_remark,
     )
 
     # Auto-advance: renewal_payment_confirmed → renewed
     application.transition_to(
         ApplicationStatus.RENEWED,
         actor=actor,
-        remarks='Application renewed after payment confirmation.',
+        remarks=renewed_remark,
     )
 
     _notify_applicant(
         payment,
         notification_type=NotificationType.PAYMENT_CONFIRMED,
-        title='Renewal Payment Confirmed',
-        message=(
-            f'Your renewal payment for application '
-            f'{application.reference_number} has been confirmed. '
-            f'Your registration has been successfully renewed until {new_expiry.strftime("%d %B %Y")}.'
+        title=title,
+        message=body.format(
+            ref=application.reference_number,
+            expiry=new_expiry.strftime('%d %B %Y'),
         ),
     )
 
@@ -325,7 +407,7 @@ def reject_payment(payment: Payment, actor, remarks: str = '') -> Payment:
                 actor=actor,
                 remarks=rejection_remark,
             )
-        elif (payment.stage == PaymentStage.RENEWAL and
+        elif (payment.stage in (PaymentStage.RENEWAL, PaymentStage.REVALIDATION) and
                 application.status == ApplicationStatus.AWAITING_RENEWAL_PAYMENT_CONFIRMATION):
             application.transition_to(
                 ApplicationStatus.AWAITING_RENEWAL_PAYMENT,

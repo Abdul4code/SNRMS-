@@ -1,4 +1,6 @@
 import uuid
+from decimal import Decimal, ROUND_HALF_UP
+
 from django.db import models
 
 
@@ -70,7 +72,8 @@ class FeeComponent(models.TextChoices):
     STREET_NAME_FEE = 'street_name_fee', 'Street Name Fee'
     SIGNPOST_INSTALLATION_FEE = 'signpost_installation_fee', 'Signpost Installation Fee'
     MAP_UPLOAD_FEE = 'map_upload_fee', 'Map Upload Fee'
-    # Renewal
+    # Derived from the street-name fee — see FeePolicy. Both vary per street type.
+    REVALIDATION_FEE = 'revalidation_fee', 'Revalidation Fee'
     RENEWAL_FEE = 'renewal_fee', 'Renewal Fee'
 
 
@@ -80,7 +83,7 @@ class FeeConfiguration(models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     street_type = models.ForeignKey(
         StreetType, null=True, blank=True, on_delete=models.SET_NULL,
-        help_text='Only for street_name_fee — varies per street type'
+        help_text='For street_name_fee, revalidation_fee and renewal_fee — these vary per street type'
     )
     is_active = models.BooleanField(default=True)
     updated_by = models.ForeignKey(
@@ -96,6 +99,61 @@ class FeeConfiguration(models.Model):
 
     def __str__(self):
         return f'{self.component}: {self.amount}'
+
+
+class FeePolicy(models.Model):
+    """Singleton — the percentages that revalidation and renewal fees are set from.
+
+    Both are charged as a share of that street type's street-name (Stage C) fee,
+    so a change to the base schedule flows through to every derived fee. The
+    derived amounts are still materialised as FeeConfiguration rows, so Finance
+    can override an individual street type without disturbing the policy; run
+    ``manage.py sync_fee_schedule`` to recompute them from these percentages.
+
+    Always use FeePolicy.get() to read/write.
+    """
+    revalidation_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal('40.00'),
+        help_text='Revalidation fee as a percentage of the street-name fee.',
+    )
+    renewal_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal('5.00'),
+        help_text='Renewal fee as a percentage of the street-name fee.',
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        'accounts.User', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='fee_policy_updates',
+    )
+
+    class Meta:
+        db_table = 'fee_policy'
+        verbose_name_plural = 'Fee policy'
+
+    @classmethod
+    def get(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def share_of(self, base_amount, percent):
+        """Apply ``percent`` to ``base_amount``, rounded to whole naira.
+
+        Fees are quoted and paid in whole naira, and a kobo remainder would make
+        the applicant's transfer never match amount_expected exactly.
+        """
+        if base_amount is None:
+            return None
+        return (Decimal(base_amount) * Decimal(percent) / Decimal('100')).quantize(
+            Decimal('1'), rounding=ROUND_HALF_UP)
+
+    def revalidation_fee_for(self, base_amount):
+        return self.share_of(base_amount, self.revalidation_percent)
+
+    def renewal_fee_for(self, base_amount):
+        return self.share_of(base_amount, self.renewal_percent)
+
+    def __str__(self):
+        return f'Revalidation {self.revalidation_percent}% / Renewal {self.renewal_percent}%'
 
 
 class RenewalSettings(models.Model):

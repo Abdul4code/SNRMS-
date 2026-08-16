@@ -110,6 +110,7 @@ _COMPONENT_STAGE = {
     'street_name_fee': 'stage_c',
     'signpost_installation_fee': 'stage_c',
     'map_upload_fee': 'stage_c',
+    'revalidation_fee': 'revalidation',
     'renewal_fee': 'renewal',
 }
 

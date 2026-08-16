@@ -32,17 +32,20 @@ STREET_TYPES = [
 ]
 
 # Street-name (Stage C) fee per street type — official Ibeju-Lekki LGA schedule.
-# Specialized types not on the official sheet default to 1,000,000 (marked TODO).
+# Avenue / Crescent / Way / Street / Lane / Close come straight off the LGA sheet;
+# Street, Lane and Close share one tier. Types not on that sheet keep their
+# previous amounts (marked TODO pending LGA confirmation).
 STREET_NAME_FEE_OVERRIDES = {
-    'Court':     1500000,
-    'Crescent':  1000000,
-    'Way':       2000000,
-    'Close':     1500000,
+    'Avenue':    2000000,
+    'Crescent':  1500000,
+    'Way':       1000000,
     'Street':     500000,
+    'Lane':       500000,
+    'Close':      500000,
+    # --- Not on the LGA revalidation sheet; amounts unchanged ---
+    'Court':     1500000,
     'Road':       700000,
-    'Avenue':    1000000,
     'Boulevard': 2000000,
-    'Lane':      2000000,
     'Drive':      500000,
     # --- Specialized types: no official fee supplied; placeholder pending LGA confirmation ---
     'Parkway':   1000000,
@@ -68,8 +71,11 @@ FLAT_FEES = [
     (FeeComponent.COMMITTEE_VERIFICATION_FEE, 100000), # ₦100,000 committee verification fee
     (FeeComponent.SIGNPOST_INSTALLATION_FEE, 25000),
     (FeeComponent.MAP_UPLOAD_FEE,           5000),
-    (FeeComponent.RENEWAL_FEE,             20000),
 ]
+
+# Revalidation and renewal are not listed here: they are a percentage of each
+# street type's street-name fee (see config.FeePolicy) and are written per
+# street type by sync_fee_schedule, which this command calls at the end.
 
 
 class Command(BaseCommand):
@@ -144,6 +150,12 @@ class Command(BaseCommand):
         self.stdout.write(
             f'Fee configurations — created: {fee_created}, skipped: {fee_skipped}\n'
         )
+
+        # Revalidation and renewal are percentages of the street-name fee, so they
+        # are derived rather than seeded — see config.FeePolicy.
+        from django.core.management import call_command
+        call_command('sync_fee_schedule')
+
         self.stdout.write(self.style.SUCCESS('Done. Seed completed successfully.'))
 
         # ------------------------------------------------------------------
