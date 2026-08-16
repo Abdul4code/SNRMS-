@@ -133,6 +133,16 @@ python manage.py seed_data
 
 # Confirm email delivery is configured (sends one real message)
 python manage.py send_test_email you@example.com
+
+# --- Fees (see "Fees" below) ---
+python manage.py sync_fee_schedule                # recompute revalidation/renewal
+python manage.py sync_fee_schedule --apply-base   # also apply the official base schedule
+python manage.py demo_fees                        # shrink every fee for gateway testing
+python manage.py reset_fees                       # restore the official schedule
+
+# --- Going live (see "Testing and Go-Live" below) ---
+python manage.py go_live                          # report only — changes nothing
+python manage.py go_live --yes                    # migrate, clear test data, apply real fees
 ```
 
 ## Email
@@ -168,6 +178,130 @@ fly ssh console -a snrms-backend -C 'python manage.py send_test_email you@exampl
 
 All sending goes through `notifications/mailer.py`; failures are logged rather
 than raised, so a mail outage can never break a registration or an approval.
+
+## Fees
+
+Registration is charged in two stages (A and C). Two further fees are a
+**percentage of the street type's Stage C street-name fee**, held in the
+`FeePolicy` singleton:
+
+| Fee | Share | When it is charged |
+| --- | --- | --- |
+| Revalidation | **40%** | An already-named street is brought onto the digital register (a legacy application). Charged instead of Stage C. |
+| Renewal | **5%** | An existing registration is renewed before or after expiry. |
+
+Official base schedule:
+
+| Street type | Base | Revalidation | Renewal |
+| --- | ---: | ---: | ---: |
+| Avenue | ₦2,000,000 | ₦800,000 | ₦100,000 |
+| Crescent | ₦1,500,000 | ₦600,000 | ₦75,000 |
+| Way | ₦1,000,000 | ₦400,000 | ₦50,000 |
+| Street / Lane / Close | ₦500,000 | ₦200,000 | ₦25,000 |
+
+Street types not on the LGA sheet (Road, Drive, Boulevard, Court and the
+specialised types) keep their own base fee and derive by the same percentages.
+
+The percentages are the source of truth, but the derived amounts are stored as
+ordinary `FeeConfiguration` rows so Finance can override a single street type in
+the admin UI. `sync_fee_schedule` rewrites them from the policy; amounts round
+to whole naira, because a kobo remainder stops an applicant's transfer ever
+matching `amount_expected` exactly.
+
+```bash
+# Preview before changing anything
+python manage.py sync_fee_schedule --apply-base --dry-run
+```
+
+Changing a base fee or a percentage takes effect on the next `sync_fee_schedule`
+run, which also re-prices any payment still pending.
+
+## Testing and Go-Live
+
+### Testing mode
+
+Real fees are far above what a payment gateway will accept for a test
+transaction, so shrink them first. `demo_fees` keeps every *payable stage* above
+the gateway minimum (default ₦100) while making each fee small:
+
+```bash
+python manage.py demo_fees            # or: --min 50
+```
+
+Testers can then register, pay, and run applications through the full lifecycle
+for a few naira. Restore the official schedule at any time:
+
+```bash
+python manage.py reset_fees
+```
+
+Both commands re-price payments that are still pending, so applications created
+mid-test keep matching the schedule in force.
+
+### Going live
+
+One command. It migrates, clears the test data, applies the official fee
+schedule and verifies the result:
+
+```bash
+# 1. Ship the code
+fly deploy -a snrms-backend
+
+# 2. Back up — this is not reversible
+# (backups must be enabled once: fly postgres backup enable -a snrms-db)
+fly postgres backup create -a snrms-db
+
+# 3. Report only: shows what would be deleted and previews the fee table
+fly ssh console -a snrms-backend -C 'python manage.py go_live'
+
+# 4. Do it
+fly ssh console -a snrms-backend -C 'python manage.py go_live --yes'
+```
+
+**Most of the production database is not test data.** The digitised old registry
+is stored as legacy applications owned by `legacy-registry@ibeju-lekki.gov.ng`,
+and the street registry links to them. A blanket wipe would destroy imported
+council records, so the reset is deliberately scoped:
+
+| Kept | Removed |
+| --- | --- |
+| **Every staff account** — finance, naming committee, chairman, superusers | Public applicant accounts |
+| The legacy import account and the digitised old registry | Non-legacy (test) applications |
+| Street registry and building survey | Their payments, receipts, documents, status history, committee reviews, notifications |
+| Street types, fee configuration, fee policy, renewal settings | Outstanding email verification codes |
+| The Treasurer's signature | Uploaded files belonging to deleted records |
+
+**No staff account is ever deleted.** There is no flag to do it — the council's
+back office has to work the moment the system opens. Applicant accounts that
+will be removed are listed by name in the report before anything happens.
+
+After the reset, `go_live` asserts the end state: no test applications or
+payments left, a superuser still present, no staff account missing, the street
+registry and building survey intact, and a revalidation fee configured for every
+street type. It reports `PROBLEM:` lines and a non-clean summary if any of that
+fails.
+
+Re-running `go_live --yes` is safe.
+
+**Applicants holding a legacy import.** `Application.applicant` is `PROTECT`ed,
+so an applicant account that owns a record in the old registry is kept rather
+than deleted. If such an account really should go, add `--reassign-legacy`: the
+import moves to `legacy-registry@ibeju-lekki.gov.ng` (the record survives, only
+its nominal owner changes) and the account is then removed.
+
+```bash
+fly ssh console -a snrms-backend -C 'python manage.py go_live --yes --reassign-legacy'
+```
+
+Other flags: `--keep-media` leaves uploaded files on disk. The underlying
+`reset_for_golive` command can be run on its own if you want the cleanup without
+the fee change, and carries a `--purge-legacy` flag that deletes the old
+registry — only ever appropriate on a database with no real imports.
+
+**Reference numbers continue, they do not restart.** Numbering counts every
+application created in the current year and the legacy imports are real records,
+so the next application follows on from them rather than returning to `00001`.
+Restarting would collide with reference numbers already issued.
 
 ## Project Structure
 
