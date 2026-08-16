@@ -246,6 +246,9 @@
                 </button>
               </div>
             </div>
+            <div class="flex justify-end -mt-2">
+              <RouterLink to="/forgot-password" class="text-xs font-semibold text-emerald-600 hover:text-emerald-700">Forgot password?</RouterLink>
+            </div>
             <div class="pt-1">
               <button type="submit" :disabled="loading || !form.email || !form.password"
                       class="w-full flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl text-sm font-semibold text-white tracking-wide transition-all duration-200 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
@@ -345,6 +348,9 @@
                   </svg>
                 </button>
               </div>
+            </div>
+            <div class="flex justify-end -mt-2">
+              <RouterLink to="/forgot-password" class="text-xs font-semibold text-emerald-600 hover:text-emerald-700">Forgot password?</RouterLink>
             </div>
             <div class="pt-1">
               <button type="submit" :disabled="loading || !form.email || !form.password"

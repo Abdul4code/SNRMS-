@@ -17,6 +17,12 @@ const router = createRouter({
       component: () => import('@/views/auth/RegisterView.vue'),
       meta: { public: true },
     },
+    {
+      path: '/forgot-password',
+      name: 'forgot-password',
+      component: () => import('@/views/auth/ForgotPasswordView.vue'),
+      meta: { public: true },
+    },
 
     // ── Root redirect ────────────────────────────────────────────────────────
     {

@@ -234,3 +234,81 @@ class RequestEmailCodeView(APIView):
         except Exception:  # noqa: BLE001
             pass
         return Response({'status': 'sent', 'message': 'A verification code has been sent to your email.'})
+
+
+class PasswordResetRequestView(APIView):
+    """POST /auth/password-reset/ {email} — email a 6-digit code to reset a forgotten password."""
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        import random
+        from datetime import timedelta
+        from django.utils import timezone
+        from django.core.mail import send_mail
+        from django.conf import settings
+        from accounts.models import EmailVerification, User
+
+        email = (request.data.get('email') or '').strip().lower()
+        # Always give the same response so we never reveal which emails are registered.
+        generic = {'status': 'sent',
+                   'message': 'If an account with that email exists, a reset code has been sent.'}
+        if not email:
+            return Response({'detail': 'Email is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        user = User.objects.filter(email__iexact=email).first()
+        if not user:
+            return Response(generic)
+        # light rate-limit: max 1 code per 60s per email
+        recent = EmailVerification.objects.filter(
+            email__iexact=email, created_at__gt=timezone.now() - timedelta(seconds=60)).exists()
+        if recent:
+            return Response(generic)
+        code = f'{random.randint(0, 999999):06d}'
+        EmailVerification.objects.create(
+            email=email, code=code, expires_at=timezone.now() + timedelta(minutes=15))
+        try:
+            send_mail(
+                subject='[Ibeju-Lekki SNRMS] Your password reset code',
+                message=(f'Your password reset code is {code}. It expires in 15 minutes.\n\n'
+                         f'Enter it on the Ibeju-Lekki Street Naming Registration Management System to '
+                         f'set a new password. If you did not request this, you can safely ignore this email.'),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[email], fail_silently=True,
+            )
+        except Exception:  # noqa: BLE001
+            pass
+        return Response(generic)
+
+
+class PasswordResetConfirmView(APIView):
+    """POST /auth/password-reset/confirm/ {email, code, new_password} — set a new password."""
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        from django.contrib.auth.password_validation import validate_password
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from accounts.models import EmailVerification, User
+
+        email = (request.data.get('email') or '').strip().lower()
+        code = (request.data.get('code') or '').strip()
+        new_password = request.data.get('new_password') or ''
+        if not (email and code and new_password):
+            return Response({'detail': 'Email, code and new password are required.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if not EmailVerification.is_verified(email, code):
+            return Response({'detail': 'Invalid or expired reset code.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        user = User.objects.filter(email__iexact=email).first()
+        if not user:
+            return Response({'detail': 'Invalid or expired reset code.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        try:
+            validate_password(new_password, user)
+        except DjangoValidationError as exc:
+            return Response({'detail': ' '.join(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+        user.set_password(new_password)
+        user.save(update_fields=['password'])
+        # Consume the code so it can't be reused.
+        EmailVerification.objects.filter(
+            email__iexact=email, code=code, consumed=False).update(consumed=True)
+        return Response({'status': 'reset',
+                         'message': 'Your password has been reset. You can now sign in.'})
