@@ -1,13 +1,12 @@
 """Send an email alongside the in-app notification.
 
-Uses Django's console backend unless SMTP is configured, so nothing breaks when
-no mail account is set up — the message simply appears in the server log.
+Delivery goes through ``notifications.mailer``, which uses SendGrid in
+production and Django's console backend when no provider is configured — so
+nothing breaks with no mail account, the message simply appears in the log.
 """
 import logging
 
-from django.conf import settings
-from django.core.mail import send_mail
-
+from . import mailer
 from .models import Notification, NotificationType
 
 logger = logging.getLogger(__name__)
@@ -24,14 +23,5 @@ def notify(recipient, title, message, notification_type=NotificationType.GENERAL
         application=application,
     )
     if send_email and getattr(recipient, 'email', ''):
-        try:
-            send_mail(
-                subject=f'[SNRMS Ibeju-Lekki] {title}',
-                message=message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[recipient.email],
-                fail_silently=True,
-            )
-        except Exception:  # noqa: BLE001 - email must never break the workflow
-            logger.exception('Failed to email %s', recipient.email)
+        mailer.send(title, message, recipient.email)
     return note

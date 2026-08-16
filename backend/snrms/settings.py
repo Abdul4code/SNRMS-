@@ -18,6 +18,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
+    'anymail',
     'accounts',
     'applications',
     'documents',
@@ -170,11 +171,24 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = True
     SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=False, cast=bool)
 
-# --- Email (renewal & application notifications) ---
-# Console backend by default: emails print to the server log, so the flow works
-# with no mail account. Set EMAIL_HOST etc. in .env to send real email via SMTP.
+# --- Email (verification codes, password resets, application notifications) ---
+# SendGrid is the production sender, over its HTTPS API rather than SMTP: Fly.io
+# restricts outbound SMTP ports, and the API also surfaces a real error body when
+# a message is rejected. SMTP stays available as a fallback for self-hosted
+# (docker-compose) deployments, and the console backend is the default so the
+# whole flow still works locally with no mail account at all.
+SENDGRID_API_KEY = config('SENDGRID_API_KEY', default='')
 EMAIL_HOST = config('EMAIL_HOST', default='')
-if EMAIL_HOST:
+if SENDGRID_API_KEY:
+    EMAIL_BACKEND = 'anymail.backends.sendgrid.EmailBackend'
+    ANYMAIL = {
+        'SENDGRID_API_KEY': SENDGRID_API_KEY,
+        # Tracking is off by default: these are transactional codes, and the
+        # click-tracking rewrite mangles any link we put in the body.
+        'SENDGRID_TRACK_OPENS': config('SENDGRID_TRACK_OPENS', default=False, cast=bool),
+        'SENDGRID_TRACK_CLICKS': config('SENDGRID_TRACK_CLICKS', default=False, cast=bool),
+    }
+elif EMAIL_HOST:
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
     EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
     EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
@@ -182,8 +196,10 @@ if EMAIL_HOST:
     EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
 else:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+# Must be an address on a domain SendGrid has authenticated — snrms.com is the
+# one we hold DNS for. SendGrid rejects the whole message from any other domain.
 DEFAULT_FROM_EMAIL = config(
-    'DEFAULT_FROM_EMAIL', default='SNRMS Ibeju-Lekki <no-reply@ibeju-lekki.gov.ng>')
+    'DEFAULT_FROM_EMAIL', default='SNRMS Ibeju-Lekki <admin@snrms.com>')
 
 # Public base URL that receipt QR codes point to (a verification page).
 RECEIPT_VERIFY_URL = config('RECEIPT_VERIFY_URL', default='http://localhost:5173/verify-receipt')

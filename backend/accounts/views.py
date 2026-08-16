@@ -203,9 +203,8 @@ class RequestEmailCodeView(APIView):
         import random
         from datetime import timedelta
         from django.utils import timezone
-        from django.core.mail import send_mail
-        from django.conf import settings
         from accounts.models import EmailVerification, User
+        from notifications import mailer
 
         email = (request.data.get('email') or '').strip().lower()
         if not email:
@@ -222,17 +221,13 @@ class RequestEmailCodeView(APIView):
         code = f'{random.randint(0, 999999):06d}'
         EmailVerification.objects.create(
             email=email, code=code, expires_at=timezone.now() + timedelta(minutes=15))
-        try:
-            send_mail(
-                subject='[Ibeju-Lekki SNRMS] Your verification code',
-                message=(f'Your verification code is {code}. It expires in 15 minutes.\n\n'
-                         f'Enter it to complete your registration on the Ibeju-Lekki Street Naming '
-                         f'Registration Management System.'),
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[email], fail_silently=True,
-            )
-        except Exception:  # noqa: BLE001
-            pass
+        mailer.send_code(
+            subject='Your verification code',
+            intro='Enter this code to complete your registration on the Ibeju-Lekki Street '
+                  'Naming Registration Management System.',
+            code=code,
+            to=email,
+        )
         return Response({'status': 'sent', 'message': 'A verification code has been sent to your email.'})
 
 
@@ -244,9 +239,8 @@ class PasswordResetRequestView(APIView):
         import random
         from datetime import timedelta
         from django.utils import timezone
-        from django.core.mail import send_mail
-        from django.conf import settings
         from accounts.models import EmailVerification, User
+        from notifications import mailer
 
         email = (request.data.get('email') or '').strip().lower()
         # Always give the same response so we never reveal which emails are registered.
@@ -265,17 +259,15 @@ class PasswordResetRequestView(APIView):
         code = f'{random.randint(0, 999999):06d}'
         EmailVerification.objects.create(
             email=email, code=code, expires_at=timezone.now() + timedelta(minutes=15))
-        try:
-            send_mail(
-                subject='[Ibeju-Lekki SNRMS] Your password reset code',
-                message=(f'Your password reset code is {code}. It expires in 15 minutes.\n\n'
-                         f'Enter it on the Ibeju-Lekki Street Naming Registration Management System to '
-                         f'set a new password. If you did not request this, you can safely ignore this email.'),
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[email], fail_silently=True,
-            )
-        except Exception:  # noqa: BLE001
-            pass
+        mailer.send_code(
+            subject='Your password reset code',
+            intro='Enter this code on the Ibeju-Lekki Street Naming Registration Management '
+                  'System to set a new password.',
+            code=code,
+            to=email,
+            outro='If you did not request this, you can safely ignore this email — your '
+                  'password has not been changed.',
+        )
         return Response(generic)
 
 
