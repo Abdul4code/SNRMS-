@@ -429,7 +429,9 @@ async function handleLogin() {
   errorMessage.value = ''
   loading.value = true
   try {
-    await auth.login(form.value.email, form.value.password)
+    // Normalise the email (trim + lowercase) so a stray space or capitalisation
+    // from autofill/paste doesn't cause a false "invalid credentials".
+    await auth.login(form.value.email.trim().toLowerCase(), form.value.password)
     const redirect =
       (router.currentRoute.value.query.redirect as string) ||
       getRoleDefault(auth.user?.role)

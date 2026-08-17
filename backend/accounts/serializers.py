@@ -72,7 +72,9 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
 
     def validate(self, attrs):
-        email = attrs.get('email')
+        # Normalise the email so a stray space or capitalisation doesn't cause a
+        # false "invalid credentials" (emails are stored lower-cased).
+        email = (attrs.get('email') or '').strip().lower()
         password = attrs.get('password')
 
         user = authenticate(request=self.context.get('request'), email=email, password=password)
