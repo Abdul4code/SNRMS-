@@ -50,6 +50,12 @@
             <p class="text-xs">{{ error }}</p>
           </div>
           <div v-show="!loading && !error" ref="mapEl" class="h-[560px] w-full"></div>
+          <!-- Picture of whichever street was picked from the directory -->
+          <div v-if="pictureStreet" class="px-5 py-4 border-t border-slate-100">
+            <p class="text-xs font-semibold text-slate-700 mb-2">{{ pictureStreet.name }}</p>
+            <StreetPicture :lat="pictureStreet.latitude" :lng="pictureStreet.longitude"
+                           :google-enabled="googleReady" :height="240" :title="pictureStreet.name" />
+          </div>
           <div v-if="false" class="flex items-center gap-5 px-5 py-3 border-t border-slate-100 text-xs">
             <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full" style="background:#059669"></span><span class="text-slate-600 font-medium">Named</span></span>
             <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full" style="background:#d97706"></span><span class="text-slate-600 font-medium">Unnamed</span></span>
@@ -91,6 +97,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { configApi } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
+import StreetPicture from '@/components/StreetPicture.vue'
 import { ChevronDownIcon } from '@heroicons/vue/24/outline'
 
 interface Survey {
@@ -141,6 +148,9 @@ function zoomToLocalitySel() {
   }
 }
 const mapEl = ref<HTMLElement | null>(null)
+const pictureStreet = ref<{ name: string; latitude: number; longitude: number } | null>(null)
+const googleReady = ref(false)
+configApi.publicSettings().then(r => { googleReady.value = !!r.data.google_maps_enabled }).catch(() => {})
 let map: L.Map | null = null
 const markers = new Map<number, L.CircleMarker>()
 
@@ -178,11 +188,15 @@ function fitToLGA() {
 }
 
 function zoomToStreet(code: string) {
-  if (!map) return
-  const st = streets.value.find(s => s.code === code) as unknown as { latitude?: number; longitude?: number } | undefined
-  if (st && st.latitude != null && st.longitude != null) {
-    map.setView([Number(st.latitude), Number(st.longitude)], 17)
-  }
+  const st = streets.value.find(s => s.code === code) as unknown as
+    { name: string; latitude?: number | null; longitude?: number | null } | undefined
+  // Offer a picture of the picked street. Half the registry is digitised from the
+  // old register and carries no coordinates, so there is nothing to show for those.
+  pictureStreet.value = (st && st.latitude != null && st.longitude != null)
+    ? { name: st.name, latitude: Number(st.latitude), longitude: Number(st.longitude) }
+    : null
+  if (!map || !pictureStreet.value) return
+  map.setView([pictureStreet.value.latitude, pictureStreet.value.longitude], 17)
 }
 
 onMounted(async () => {

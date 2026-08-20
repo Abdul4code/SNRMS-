@@ -51,19 +51,10 @@
       <p class="text-sm text-slate-500">No location data available for this application.</p>
     </div>
 
-    <!-- Street picture: satellite (always) + Google Street View (when key active) -->
+    <!-- Street picture: satellite always, plus Street View (works without a key) -->
     <div v-if="showStreetPicture && coords" class="mt-3">
-      <button v-if="!picShown" type="button" @click="revealStreetPicture"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white" style="background:#0f172a">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-        Show street's picture
-      </button>
-      <div v-else>
-        <img v-if="picStreetView" :src="picStreetView" alt="Street view" class="w-full rounded-lg border border-slate-200 mb-2" style="max-height:220px;object-fit:cover" @error="picStreetView = ''" />
-        <div ref="picMapEl" class="w-full rounded-lg border border-slate-200 overflow-hidden" style="height:220px"></div>
-        <p class="text-[10px] text-slate-400 mt-0.5">{{ picStreetView ? 'Google Street View plus a satellite view of the exact spot.' : 'Satellite/aerial view of the exact spot.' }}</p>
-        <button type="button" @click="hideStreetPicture" class="mt-1 text-[11px] text-slate-400 underline">Hide picture</button>
-      </div>
+      <StreetPicture :lat="coords[0]" :lng="coords[1]" :google-enabled="googleReady"
+                     :height="220" :title="proposedStreetName || streetName" />
     </div>
 
     <!-- Building detail panel — shown when a marker is clicked -->
@@ -390,6 +381,7 @@ import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
 import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 import { configApi } from '@/services/api'
+import StreetPicture from '@/components/StreetPicture.vue'
 
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl
 L.Icon.Default.mergeOptions({ iconUrl: markerIcon, iconRetinaUrl: markerIcon2x, shadowUrl: markerShadow })
@@ -426,27 +418,8 @@ const showModal = ref(false)
 const allSurveys = ref<SurveyBuilding[]>([])
 const surveysLoading = ref(false)
 
-// Street picture (satellite always; Google Street View when a key is configured)
-const picShown = ref(false)
-const picStreetView = ref('')
-const picMapEl = ref<HTMLElement | null>(null)
-let picMap: L.Map | null = null
-let googleReady = false
-async function revealStreetPicture() {
-  const c = coords.value
-  if (!c) return
-  if (googleReady) picStreetView.value = configApi.streetViewUrl(c[0], c[1])
-  picShown.value = true
-  await nextTick()
-  if (picMap) { picMap.remove(); picMap = null }
-  if (!picMapEl.value) return
-  picMap = L.map(picMapEl.value, { attributionControl: false, scrollWheelZoom: false })
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }).addTo(picMap)
-  picMap.setView([c[0], c[1]], 18)
-  L.circleMarker([c[0], c[1]], { radius: 8, color: '#f59e0b', weight: 3, fillColor: '#f59e0b', fillOpacity: 0.5 }).addTo(picMap)
-  setTimeout(() => picMap?.invalidateSize(), 120)
-}
-function hideStreetPicture() { if (picMap) { picMap.remove(); picMap = null } picShown.value = false }
+// Does the server have a Google Maps key? Only the still image needs one.
+const googleReady = ref(false)
 const selectedBuilding = ref<SurveyBuilding | null>(null)
 const photoError = ref(false)
 
@@ -573,7 +546,7 @@ function initMap(el: HTMLElement, scrollWheel: boolean): L.Map {
 }
 
 onMounted(async () => {
-  configApi.publicSettings().then(r => { googleReady = !!r.data.google_maps_enabled }).catch(() => {})
+  configApi.publicSettings().then(r => { googleReady.value = !!r.data.google_maps_enabled }).catch(() => {})
   await loadSurveys()
   if (!mapEl.value || !hasMapData.value) return
   map = initMap(mapEl.value, false)

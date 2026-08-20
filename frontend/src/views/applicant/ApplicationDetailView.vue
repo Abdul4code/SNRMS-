@@ -139,6 +139,11 @@
                 <div class="sm:col-span-2">
                   <dt class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Location Description</dt>
                   <dd class="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{{ application.location_description }}</dd>
+                  <dd v-if="detailCoords" class="mt-2">
+                    <StreetPicture :lat="detailCoords.lat" :lng="detailCoords.lng"
+                                   :google-enabled="googleReady" :height="240"
+                                   :title="application.proposed_street_name" />
+                  </dd>
                 </div>
                 <div v-if="application.committee_remarks" class="sm:col-span-2 rounded-xl p-4"
                      style="background: rgba(139,92,246,0.05); border: 1px solid rgba(139,92,246,0.15)">
@@ -332,7 +337,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, RouterLink, useRouter } from 'vue-router'
 import { DocumentIcon, ChevronRightIcon, ClockIcon } from '@heroicons/vue/24/outline'
-import { applicationApi, documentApi } from '@/services/api'
+import { applicationApi, configApi, documentApi } from '@/services/api'
+import StreetPicture from '@/components/StreetPicture.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import DocumentRepository from '@/components/DocumentRepository.vue'
 
@@ -362,6 +368,8 @@ interface Application {
   expires_at?: string | null
   google_map_uploaded?: boolean
   signpost_installed?: boolean
+  latitude?: string | number | null
+  longitude?: string | number | null
   street_hold?: {
     holds: boolean
     kind: 'unpaid' | 'decision' | 'settled' | 'none'
@@ -380,6 +388,18 @@ const RENEWAL_STATUSES = ['certificate_issued', 'expired', 'renewed']
 const route = useRoute()
 const router = useRouter()
 const application = ref<Application | null>(null)
+
+// The street's location, for the picture panel — stored on the application, or
+// written into the description as "lat,lng" by the map picker.
+const detailCoords = computed(() => {
+  const a = application.value
+  if (!a) return null
+  if (a.latitude && a.longitude) return { lat: Number(a.latitude), lng: Number(a.longitude) }
+  const m = (a.location_description || '').match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/)
+  return m ? { lat: Number(m[1]), lng: Number(m[2]) } : null
+})
+const googleReady = ref(false)
+configApi.publicSettings().then(r => { googleReady.value = !!r.data.google_maps_enabled }).catch(() => {})
 
 // Amber while the street is still held (act now), slate once it has opened up.
 const holdColour = computed(() =>

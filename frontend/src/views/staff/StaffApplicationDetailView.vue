@@ -146,29 +146,21 @@
                   :street-name="application.proposed_street_name"
                   :proposed-street-name="application.proposed_street_name"
                 />
-                <!-- External views + duplicate check -->
-                <div v-if="coords" class="mt-3 flex flex-wrap gap-2">
-                  <button v-if="!showPicture" type="button" @click="revealPicture"
-                          class="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white" style="background:#0f172a">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                    Show street's picture
-                  </button>
-                  <a :href="streetViewUrl" target="_blank" rel="noopener"
-                     class="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white" style="background:#059669">
-                    Open Street View
-                  </a>
-                  <a :href="mapsUrl" target="_blank" rel="noopener"
-                     class="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 border border-slate-200 hover:bg-slate-50">
-                    Open in Google Maps
-                  </a>
-                  <span v-if="application.locality" class="inline-flex items-center text-xs text-slate-500 px-2">Locality: <span class="font-semibold text-slate-700 ml-1">{{ application.locality }}</span></span>
-                </div>
-                <div v-if="showPicture && coords" class="mt-3">
-                  <img v-if="pictureSrc" :src="pictureSrc" alt="Street picture"
-                       class="w-full rounded-lg border border-slate-200 mb-2" style="max-height:260px;object-fit:cover"
-                       @error="pictureSrc = ''" />
-                  <div ref="staffPicMapEl" class="w-full rounded-lg border border-slate-200 overflow-hidden" style="height:240px"></div>
-                  <button type="button" @click="hideStaffPicture" class="mt-1 text-[11px] text-slate-400 underline">Hide picture</button>
+                <!-- Street picture + external views + duplicate check -->
+                <div v-if="coords" class="mt-3">
+                  <StreetPicture :lat="coords.lat" :lng="coords.lng" :google-enabled="googleReady"
+                                 :height="260" :title="application.proposed_street_name" />
+                  <div class="mt-2 flex flex-wrap gap-2 items-center">
+                    <a :href="streetViewUrl" target="_blank" rel="noopener"
+                       class="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white" style="background:#059669">
+                      Open Street View
+                    </a>
+                    <a :href="mapsUrl" target="_blank" rel="noopener"
+                       class="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 border border-slate-200 hover:bg-slate-50">
+                      Open in Google Maps
+                    </a>
+                    <span v-if="application.locality" class="inline-flex items-center text-xs text-slate-500 px-2">Locality: <span class="font-semibold text-slate-700 ml-1">{{ application.locality }}</span></span>
+                  </div>
                 </div>
                 <!-- Duplicate check verdict for reviewers -->
                 <div v-if="dupReport" class="mt-3 rounded-xl p-3 text-xs"
@@ -701,14 +693,13 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import LeafletLib from 'leaflet'
-import type * as LType from 'leaflet'
 import { useRoute, RouterLink } from 'vue-router'
 import { DocumentIcon, ChevronRightIcon, ClockIcon, CurrencyDollarIcon, BanknotesIcon, MapPinIcon } from '@heroicons/vue/24/outline'
 import { applicationApi, documentApi, paymentApi, configApi, committeeApi } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import StatusBadge from '@/components/StatusBadge.vue'
 import ApplicationMap from '@/components/ApplicationMap.vue'
+import StreetPicture from '@/components/StreetPicture.vue'
 import DocumentRepository from '@/components/DocumentRepository.vue'
 
 interface Applicant { id: string; email: string; full_name: string; phone?: string }
@@ -803,25 +794,10 @@ const streetViewUrl = computed(() =>
   coords.value ? `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${coords.value.lat},${coords.value.lng}` : '#')
 const mapsUrl = computed(() =>
   coords.value ? `https://www.google.com/maps/search/?api=1&query=${coords.value.lat},${coords.value.lng}` : '#')
-const showPicture = ref(false)
-const pictureSrc = ref('')
-const staffPicMapEl = ref<HTMLElement | null>(null)
-let staffPicMap: LType.Map | null = null
-function revealPicture() {
-  if (!coords.value) return
-  pictureSrc.value = configApi.streetViewUrl(coords.value.lat, coords.value.lng)
-  showPicture.value = true
-  setTimeout(() => {
-    if (staffPicMap) { staffPicMap.remove(); staffPicMap = null }
-    if (!staffPicMapEl.value || !coords.value) return
-    staffPicMap = LeafletLib.map(staffPicMapEl.value, { attributionControl: false, scrollWheelZoom: false })
-    LeafletLib.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }).addTo(staffPicMap)
-    staffPicMap.setView([coords.value.lat, coords.value.lng], 18)
-    LeafletLib.circleMarker([coords.value.lat, coords.value.lng], { radius: 8, color: '#f59e0b', weight: 3, fillColor: '#f59e0b', fillOpacity: 0.5 }).addTo(staffPicMap)
-    setTimeout(() => staffPicMap?.invalidateSize(), 120)
-  }, 0)
-}
-function hideStaffPicture() { if (staffPicMap) { staffPicMap.remove(); staffPicMap = null } showPicture.value = false }
+// Does the server have a Google Maps key? Only the still image needs one; the
+// satellite view and the interactive Street View work without it.
+const googleReady = ref(false)
+configApi.publicSettings().then(r => { googleReady.value = !!r.data.google_maps_enabled }).catch(() => {})
 
 interface DupMatch { code: string; name: string; locality: string; distance_m: number | null }
 const dupReport = ref<{ verdict: string; name_matches: DupMatch[] } | null>(null)
