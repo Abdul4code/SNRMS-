@@ -183,20 +183,15 @@ class ApplicationDetailSerializer(serializers.ModelSerializer):
         return PaymentSummarySerializer(payments, many=True).data
 
     def get_certificate_file(self, obj):
-        if not obj.certificate_file:
-            return None
-        request = self.context.get('request')
-        if request:
-            return request.build_absolute_uri(obj.certificate_file.url)
-        return obj.certificate_file.url
+        # Signed link, not a raw /media/ path: public media serving is off in
+        # production, so a raw path 404s wherever it is opened.
+        from snrms.media_access import signed_media_url
+        return signed_media_url(obj.certificate_file, self.context.get('request'))
 
     def get_legacy_certificate_url(self, obj):
-        if not obj.legacy_certificate:
-            return None
-        request = self.context.get('request')
-        if request:
-            return request.build_absolute_uri(obj.legacy_certificate.url)
-        return obj.legacy_certificate.url
+        """The document a validate applicant uploaded — the committee reviews it."""
+        from snrms.media_access import signed_media_url
+        return signed_media_url(obj.legacy_certificate, self.context.get('request'))
 
 
 class ApplicationCreateSerializer(serializers.ModelSerializer):

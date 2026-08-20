@@ -168,3 +168,73 @@ class LegacyCommitteeWorkflowTests(TestCase):
         self.app.refresh_from_db()
         self.assertEqual(self.app.status, ApplicationStatus.AWAITING_CHAIRMAN_APPROVAL,
                          'a validated street must reach the Chairman like any other')
+
+
+class MediaLinkTests(TestCase):
+    """Links to uploaded files must actually open.
+
+    Public /media/ is deliberately not served in production, so a raw /media/
+    path is a dead link everywhere except a developer's laptop. Every file handed
+    to a user has to be a signed /media-download/ link. Asserting the link is
+    non-empty is not enough — these tests fetch it.
+    """
+
+    def setUp(self):
+        from django.core.files.base import ContentFile
+
+        self.applicant = User.objects.create_user(
+            email='a3@example.com', password='x', first_name='A', last_name='B',
+            role=Role.APPLICANT)
+        self.committee = User.objects.create_user(
+            email='c3@example.com', password='x', first_name='C', last_name='M',
+            role=Role.NAMING_COMMITTEE)
+        self.st = StreetType.objects.create(name='Street', code='ST')
+        self.app = Application.objects.create(
+            applicant=self.applicant, proposed_street_name='Akili',
+            location_description='6.470926,3.662995', street_type=self.st,
+            latitude=LAT, longitude=LNG, is_legacy=True,
+            status=ApplicationStatus.UNDER_NAMING_COMMITTEE_REVIEW)
+        self.app.legacy_certificate.save(
+            'cert.pdf', ContentFile(b'%PDF-1.4 the existing certificate'), save=True)
+        self.client = APIClient()
+        self.client.force_authenticate(self.committee)
+
+    def test_the_validate_document_link_opens(self):
+        r = self.client.get(f'/api/applications/{self.app.id}/')
+        url = r.data['legacy_certificate_url']
+        self.assertIsNotNone(url)
+        self.assertNotIn('/media/', url, 'raw media paths 404 in production')
+        self.assertIn('/media-download/', url)
+
+        got = self.client.get(url[url.index('/media-download/'):])
+        self.assertEqual(got.status_code, 200, 'the committee must be able to open it')
+        self.assertEqual(b''.join(got.streaming_content), b'%PDF-1.4 the existing certificate')
+
+    def test_the_committee_console_link_opens(self):
+        r = self.client.get(f'/api/applications/committee/{self.app.id}/review/')
+        url = r.data['legacy_certificate']
+        self.assertIsNotNone(url, 'the committee console must surface the document')
+        self.assertNotIn('/media/', url)
+
+        got = self.client.get(url[url.index('/media-download/'):])
+        self.assertEqual(got.status_code, 200)
+
+    def test_an_issued_certificate_link_opens(self):
+        from django.core.files.base import ContentFile
+        self.app.certificate_file.save(
+            'issued.pdf', ContentFile(b'%PDF-1.4 issued'), save=True)
+        r = self.client.get(f'/api/applications/{self.app.id}/')
+        url = r.data['certificate_file']
+        self.assertIsNotNone(url)
+        self.assertNotIn('/media/', url)
+        self.assertEqual(
+            self.client.get(url[url.index('/media-download/'):]).status_code, 200)
+
+    def test_no_link_when_there_is_no_file(self):
+        app = Application.objects.create(
+            applicant=self.applicant, proposed_street_name='Plain',
+            location_description='d', street_type=self.st,
+            status=ApplicationStatus.UNDER_NAMING_COMMITTEE_REVIEW)
+        r = self.client.get(f'/api/applications/{app.id}/')
+        self.assertIsNone(r.data['legacy_certificate_url'])
+        self.assertIsNone(r.data['certificate_file'])

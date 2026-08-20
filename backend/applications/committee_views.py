@@ -146,10 +146,12 @@ class CommitteeQuorumReviewView(APIView):
 
         # Applicant's uploaded document for a validate/legacy application lives on the
         # application itself (not as a Document record), so surface it here too.
-        legacy_certificate = None
+        # It must be a signed link — raw /media/ is not served in production, so a
+        # raw path left the committee with a dead "View" on the very document they
+        # are there to review.
+        from snrms.media_access import signed_media_url
         try:
-            if application.legacy_certificate:
-                legacy_certificate = application.legacy_certificate.url
+            legacy_certificate = signed_media_url(application.legacy_certificate, request)
         except Exception:  # noqa: BLE001
             legacy_certificate = None
 
