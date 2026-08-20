@@ -92,6 +92,26 @@
       </div>
 
       <div class="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+
+        <!-- How long this street is held for you (see backend street_locks.py) -->
+        <div v-if="application.street_hold && application.street_hold.kind !== 'settled'"
+             class="mb-6 rounded-2xl p-4 flex items-start gap-3"
+             :style="holdStyle">
+          <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM11 6a1 1 0 10-2 0v4a1 1 0 00.293.707l2.5 2.5a1 1 0 001.414-1.414L11 9.586V6z" clip-rule="evenodd"/>
+          </svg>
+          <div>
+            <p class="text-sm font-bold" :style="{ color: holdColour }">
+              {{ application.street_hold.holds ? 'This street is held for you' : 'This street is open to others again' }}
+            </p>
+            <p class="text-xs mt-0.5" :style="{ color: holdColour }">{{ application.street_hold.message }}</p>
+            <p v-if="application.street_hold.expires_at" class="text-[11px] mt-1 opacity-75" :style="{ color: holdColour }">
+              {{ application.street_hold.holds ? 'Opens to others' : 'Opened' }}
+              {{ formatDate(application.street_hold.expires_at) }}
+            </p>
+          </div>
+        </div>
+
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
           <!-- Left: details + documents -->
@@ -342,6 +362,14 @@ interface Application {
   expires_at?: string | null
   google_map_uploaded?: boolean
   signpost_installed?: boolean
+  street_hold?: {
+    holds: boolean
+    kind: 'unpaid' | 'decision' | 'settled' | 'none'
+    expires_at?: string | null
+    seconds_left?: number | null
+    hold_days?: number | null
+    message: string
+  } | null
 }
 interface Document { id: number; document_type: string; document_type_display?: string; file?: string; file_url?: string; is_verified?: boolean }
 interface HistoryEntry { new_status?: string; status?: string; created_at?: string; timestamp?: string; remarks?: string; comment?: string }
@@ -352,6 +380,14 @@ const RENEWAL_STATUSES = ['certificate_issued', 'expired', 'renewed']
 const route = useRoute()
 const router = useRouter()
 const application = ref<Application | null>(null)
+
+// Amber while the street is still held (act now), slate once it has opened up.
+const holdColour = computed(() =>
+  application.value?.street_hold?.holds ? '#92400e' : '#334155')
+const holdStyle = computed(() =>
+  application.value?.street_hold?.holds
+    ? 'background: rgba(251,191,36,0.10); border: 1px solid rgba(251,191,36,0.35)'
+    : 'background: #f1f5f9; border: 1px solid #e2e8f0')
 const documents = ref<Document[]>([])
 const history = ref<HistoryEntry[]>([])
 const loading = ref(false)

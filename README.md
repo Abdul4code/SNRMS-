@@ -95,6 +95,30 @@ draft → submitted → awaiting_stage_a_payment → stage_a_confirmed
   → certificate_issued → [expired] → renewal flow → renewed
 ```
 
+### Who holds a street
+
+One street, one applicant — but only while that applicant keeps moving. Two
+selections within 75 m count as the same street.
+
+| Applicant's position | Street is held | Then |
+| --- | --- | --- |
+| Applied, fee not paid | 3 days from applying | Opens to everyone again |
+| Fee paid, decision pending | 1 month from the payment | Opens to everyone again |
+| Name granted (Chairman approved onward) | Permanently | Never reopens |
+
+The applicant is shown the countdown on their application, and is told plainly
+that the street opens up if they do not pay in time. Rejecting or withdrawing an
+application releases the street immediately.
+
+A street that reopens can collect several applications. **None is rejected
+automatically** — staff see "2nd of 3 applications for this same location" on the
+application, with links to the others and which one still holds the street, and
+the council chooses.
+
+Holds are derived from the application's status and its payment timestamps
+(`applications/street_locks.py`), never stored, so they cannot drift out of step
+with the application and expiry needs no scheduled job.
+
 ## API Endpoints
 
 | Method | URL | Description |

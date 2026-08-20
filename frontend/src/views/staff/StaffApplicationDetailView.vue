@@ -49,6 +49,46 @@
       </div>
 
       <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+
+        <!-- Competing applications for the same street. A street reopens if its
+             applicant does not pay, or a month after payment with no decision, so
+             the council can end up choosing between several. -->
+        <div v-if="application.location_contention"
+             class="mb-6 rounded-2xl overflow-hidden"
+             style="background:#fff; border:1px solid rgba(2,132,199,0.35); box-shadow:0 2px 8px rgba(0,0,0,0.05)">
+          <div class="px-6 py-3.5 flex items-center gap-2" style="background:rgba(2,132,199,0.07); border-bottom:1px solid rgba(2,132,199,0.2)">
+            <svg class="w-4 h-4 flex-shrink-0" style="color:#0369a1" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.97 5.97 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/>
+            </svg>
+            <h2 class="text-sm font-bold" style="color:#0c4a6e">
+              {{ ordinal(application.location_contention.position) }} of
+              {{ application.location_contention.total }} applications for this same location
+            </h2>
+          </div>
+          <div class="px-6 py-4">
+            <p class="text-xs text-slate-500 mb-3">
+              This street was applied for more than once. Nothing is rejected automatically —
+              the council decides which application to grant.
+            </p>
+            <ul class="space-y-2">
+              <li v-for="o in application.location_contention.others" :key="o.id"
+                  class="flex flex-wrap items-center gap-2 text-xs rounded-xl px-3 py-2" style="background:#f8fafc">
+                <RouterLink :to="`/staff/applications/${o.id}`" class="font-semibold text-sky-700 hover:underline">
+                  {{ o.reference_number || o.id.slice(0, 8) }}
+                </RouterLink>
+                <span class="text-slate-700 font-medium">{{ o.proposed_street_name }}</span>
+                <span class="text-slate-500">· {{ o.applicant_name }}</span>
+                <span class="text-slate-400">· applied {{ formatDate(o.created_at) }}</span>
+                <span v-if="o.holds_street"
+                      class="ml-auto px-2 py-0.5 rounded-full font-semibold"
+                      style="background:rgba(251,191,36,0.15); color:#92400e">holds the street</span>
+                <span v-else class="ml-auto px-2 py-0.5 rounded-full font-semibold"
+                      style="background:#e2e8f0; color:#475569">hold lapsed</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
           <!-- Left: applicant info + payment evidence + documents -->
@@ -698,6 +738,19 @@ interface Application {
   is_royalty_exempt?: boolean
   signboard_number?: string
   pole_number?: string
+  location_contention?: {
+    position: number
+    total: number
+    others: {
+      id: string
+      reference_number?: string
+      applicant_name?: string
+      proposed_street_name: string
+      status: string
+      created_at: string
+      holds_street: boolean
+    }[]
+  } | null
 }
 
 interface Doc { id: string; document_type: string; document_type_display?: string; file?: string; file_url?: string; is_verified?: boolean; is_rejected?: boolean; verification_note?: string; direction?: string; title?: string }
@@ -806,6 +859,13 @@ const isDocReviewStage = computed(() =>
   application.value?.status === 'under_naming_committee_review' ||
   application.value?.status === 'awaiting_document_resubmission'
 )
+
+/** 1 -> "1st", 2 -> "2nd", 3 -> "3rd" — how the council reads a queue position. */
+function ordinal(n: number) {
+  const rem100 = n % 100
+  if (rem100 >= 11 && rem100 <= 13) return `${n}th`
+  return `${n}${({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] || 'th'}`
+}
 
 function formatDate(d: string) {
   if (!d) return ''

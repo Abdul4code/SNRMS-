@@ -8,6 +8,7 @@ from accounts.models import Role
 from notifications.models import NotificationType
 
 from .models import Application, ApplicationStatus, StatusHistory
+from .street_locks import lock_state, street_holder
 from .serializers import (
     ApplicationCreateSerializer,
     ApplicationDetailSerializer,
@@ -89,49 +90,19 @@ def _auto_expire_certificates():
             pass
 
 
-# Statuses in which a street is actively being pursued — a new applicant may not
-# register the same street while one of these applications is open.
-ACTIVE_CONSIDERATION_STATUSES = [
-    ApplicationStatus.SUBMITTED,
-    ApplicationStatus.AWAITING_STAGE_A_PAYMENT,
-    ApplicationStatus.AWAITING_STAGE_A_PAYMENT_CONFIRMATION,
-    ApplicationStatus.STAGE_A_CONFIRMED,
-    ApplicationStatus.UNDER_NAMING_COMMITTEE_REVIEW,
-    ApplicationStatus.APPROVED_BY_COMMITTEE,
-    ApplicationStatus.AWAITING_CHAIRMAN_APPROVAL,
-    ApplicationStatus.APPROVED_BY_CHAIRMAN,
-    ApplicationStatus.AWAITING_STAGE_C_PAYMENT,
-    ApplicationStatus.AWAITING_STAGE_C_PAYMENT_CONFIRMATION,
-    ApplicationStatus.STAGE_C_CONFIRMED,
-    ApplicationStatus.AWAITING_DOCUMENT_RESUBMISSION,
-]
-
-# Two selections within this distance are treated as the same street.
-STREET_LOCK_RADIUS_M = 75
-
-
 def street_under_consideration(lat, lng, exclude_id=None):
-    """Return an open application near (lat,lng), or None. Proximity-based: a
-    point within STREET_LOCK_RADIUS_M of an active application's location is
-    treated as the same street already under consideration."""
-    import math
-    qs = (Application.objects
-          .filter(status__in=ACTIVE_CONSIDERATION_STATUSES, is_deleted=False, is_legacy=False)
-          .exclude(latitude=None).exclude(longitude=None))
-    if exclude_id:
-        qs = qs.exclude(pk=exclude_id)
-    cos_lat = math.cos(math.radians(lat))
-    for a in qs:
-        d = math.hypot((float(a.latitude) - lat) * 111000,
-                       (float(a.longitude) - lng) * 111000 * cos_lat)
-        if d <= STREET_LOCK_RADIUS_M:
-            return a
-    return None
+    """The application holding this street, or None if it is free.
+
+    A hold lapses when its owner stops moving — unpaid after three days, or
+    undecided a month after payment — so this returns None for a street whose
+    previous applicant has run out of time. See applications/street_locks.py.
+    """
+    return street_holder(lat, lng, exclude_id)
 
 
 class StreetAvailabilityView(APIView):
     """GET /api/applications/street-availability/?lat=&lng= — can this street be
-    registered, or is another applicant already pursuing it?"""
+    registered, or is another applicant already holding it?"""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -140,10 +111,22 @@ class StreetAvailabilityView(APIView):
             lng = float(request.query_params.get('lng'))
         except (TypeError, ValueError):
             return Response({'available': True})
-        if street_under_consideration(lat, lng):
+        holder = street_holder(lat, lng)
+        if holder:
+            state = lock_state(holder)
+            if state['kind'] == 'settled':
+                reason = 'This street has already been registered.'
+            elif state['kind'] == 'unpaid':
+                reason = ('Another applicant is applying for this street. If they do not pay '
+                          'within 3 days of applying, it opens again.')
+            else:
+                reason = ('Another applicant has paid for this street and it is awaiting a '
+                          'decision. It opens again one month after their payment if no '
+                          'decision has been made.')
             return Response({
                 'available': False,
-                'reason': 'This street is already being considered for registration by another applicant.',
+                'reason': reason,
+                'opens_at': state['expires_at'],
             })
         return Response({'available': True})
 
@@ -196,8 +179,10 @@ class ApplicationListCreateView(generics.ListCreateAPIView):
                 {'detail': 'Only applicants can create applications.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        # Lock a street once another applicant is already pursuing it. Legacy
-        # (validate-existing) applications are for already-named streets, so skip.
+        # Hold a street for whoever is actively pursuing it. The hold lapses if they
+        # do not pay, or if a month passes after payment with no decision, and then
+        # anyone may apply again. Legacy (validate-existing) applications are for
+        # already-named streets, so they skip this.
         is_legacy = str(request.data.get('is_legacy', '')).lower() in ('true', '1')
         if not is_legacy:
             try:
@@ -205,11 +190,20 @@ class ApplicationListCreateView(generics.ListCreateAPIView):
                 lng = float(request.data.get('longitude'))
             except (TypeError, ValueError):
                 lat = lng = None
-            if lat is not None and lng is not None and street_under_consideration(lat, lng):
-                return Response(
-                    {'detail': 'This street is already being considered for registration by another applicant.'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+            holder = street_holder(lat, lng) if (lat is not None and lng is not None) else None
+            if holder:
+                state = lock_state(holder)
+                if state['kind'] == 'settled':
+                    detail = 'This street has already been registered.'
+                elif state['kind'] == 'unpaid':
+                    detail = ('Another applicant is applying for this street. If they do not '
+                              'pay within 3 days of applying, it opens again.')
+                else:
+                    detail = ('Another applicant has paid for this street and it is awaiting a '
+                              'decision. It opens again one month after their payment if no '
+                              'decision has been made.')
+                return Response({'detail': detail, 'opens_at': state['expires_at']},
+                                status=status.HTTP_400_BAD_REQUEST)
         response = super().create(request, *args, **kwargs)
         # Validate-existing-registration flow: check the picked location against the
         # registry and flag the Street Naming Committee if it doesn't line up (#validate).

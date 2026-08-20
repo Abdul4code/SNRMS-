@@ -1,7 +1,9 @@
 from rest_framework import serializers
 
+from accounts.models import Role
 from accounts.serializers import UserSerializer
 from .models import Application, ApplicationStatus, StatusHistory, Ward
+from .street_locks import applications_at_location, hold_message, lock_state
 from config.models import StreetType
 
 
@@ -108,6 +110,8 @@ class ApplicationDetailSerializer(serializers.ModelSerializer):
     payments = serializers.SerializerMethodField()
     certificate_file = serializers.SerializerMethodField()
     legacy_certificate_url = serializers.SerializerMethodField()
+    street_hold = serializers.SerializerMethodField()
+    location_contention = serializers.SerializerMethodField()
 
     class Meta:
         model = Application
@@ -146,8 +150,29 @@ class ApplicationDetailSerializer(serializers.ModelSerializer):
             'status_history',
             'documents',
             'payments',
+            'street_hold',
+            'location_contention',
         ]
         read_only_fields = fields
+
+    def get_street_hold(self, obj):
+        """Whether this application still holds its street, and for how long —
+        so the applicant can be told to pay before the hold lapses."""
+        if obj.is_legacy:
+            return None
+        state = lock_state(obj)
+        if state['kind'] == 'none':
+            return None
+        return {**state, 'message': hold_message(obj, state)}
+
+    def get_location_contention(self, obj):
+        """Other applications for the same street, oldest first. Staff only — it
+        names other applicants, which one applicant may not see about another."""
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if not user or getattr(user, 'role', None) == Role.APPLICANT:
+            return None
+        return applications_at_location(obj)
 
     def get_documents(self, obj):
         docs = obj.documents.filter(is_deleted=False)
