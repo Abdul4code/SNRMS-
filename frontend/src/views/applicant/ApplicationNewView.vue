@@ -505,6 +505,12 @@ const localityMeta = ref<Record<string, { ward: string; pts: [number, number][] 
 function titleCase(s: string) {
   return s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
 }
+// Enumerator misspellings of real localities. Keyed by the raw survey value in
+// UPPERCASE; the points are folded into the correct locality so the typo never
+// shows up as its own option. "Abidjan" is a mis-typed "Abijo".
+const LOCALITY_CORRECTIONS: Record<string, string> = {
+  ABIDJAN: 'Abijo',
+}
 // Map the messy survey ward strings (e.g. "B", "Ward E", "Ibeju 1", "N/A") to the
 // canonical ward codes. Junk values return '' and are ignored in the vote.
 function normalizeWard(raw: string): string {
@@ -528,8 +534,9 @@ function normalizeWard(raw: string): string {
 function rebuildLocalityIndex() {
   const groups: Record<string, { display: string; wards: Record<string, number>; pts: [number, number][] }> = {}
   for (const p of pickPoints) {
-    const raw = (p.locality || '').trim()
+    let raw = (p.locality || '').trim()
     if (!raw) continue
+    raw = LOCALITY_CORRECTIONS[raw.toUpperCase().replace(/\s+/g, ' ')] || raw
     const key = raw.toUpperCase().replace(/\s+/g, ' ')
     if (!groups[key]) groups[key] = { display: titleCase(raw), wards: {}, pts: [] }
     groups[key].pts.push([p.lat, p.lng])
@@ -559,12 +566,38 @@ function onLocalityChange() {
   zoomToLocality()
 }
 
+// A handful of survey points carry bad GPS fixes or a mis-typed locality, and they
+// sit kilometres from the community they are filed under — fitting the map to every
+// point then zooms out to the whole state instead of the locality. Drop the strays:
+// keep the points within 3x the 90th-percentile distance from the cluster's median
+// centre (at least 800 m, so a genuinely compact locality is never cut). That is
+// conservative enough to keep >=99% of the points in every locality we have.
+function coreCluster(pts: [number, number][]): [number, number][] {
+  if (pts.length < 10) return pts
+  const median = (xs: number[]) => {
+    const v = [...xs].sort((a, b) => a - b)
+    const m = Math.floor(v.length / 2)
+    return v.length % 2 ? (v[m] as number) : (((v[m - 1] as number) + (v[m] as number)) / 2)
+  }
+  const cLat = median(pts.map(p => p[0]))
+  const cLng = median(pts.map(p => p[1]))
+  const dists = pts.map(p => Math.hypot(
+    (p[0] - cLat) * 111000,
+    (p[1] - cLng) * 111000 * Math.cos(cLat * Math.PI / 180),
+  ))
+  const sorted = [...dists].sort((a, b) => a - b)
+  const p90 = sorted[Math.floor((sorted.length - 1) * 0.9)] as number
+  const cutoff = Math.max(p90 * 3, 800)
+  const kept = pts.filter((_, i) => (dists[i] as number) <= cutoff)
+  return kept.length >= 5 ? kept : pts
+}
+
 function zoomToLocality() {
   const sel = form.value.locality
   if (!pickerMap || !sel) return
   if (!pickPoints.length) { pendingZoomLocality = sel; return }
   const meta = localityMeta.value[sel]
-  const pts = meta?.pts || []
+  const pts = coreCluster(meta?.pts || [])
   if (pts.length >= 1) {
     // Leaflet mis-measures if the container was resized/hidden — fix before fitting.
     pickerMap.invalidateSize()

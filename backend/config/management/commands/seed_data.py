@@ -4,7 +4,21 @@ from pathlib import Path
 
 from django.core.management.base import BaseCommand
 
-from config.models import BuildingSurvey, FeeComponent, FeeConfiguration, StreetType
+from config.models import BuildingSurvey, FeeComponent, FeeConfiguration, Street, StreetType
+
+
+# Enumerator misspellings of real localities, keyed by the raw survey value in
+# UPPERCASE. The survey rows are stored under the correct name so the typo never
+# reaches the locality pickers. "Abidjan" is a mis-typed "Abijo".
+LOCALITY_CORRECTIONS = {
+    'ABIDJAN': 'Abijo',
+}
+
+
+def correct_locality(raw):
+    """Return the canonical locality name for a raw survey value."""
+    name = (raw or '').strip()
+    return LOCALITY_CORRECTIONS.get(' '.join(name.upper().split()), name)
 
 
 STREET_TYPES = [
@@ -269,7 +283,7 @@ class Command(BaseCommand):
                         submission_time=submission_time,
                         enumerator_id=row.get('Enumerator_ID', '').strip(),
                         survey_date=survey_date,
-                        locality=row.get('Locality', '').strip(),
+                        locality=correct_locality(row.get('Locality', '')),
                         ward=row.get('Ward', '').strip(),
                         latitude=to_float(row.get('_location_latitude', '')),
                         longitude=to_float(row.get('_location_longitude', '')),
@@ -302,6 +316,14 @@ class Command(BaseCommand):
                     survey_created += 1
                 else:
                     survey_skipped += 1
+
+        # Rows seeded before a correction was added keep the misspelling, and the
+        # street registry copies it onto the streets it builds — fix both in place.
+        for wrong, right in LOCALITY_CORRECTIONS.items():
+            fixed = BuildingSurvey.objects.filter(locality__iexact=wrong).update(locality=right)
+            fixed += Street.objects.filter(locality__iexact=wrong).update(locality=right)
+            if fixed:
+                self.stdout.write(f'  Corrected locality {wrong} -> {right} on {fixed} record(s)')
 
         self.stdout.write(
             f'Building surveys — created: {survey_created}, skipped: {survey_skipped}\n'
