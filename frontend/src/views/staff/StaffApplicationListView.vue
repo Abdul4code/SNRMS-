@@ -105,7 +105,15 @@
                   :style="i < applications.length - 1 ? 'border-bottom: 1px solid #f8fafc' : ''"
                   class="hover:bg-slate-50/60 transition-colors">
                 <td class="px-5 py-4 font-mono text-xs text-slate-400 font-medium">{{ app.reference_number || `APP-${app.id}` }}</td>
-                <td class="px-5 py-4 font-semibold text-slate-900">{{ app.proposed_street_name }}</td>
+                <td class="px-5 py-4 font-semibold text-slate-900">
+                  {{ app.proposed_street_name }}
+                  <!-- Validating an existing street reads very differently from a
+                       brand-new name, so say which this is right in the queue. -->
+                  <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded ml-2 align-middle whitespace-nowrap"
+                        :style="app.is_legacy ? 'background:#fef3c7;color:#92400e' : 'background:#dcfce7;color:#047857'">
+                    {{ app.is_legacy ? 'Validation' : 'New' }}
+                  </span>
+                </td>
                 <td class="px-5 py-4 text-slate-500 text-sm hidden sm:table-cell">{{ app.applicant_name || '—' }}</td>
                 <td class="px-5 py-4"><StatusBadge :status="app.status" /></td>
                 <td class="px-5 py-4 text-xs text-slate-400 hidden md:table-cell">{{ formatDate(app.updated_at || app.created_at) }}</td>
@@ -158,6 +166,7 @@ interface Application {
   status: string
   created_at: string
   updated_at?: string
+  is_legacy?: boolean
 }
 
 const auth = useAuthStore()

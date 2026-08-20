@@ -444,6 +444,7 @@
                   <label class="block text-sm font-semibold text-slate-700 mb-1.5">Expiry Date <span class="text-red-500">*</span></label>
                   <input type="date" v-model="certExpiresAt" :min="minExpiryDate"
                          class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent" />
+                  <p class="mt-1 text-xs text-slate-400">Set to five years from today — the standard term. Change it only if this certificate runs for a different period.</p>
                 </div>
                 <div>
                   <label class="block text-sm font-semibold text-slate-700 mb-1.5">Custom certificate file <span class="font-normal text-slate-400">(optional)</span></label>
@@ -803,8 +804,20 @@ interface DupMatch { code: string; name: string; locality: string; distance_m: n
 const dupReport = ref<{ verdict: string; name_matches: DupMatch[] } | null>(null)
 const chairmanForm = ref({ decision: '', remarks: '' })
 const certFile = ref<File | null>(null)
-const certExpiresAt = ref('')
 const certRelease = ref(false)
+
+/** A certificate runs five years from the day it is issued. Pre-filled rather
+ *  than typed, so the standard term is what happens by default; the Chairman can
+ *  still override it for a shorter or longer one. */
+function fiveYearsFromToday() {
+  const d = new Date()
+  d.setFullYear(d.getFullYear() + 5)
+  // 29 Feb rolls into 1 Mar on a non-leap year; step back to stay in February.
+  const today = new Date()
+  if (today.getMonth() === 1 && today.getDate() === 29 && d.getMonth() === 2) d.setDate(0)
+  return d.toISOString().slice(0, 10)
+}
+const certExpiresAt = ref(fiveYearsFromToday())
 
 const minExpiryDate = computed(() => {
   const d = new Date()
@@ -939,7 +952,7 @@ async function handleIssueCertificate() {
       ? 'Certificate issued and released to the applicant.'
       : 'Certificate issued and stored. Not yet released to the applicant.'
     certFile.value = null
-    certExpiresAt.value = ''
+    certExpiresAt.value = fiveYearsFromToday()
     certRelease.value = false
     await load()
   } catch (err: unknown) {

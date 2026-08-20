@@ -92,6 +92,7 @@ class ApplicationListSerializer(serializers.ModelSerializer):
             'street_type_name',
             'applicant_name',
             'status',
+            'is_legacy',      # lets every queue show new-application vs validation
             'google_map_uploaded',
             'signpost_installed',
             'expires_at',

@@ -45,7 +45,12 @@
           <button v-for="a in apps" :key="a.id" @click="openApp(a)"
                   class="w-full text-left px-4 py-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 flex items-center justify-between">
             <span><span class="font-medium text-slate-800">{{ a.proposed_street_name }}</span>
-              <span class="text-xs text-slate-400 ml-2">{{ a.reference_number }}</span></span>
+              <span class="text-xs text-slate-400 ml-2">{{ a.reference_number }}</span>
+              <!-- Which kind of application the member is about to open -->
+              <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded ml-2 whitespace-nowrap"
+                    :style="a.is_legacy ? 'background:#fef3c7;color:#92400e' : 'background:#dcfce7;color:#047857'">
+                {{ a.is_legacy ? 'Validation' : 'New application' }}
+              </span></span>
             <span class="text-xs text-emerald-600 font-semibold">Review →</span>
           </button>
           <p v-if="apps.length === 0" class="text-sm text-slate-400 text-center py-8">No applications awaiting committee review.</p>
@@ -195,7 +200,7 @@ import ApplicationMap from '@/components/ApplicationMap.vue'
 import DocumentRepository from '@/components/DocumentRepository.vue'
 
 interface Member { number: number; name: string; is_chairman: boolean; responded?: boolean }
-interface AppRow { id: string; proposed_street_name: string; reference_number: string; locality: string }
+interface AppRow { id: string; proposed_street_name: string; reference_number: string; locality: string; is_legacy?: boolean }
 interface AppDetail { proposed_street_name: string; street_type_name?: string; ward?: string; ward_display?: string; locality?: string; location_description?: string; latitude?: number | string | null; longitude?: number | string | null; is_legacy?: boolean }
 interface DocRow { id: string; document_type: string; document_type_display?: string; title?: string; file?: string; file_url?: string }
 interface Review {

@@ -21,6 +21,22 @@ from .models import Application, ApplicationStatus
 # Helpers
 # ---------------------------------------------------------------------------
 
+CERTIFICATE_VALID_YEARS = 5
+
+
+def _five_years_from(day: datetime.date) -> datetime.date:
+    """The same calendar day five years on.
+
+    Counting 5 x 365 days loses a day to every leap year in between, which put
+    certificates a day or two short of their term. 29 February keeps the last
+    valid day of the month it lands in.
+    """
+    try:
+        return day.replace(year=day.year + CERTIFICATE_VALID_YEARS)
+    except ValueError:                    # 29 Feb -> a non-leap year
+        return day.replace(year=day.year + CERTIFICATE_VALID_YEARS, month=2, day=28)
+
+
 def _next_certificate_number() -> str:
     """Return the next CERT-YEAR-NNNNN string."""
     year = timezone.now().year
@@ -196,14 +212,15 @@ def issue_certificate(application: Application, actor, expires_at=None) -> Appli
     stage_c_confirmed → certificate_issued.
 
     Args:
-        expires_at: explicit expiry date (datetime.date). Defaults to 5 years from today.
+        expires_at: explicit expiry date (datetime.date). Defaults to five years
+            from the day of issue.
 
     Raises:
         ValueError: if the transition is not valid.
     """
     cert_number = _next_certificate_number()
     now = timezone.now()
-    expires = expires_at if expires_at else (now + datetime.timedelta(days=5 * 365)).date()
+    expires = expires_at if expires_at else _five_years_from(now.date())
 
     application.certificate_number = cert_number
     application.certificate_issued_at = now
