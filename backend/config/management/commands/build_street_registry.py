@@ -70,6 +70,37 @@ def normalize(raw: str) -> str:
     return ' '.join(tokens)
 
 
+# Some enumerators numbered their entries in the name field — "2 Akili Street
+# Awoyaya". The digit is the row number off their list, not part of the street.
+LEADING_INDEX_RE = re.compile(r'^\s*\d+\s*[.):\-]?\s+')
+
+
+def strip_leading_index(raw: str) -> str:
+    return LEADING_INDEX_RE.sub('', raw or '', count=1).strip()
+
+
+def is_real_name(raw: str) -> bool:
+    """False for the junk that lands in the street-name field: ward letters ("B"),
+    plot or meter numbers ("1", "02's", "02's Close"). Such a point is treated
+    exactly like a blank one, so it can still be rescued by the majority vote of
+    the named streets around it.
+
+    Numbered estate roads are names, not junk — "Road 2", "Road 3A" and "Road3b"
+    all survive. Only a *leading* number is read as a plot number, and only a name
+    that is nothing but a bare type word ("Close") is dropped for having no name
+    in it."""
+    toks = normalize(strip_leading_index(raw)).split()
+    if toks and toks[0].isdigit():          # "02's Close" — plot number, not a name
+        toks = toks[1:]
+        if toks[:1] == ['s']:               # the possessive left behind by "02's"
+            toks = toks[1:]
+    if not toks or ' '.join(toks) in UNNAMED_TOKENS:
+        return False
+    if not any(sum(c.isalpha() for c in t) >= 2 for t in toks):
+        return False                        # "1", "B", "02's"
+    return not all(t in TYPE_WORDS for t in toks)
+
+
 class Command(BaseCommand):
     help = 'Build the canonical Street registry from building survey data.'
 
@@ -114,8 +145,8 @@ class Command(BaseCommand):
                 if not _in_bounds(b.latitude, b.longitude):
                     continue
                 raw = (b.existing_street_name or '').strip()
-                rec = (float(b.latitude), float(b.longitude), raw, b.kobo_id)
-                if raw.lower() in UNNAMED_TOKENS:
+                rec = (float(b.latitude), float(b.longitude), strip_leading_index(raw), b.kobo_id)
+                if not is_real_name(raw):
                     blank_pts.append(rec)
                 else:
                     named_pts.append(rec)
@@ -152,15 +183,15 @@ class Command(BaseCommand):
         unnamed = 0
         for b in BuildingSurvey.objects.all():
             raw = (b.existing_street_name or '').strip()
-            if raw.lower() in UNNAMED_TOKENS:
+            if not is_real_name(raw):
                 raw = inferred.get(b.kobo_id, '')
-            if not raw or raw.lower() in UNNAMED_TOKENS:
+            if not is_real_name(raw):
                 unnamed += 1
                 continue
-            groups[normalize(raw)].append(b)
+            groups[normalize(strip_leading_index(raw))].append(b)
 
-        # Trim obvious duplications: a bare-name group (e.g. "02 s") folds into its
-        # unique typed counterpart (e.g. "02 s close"), since they are the same street.
+        # Trim obvious duplications: a bare-name group (e.g. "ogunmuda") folds into
+        # its unique typed counterpart (e.g. "ogunmuda street"), same street.
         type_set = set(TYPE_WORDS.keys())
         typed_by_base = defaultdict(list)
         for k in list(groups.keys()):
@@ -351,9 +382,9 @@ class Command(BaseCommand):
             # ignoring buildings whose name was blank/None (including any rescued by
             # the majority-vote pass) so a blank can never win the display name.
             raw_names = Counter(
-                (b.existing_street_name or '').strip()
+                strip_leading_index(b.existing_street_name or '')
                 for b in buildings
-                if (b.existing_street_name or '').strip().lower() not in UNNAMED_TOKENS
+                if is_real_name(b.existing_street_name or '')
             )
             if not raw_names:
                 # Fall back to the inferred name for a group made purely of rescued blanks.
