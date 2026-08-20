@@ -122,7 +122,7 @@
               Select Street Name <span class="text-red-500">*</span>
             </label>
             <div class="relative">
-              <select v-model="form.registry_street_id" required
+              <select v-model="form.registry_street_id" required @change="onRegistryStreetChange"
                       class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:bg-white transition-all appearance-none">
                 <option value="" disabled>Select the street from the registry</option>
                 <option v-for="s in registryStreets" :key="s.id" :value="s.id">{{ s.name }}</option>
@@ -131,7 +131,7 @@
                 <ChevronDownIcon class="w-4 h-4 text-slate-400" />
               </div>
             </div>
-            <p class="mt-1.5 text-xs text-slate-500">Choose the existing street you want to validate, then upload your documents and select its location below.</p>
+            <p class="mt-1.5 text-xs text-slate-500">Choose the existing street you want to validate. It is highlighted on the map automatically — you only need to upload your documents.</p>
             <div v-if="validateNote" class="mt-2 rounded-xl border p-3"
                  :class="validateNote.ok ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'">
               <p class="text-xs" :class="validateNote.ok ? 'text-emerald-700' : 'text-amber-700'">{{ validateNote.msg }}</p>
@@ -200,27 +200,35 @@
             <!-- Map street picker -->
             <div class="rounded-xl overflow-hidden border border-slate-200">
               <div class="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                <p class="text-xs text-slate-600 font-medium">Click the street you want to name on the map</p>
-                <button type="button" @click="locateMe"
+                <p class="text-xs font-medium" :class="streetLocked ? 'text-emerald-700' : 'text-slate-600'">
+                  <template v-if="streetLocked">🔒 Selected street — set from the registry</template>
+                  <template v-else-if="isLegacy">Click the location of the street you selected above</template>
+                  <template v-else>Click the street you want to name on the map</template>
+                </p>
+                <button type="button" v-if="!streetLocked" @click="locateMe"
                         class="text-xs font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1">
                   <MapPinIcon class="w-3.5 h-3.5" /> Use my location
                 </button>
               </div>
-              <div ref="pickerMapEl" class="h-[320px] w-full" style="background:#eef2f7"></div>
+              <div ref="pickerMapEl" class="h-[320px] w-full"
+                   :class="streetLocked ? 'cursor-not-allowed' : ''" style="background:#eef2f7"></div>
               <div class="flex items-center gap-4 px-4 py-2 text-[11px] border-t border-slate-100 text-slate-500">
-                <span>Zoom in and click the exact location of your street.</span>
+                <span v-if="streetLocked">The location of this street is fixed by the registry and cannot be changed.</span>
+                <span v-else>Zoom in and click the exact location of your street.</span>
                 <span v-if="pickerLoading" class="text-slate-400 ml-auto">Loading…</span>
               </div>
             </div>
 
             <!-- Recognition result -->
             <div v-if="geoState === 'success' && recognized" class="mt-3 rounded-xl p-3"
-                 :style="recognized.is_named ? 'background:#fef3c7' : 'background:rgba(5,150,105,0.06)'">
-              <p class="text-sm font-bold" :style="recognized.is_named ? 'color:#b45309' : 'color:#047857'">
-                {{ recognized.is_named ? '⚠ This street is already named' : '✓ Unnamed street selected' }}
+                 :style="(recognized.is_named && !streetLocked) ? 'background:#fef3c7' : 'background:rgba(5,150,105,0.06)'">
+              <p class="text-sm font-bold" :style="(recognized.is_named && !streetLocked) ? 'color:#b45309' : 'color:#047857'">
+                <template v-if="streetLocked">✓ Validating {{ selectedRegistryStreet?.name }}</template>
+                <template v-else>{{ recognized.is_named ? '⚠ This street is already named' : '✓ Unnamed street selected' }}</template>
               </p>
-              <p class="text-xs mt-0.5" :style="recognized.is_named ? 'color:#92400e' : 'color:#065f46'">
-                <template v-if="recognized.is_named">This location is on <strong>{{ recognized.name }}</strong>, which already has a name. Applications are for streets that are not yet named — please pick an amber (unnamed) street.</template>
+              <p class="text-xs mt-0.5" :style="(recognized.is_named && !streetLocked) ? 'color:#92400e' : 'color:#065f46'">
+                <template v-if="streetLocked">This is the street's own location, taken from the registry. Use the picture below to confirm it.</template>
+                <template v-else-if="recognized.is_named">This location is on <strong>{{ recognized.name }}</strong>, which already has a name. Applications are for streets that are not yet named — please pick an amber (unnamed) street.</template>
                 <template v-else>You've selected an unnamed street<template v-if="recognized.locality"> in {{ recognized.locality }}</template>. Give it a name below.</template>
               </p>
               <!-- Item 1: street already being pursued by another applicant -->
@@ -282,7 +290,7 @@
                 </div>
               </div>
             </div>
-            <div v-else class="mt-2 text-xs text-slate-400">Tap a point on the map to select the street's location.</div>
+            <div v-else-if="!streetLocked" class="mt-2 text-xs text-slate-400">Tap a point on the map to select the street's location.</div>
           </div>
 
           <!-- Validate mode: upload the existing document -->
@@ -312,7 +320,7 @@
           <div class="flex items-center gap-3 pt-1">
             <button type="submit"
                     :disabled="submitting || !form.locality || !form.ward || geoState !== 'success'
-                      || (isLegacy ? (!form.registry_street_id || !legacyCertFile)
+                      || (isLegacy ? (!form.registry_street_id || !legacyCertFile || wrongStreet)
                                    : (!form.proposed_street_name || !form.street_type || dup?.verdict === 'duplicate' || !!dup?.rename_blocked || !!streetTaken))"
                     class="flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold text-white transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
                     style="background: linear-gradient(135deg, #059669, #047857); box-shadow: 0 4px 16px rgba(5,150,105,0.3)">
@@ -372,28 +380,101 @@ const router = useRouter()
 const form = ref({ proposed_street_name: '', street_type: '', ward: '', locality: '', location_description: '', registry_street_id: '' })
 const registryStreets = ref<{ id: string; name: string; latitude?: number | string | null; longitude?: number | string | null }[]>([])
 const validateNote = ref<{ ok: boolean; msg: string } | null>(null)
+// Validate mode only. When the street chosen in the dropdown has a known location
+// the map is LOCKED to it: the location is auto-picked, the street is highlighted,
+// and clicks are ignored so nobody can validate one name against another street.
+const streetLocked = ref(false)
+const selectedRegistryStreet = computed(() =>
+  registryStreets.value.find(s => String(s.id) === String(form.value.registry_street_id)) || null)
+// Set when a hand-picked location sits on a DIFFERENT named street — blocks submit.
+const wrongStreet = ref(false)
+let streetPendingId = ''            // chosen before the map finished loading
+
+const normName = (x: string) => (x || '').trim().toLowerCase().replace(/\s+/g, ' ')
+
+/** Width of a point set in metres, along its widest axis. */
+function spanMetres(pts: [number, number][]): number {
+  const lats = pts.map(p => p[0]), lngs = pts.map(p => p[1])
+  const dLat = (Math.max(...lats) - Math.min(...lats)) * 111000
+  const dLng = (Math.max(...lngs) - Math.min(...lngs)) * 111000 * Math.cos((lats[0] as number) * Math.PI / 180)
+  return Math.max(dLat, dLng)
+}
+
+/** Survey points that belong to the named street, matched by name. */
+function pointsForStreet(name: string): [number, number][] {
+  const want = normName(name)
+  if (!want) return []
+  return pickPoints
+    .filter(p => p.is_named && normName(p.existing_street_name || p.street_name) === want)
+    .map(p => [p.lat, p.lng] as [number, number])
+}
 
 function checkValidateMatch() {
-  if (!isLegacy.value) { validateNote.value = null; return }
+  if (!isLegacy.value) { validateNote.value = null; wrongStreet.value = false; return }
+  if (streetLocked.value) return          // the location came from the registry itself
   const sid = form.value.registry_street_id
   const lat = parseFloat(geoCoords.value.lat), lng = parseFloat(geoCoords.value.lng)
-  if (!sid || Number.isNaN(lat) || Number.isNaN(lng)) { validateNote.value = null; return }
+  if (!sid || Number.isNaN(lat) || Number.isNaN(lng)) { wrongStreet.value = false; return }
   const selected = registryStreets.value.find(s => String(s.id) === String(sid))
-  if (!selected) { validateNote.value = null; return }
+  if (!selected) { validateNote.value = null; wrongStreet.value = false; return }
   let nearest: PickPoint | null = null, best = Infinity
   for (const p of pickPoints) {
     if (!p.is_named) continue
     const d = Math.hypot((p.lat - lat) * 111000, (p.lng - lng) * 111000 * Math.cos(lat * Math.PI / 180))
     if (d < best) { best = d; nearest = p }
   }
-  const norm = (x: string) => (x || '').trim().toLowerCase().replace(/\s+/g, ' ')
   if (!nearest || best > 60) {
+    // Nothing named nearby: this is an old-register street the survey never saw.
+    // Allowed, but flagged — it is the only way to give these streets a location.
+    wrongStreet.value = false
     validateNote.value = { ok: false, msg: 'The street selected for validation does not match any initially named street. It will be flagged to the Street Naming Committee Chairman as probably part of the old record.' }
-  } else if (norm(nearest.street_name || nearest.existing_street_name) !== norm(selected.name)) {
-    validateNote.value = { ok: false, msg: 'The name you wish to validate does not match the name already in the database at this location.' }
+  } else if (normName(nearest.street_name || nearest.existing_street_name) !== normName(selected.name)) {
+    // Pointing at someone else's street — refuse it outright.
+    wrongStreet.value = true
+    validateNote.value = { ok: false, msg: `That location is on ${nearest.street_name || nearest.existing_street_name}, not ${selected.name}. You can only validate the street you selected — choose its own location, or pick the right street from the list.` }
   } else {
+    wrongStreet.value = false
     validateNote.value = { ok: true, msg: '\u2713 This location matches the selected street in the registry.' }
   }
+}
+
+/** Dropdown changed in validate mode: auto-pick and highlight that street. */
+function onRegistryStreetChange() {
+  wrongStreet.value = false
+  streetLocked.value = false
+  clearStreetHighlight()
+  clearPickedLocation()          // never carry the previous street's location over
+  const selected = registryStreets.value.find(s => String(s.id) === String(form.value.registry_street_id))
+  if (!selected) { validateNote.value = null; return }
+  if (pickerLoading.value) { streetPendingId = String(selected.id); return }
+
+  // Prefer the surveyed extent of the street; fall back to its registry centroid.
+  // coreCluster drops bad GPS fixes — on a locked map a centroid dragged
+  // kilometres off by one stray point is not something the applicant can correct.
+  let pts = coreCluster(pointsForStreet(selected.name))
+  if (!pts.length) {
+    const la = Number(selected.latitude), ln = Number(selected.longitude)
+    if (Number.isFinite(la) && Number.isFinite(ln) && inBounds(la, ln)) pts = [[la, ln]]
+  }
+  // A handful of points scattered over kilometres is a conflict in the survey, not
+  // a long road: the centroid would sit where the street isn't, and a locked map
+  // gives the applicant no way to correct it. Long roads with many points are fine.
+  if (pts.length >= 1 && pts.length < 5 && spanMetres(pts) > 1500) pts = []
+
+  if (!pts.length) {
+    // Digitised old-register streets carry no coordinates at all. Nothing to lock
+    // onto, so the applicant marks it — checkValidateMatch still refuses a spot
+    // that belongs to another named street.
+    validateNote.value = { ok: false, msg: `${selected.name} has no reliable location on record yet. Click its location on the map — you cannot select a spot that belongs to a different named street.` }
+    return
+  }
+
+  const cLat = pts.reduce((a, p) => a + p[0], 0) / pts.length
+  const cLng = pts.reduce((a, p) => a + p[1], 0) / pts.length
+  streetLocked.value = true
+  selectAt(cLat, cLng)                       // fills geoCoords / geoState / description
+  drawStreetHighlight(pts, selected.name)
+  validateNote.value = { ok: true, msg: `\u2713 ${selected.name} is selected and highlighted on the map. Its location comes from the registry, so it cannot be changed.` }
 }
 const streetTypes = ref<StreetType[]>([])
 const streetTypesLoading = ref(false)
@@ -559,6 +640,10 @@ function rebuildLocalityIndex() {
 
 function onLocalityChange() {
   const meta = localityMeta.value[form.value.locality]
+  if (streetLocked.value) {           // keep the map framed on the locked street
+    if (meta && meta.ward) { form.value.ward = meta.ward; wardAutoSet.value = true }
+    return
+  }
   // Prefer the ward derived from the locality's points; if none could be derived,
   // keep whatever the applicant already chose so they can set it manually.
   if (meta && meta.ward) { form.value.ward = meta.ward; wardAutoSet.value = true }
@@ -615,7 +700,50 @@ let pickerMap: L.Map | null = null
 let streetLabelLayer: L.LayerGroup | null = null
 let pendingZoomLocality = ""
 let clickMarker: L.CircleMarker | null = null
+let streetHighlightLayer: L.LayerGroup | null = null
 const pickPoints: PickPoint[] = []
+
+function clearStreetHighlight() {
+  if (streetHighlightLayer) { streetHighlightLayer.remove(); streetHighlightLayer = null }
+}
+
+/** Drop a previously picked location, so switching streets can never carry the
+ *  old street's coordinates onto the new one. */
+function clearPickedLocation() {
+  if (clickMarker) { clickMarker.remove(); clickMarker = null }
+  geoCoords.value = { lat: '', lng: '', accuracy: '' }
+  geoState.value = 'idle'
+  recognized.value = null
+  form.value.location_description = ''
+  if (pictureMap) { pictureMap.remove(); pictureMap = null }
+  showPicture.value = false
+  streetViewSrc.value = ''
+}
+
+/** Paint the selected registry street on the map and frame it. */
+function drawStreetHighlight(pts: [number, number][], name: string) {
+  if (!pickerMap) return
+  clearStreetHighlight()
+  streetHighlightLayer = L.layerGroup().addTo(pickerMap)
+  for (const [lat, lng] of pts) {
+    L.circleMarker([lat, lng], {
+      radius: 7, color: '#047857', weight: 2, fillColor: '#34d399', fillOpacity: 0.85, interactive: false,
+    }).addTo(streetHighlightLayer)
+  }
+  const cLat = pts.reduce((a, p) => a + p[0], 0) / pts.length
+  const cLng = pts.reduce((a, p) => a + p[1], 0) / pts.length
+  L.marker([cLat, cLng], {
+    interactive: false,
+    icon: L.divIcon({
+      className: 'street-name-label',
+      html: `<span style="background:#047857;color:#fff;border-radius:4px;padding:2px 7px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.25)">${name.replace(/</g, '')}</span>`,
+      iconSize: [0, 0],
+    }),
+  }).addTo(streetHighlightLayer)
+  pickerMap.invalidateSize()
+  if (pts.length === 1) pickerMap.setView(pts[0] as L.LatLngTuple, 17)
+  else pickerMap.fitBounds(L.latLngBounds(pts).pad(0.4), { maxZoom: 17 })
+}
 
 function inBounds(lat: number, lng: number) {
   return lat >= 6.2 && lat <= 6.85 && lng >= 3.4 && lng <= 4.5
@@ -672,6 +800,7 @@ function selectAt(lat: number, lng: number) {
 }
 
 function locateMe() {
+  if (streetLocked.value) return
   if (!('geolocation' in navigator)) return
   navigator.geolocation.getCurrentPosition((pos) => {
     const lat = pos.coords.latitude, lng = pos.coords.longitude
@@ -686,7 +815,11 @@ async function initPicker() {
   pickerMap = L.map(pickerMapEl.value, { preferCanvas: true, scrollWheelZoom: true })
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(pickerMap)
   pickerMap.setView([6.465, 3.72], 13)
-  pickerMap.on('click', (e: L.LeafletMouseEvent) => selectAt(e.latlng.lat, e.latlng.lng))
+  pickerMap.on('click', (e: L.LeafletMouseEvent) => {
+    // Validate mode with a registry location: the street is fixed, ignore clicks.
+    if (streetLocked.value) return
+    selectAt(e.latlng.lat, e.latlng.lng)
+  })
   streetLabelLayer = L.layerGroup().addTo(pickerMap)
   pickerMap.on('zoomend moveend', refreshStreetLabels)
   try {
@@ -708,6 +841,8 @@ async function initPicker() {
     refreshStreetLabels()
     // If a locality was chosen before points finished loading, zoom now.
     if (pendingZoomLocality || form.value.locality) { pendingZoomLocality = ''; zoomToLocality() }
+    // A street chosen while the map was still loading can now be located.
+    if (streetPendingId) { streetPendingId = ''; onRegistryStreetChange() }
   }
 }
 
@@ -847,6 +982,10 @@ watch(() => route.fullPath, async () => {
   recognized.value = null
   streetTaken.value = ''
   validateNote.value = null
+  streetLocked.value = false
+  wrongStreet.value = false
+  streetPendingId = ''
+  clearStreetHighlight()
   streetViewSrc.value = ''
   if (pictureMap) { pictureMap.remove(); pictureMap = null }
   showPicture.value = false
