@@ -102,7 +102,7 @@
 
             <p class="text-xs font-semibold text-slate-600 mb-1.5">Uploaded documents</p>
             <ul v-if="docs.length || review?.legacy_certificate" class="space-y-1.5 mb-3">
-              <li v-for="d in docs" :key="d.id" class="flex items-center justify-between text-sm">
+              <li v-for="d in docs" :key="d?.id" class="flex items-center justify-between text-sm">
                 <span class="text-slate-600">{{ d.title || d.document_type_display || d.document_type }}</span>
                 <a v-if="d.file_url || d.file" :href="d.file_url || d.file" target="_blank"
                    class="text-xs font-semibold text-emerald-600 hover:text-emerald-700">View</a>
@@ -259,8 +259,15 @@ async function openApp(a: AppRow) {
 }
 async function loadDocs() {
   if (!activeApp.value) return
-  try { docs.value = (await documentApi.list(activeApp.value.id)).data as DocRow[] }
-  catch { docs.value = [] }
+  try {
+    // The endpoint answers with a paginated envelope, not a bare array. Assigning
+    // the envelope made the list below iterate its VALUES — count, next, previous,
+    // results — and reading .id off `next: null` threw inside the render function,
+    // blanking the whole review panel. It only ever showed on validate
+    // applications, because those are the only ones that render this list.
+    const { data } = await documentApi.list(activeApp.value.id)
+    docs.value = (Array.isArray(data) ? data : data.results ?? []) as DocRow[]
+  } catch { docs.value = [] }
 }
 async function markViewed() {
   if (!activeApp.value) return
