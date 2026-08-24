@@ -231,6 +231,7 @@ class ApplicationCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         from config.models import StreetType
+        from .wards import resolve_ward
         request = self.context.get('request')
         validated_data['applicant'] = request.user
         # Validate-existing-registration flow may not carry a street type — default it.
@@ -239,6 +240,14 @@ class ApplicationCreateSerializer(serializers.ModelSerializer):
                 StreetType.objects.filter(name__iexact='Street').first()
                 or StreetType.objects.first()
             )
+        # The applicant is no longer asked for a ward — a locality sits in one ward,
+        # so it is derived here rather than taken on trust from the form.
+        validated_data['ward'] = resolve_ward(
+            validated_data.get('locality'),
+            validated_data.get('latitude'),
+            validated_data.get('longitude'),
+            fallback=validated_data.get('ward', ''),
+        )
         return Application.objects.create(**validated_data)
 
 

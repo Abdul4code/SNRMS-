@@ -18,6 +18,16 @@
           <label class="block text-xs font-semibold text-slate-600 mb-1">To</label>
           <input v-model="to" type="date" class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm" />
         </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Category</label>
+          <select v-model="category" @change="run"
+                  class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+            <option value="">All categories</option>
+            <option value="new_street">New street names</option>
+            <option value="validation">Validations</option>
+            <option value="renewal">Renewals</option>
+          </select>
+        </div>
         <button @click="run" :disabled="loading" class="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" style="background:#059669">
           {{ loading ? 'Running…' : 'Run report' }}
         </button>
@@ -52,10 +62,20 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div class="rounded-2xl bg-white border border-slate-200 p-5">
-            <p class="text-sm font-bold text-slate-900 mb-3">Revenue by category</p>
-            <div v-for="(v, k) in data.payments_by_category" :key="k" class="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
-              <span class="text-sm text-slate-600">{{ STAGE_LABELS[k] || k }}</span>
-              <span class="text-sm font-semibold text-slate-800">₦{{ v.total.toLocaleString() }} <span class="text-xs text-slate-400">({{ v.count }})</span></span>
+            <p class="text-sm font-bold text-slate-900 mb-1">Revenue by category</p>
+            <p class="text-xs text-slate-400 mb-3">{{ data.category_label }} — each fee inside it shown beneath.</p>
+            <div v-for="(v, k) in data.revenue_by_category" :key="k" class="py-2 border-b border-slate-50 last:border-0">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-semibold text-slate-800">{{ v.label }}</span>
+                <span class="text-sm font-bold" style="color:#059669">₦{{ v.total.toLocaleString() }}
+                  <span class="text-xs font-normal text-slate-400">({{ v.count }})</span></span>
+              </div>
+              <div v-for="(f, fk) in v.fees" :key="fk" class="flex items-center justify-between pl-4 mt-1">
+                <span class="text-xs text-slate-500">— {{ f.label }}</span>
+                <span class="text-xs text-slate-600">₦{{ f.total.toLocaleString() }}
+                  <span class="text-slate-400">({{ f.count }})</span></span>
+              </div>
+              <p v-if="!Object.keys(v.fees).length" class="text-xs text-slate-400 pl-4 mt-1">Nothing in this period.</p>
             </div>
           </div>
           <div class="rounded-2xl bg-white border border-slate-200 p-5">
@@ -75,21 +95,23 @@
 import { ref, onMounted } from 'vue'
 import api, { applicationApi } from '@/services/api'
 
-interface Cat { count: number; total: number }
+interface Fee { label: string; count: number; total: number }
+interface Cat { label: string; count: number; total: number; fees: Record<string, Fee> }
 interface Audit {
   total_applications: number; certificates_issued: number; payments_confirmed_count: number
-  total_revenue: number; payments_by_category: Record<string, Cat>; applications_by_status: Record<string, number>
+  total_revenue: number; category: string; category_label: string
+  revenue_by_category: Record<string, Cat>; applications_by_status: Record<string, number>
 }
-const STAGE_LABELS: Record<string, string> = { stage_a: 'Application Fee', stage_c: 'Certificate Fee', renewal: 'Renewal Fee' }
 const from = ref('')
 const to = ref('')
+const category = ref('')
 const data = ref<Audit | null>(null)
 const loading = ref(false)
 const downloading = ref(false)
 async function downloadReport() {
   downloading.value = true
   try {
-    const res = await api.get('/applications/audit/report/', { params: { from: from.value, to: to.value }, responseType: 'blob' })
+    const res = await api.get('/applications/audit/report/', { params: { from: from.value, to: to.value, category: category.value }, responseType: 'blob' })
     const url = URL.createObjectURL(res.data as Blob)
     const a = document.createElement('a'); a.href = url; a.download = `audit_${from.value}_${to.value}.pdf`; a.click()
     URL.revokeObjectURL(url)
@@ -105,7 +127,7 @@ function preset(kind: 'month' | 'year') {
 }
 async function run() {
   loading.value = true
-  try { data.value = (await applicationApi.audit({ from: from.value, to: to.value })).data }
+  try { data.value = (await applicationApi.audit({ from: from.value, to: to.value, category: category.value })).data }
   finally { loading.value = false }
 }
 onMounted(() => preset('month'))

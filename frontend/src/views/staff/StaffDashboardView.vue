@@ -93,6 +93,50 @@
         </div>
       </div>
 
+      <!-- What each kind of work brought in — the Chairman's at-a-glance view.
+           The cards above are by fee; this is by the work the fee paid for. -->
+      <div v-if="auth.isChairman" class="rounded-2xl overflow-hidden"
+           style="background:#fff; border:1px solid #e2e8f0; box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+        <div class="px-6 py-5 flex flex-wrap items-center gap-3" style="border-bottom:1px solid #f1f5f9">
+          <div>
+            <h2 class="text-sm font-bold text-slate-900">Revenue by category</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Confirmed payments this year, by the kind of work.</p>
+          </div>
+          <select v-model="revenueCategory" @change="loadRevenue"
+                  class="ml-auto rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold">
+            <option value="">All categories</option>
+            <option value="new_street">New street names</option>
+            <option value="validation">Validations</option>
+            <option value="renewal">Renewals</option>
+          </select>
+          <RouterLink to="/admin/audit" class="text-xs font-semibold text-emerald-600 hover:text-emerald-700">
+            Full audit →
+          </RouterLink>
+        </div>
+        <div class="px-6 py-5">
+          <p v-if="revenueLoading" class="text-sm text-slate-400">Loading…</p>
+          <template v-else-if="revenue">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div v-for="(v, k) in revenue.revenue_by_category" :key="k"
+                   class="rounded-xl p-4" style="background:#f8fafc; border:1px solid #eef2f7">
+                <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">{{ v.label }}</p>
+                <p class="text-xl font-bold tracking-tight mt-1" style="color:#059669">{{ formatAmount(v.total) }}</p>
+                <p class="text-[11px] text-slate-400 mt-0.5">{{ v.count }} payment{{ v.count !== 1 ? 's' : '' }}</p>
+                <div v-for="(f, fk) in v.fees" :key="fk" class="flex justify-between mt-1.5 text-[11px]">
+                  <span class="text-slate-500">{{ f.label }}</span>
+                  <span class="text-slate-600 font-medium">{{ formatAmount(f.total) }}</span>
+                </div>
+              </div>
+            </div>
+            <p class="text-xs text-slate-500 mt-4">
+              Total <span class="font-bold text-slate-800">{{ formatAmount(revenue.total_revenue) }}</span>
+              across {{ revenue.payments_confirmed_count }} confirmed payment{{ revenue.payments_confirmed_count !== 1 ? 's' : '' }}.
+            </p>
+          </template>
+          <p v-else class="text-sm text-slate-400">No revenue recorded yet.</p>
+        </div>
+      </div>
+
       <!-- Pending actions card -->
       <div class="rounded-2xl overflow-hidden"
            style="background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06)">
@@ -496,9 +540,34 @@ async function loadRoleStats() {
   await Promise.all(queries)
 }
 
+// --- Revenue by category (Chairman) ---
+interface RevFee { label: string; count: number; total: number }
+interface RevCat { label: string; count: number; total: number; fees: Record<string, RevFee> }
+const revenue = ref<{
+  total_revenue: number; payments_confirmed_count: number
+  revenue_by_category: Record<string, RevCat>
+} | null>(null)
+const revenueCategory = ref('')
+const revenueLoading = ref(false)
+
+async function loadRevenue() {
+  if (!auth.isChairman) return
+  revenueLoading.value = true
+  try {
+    const year = new Date().getFullYear()
+    const { data } = await applicationApi.audit({
+      from: `${year}-01-01`,
+      to: new Date().toISOString().slice(0, 10),
+      category: revenueCategory.value,
+    })
+    revenue.value = data
+  } catch { revenue.value = null } finally { revenueLoading.value = false }
+}
+
 onMounted(async () => {
   loadingApps.value = true
   configApi.getStreetSummary().then(r => { registrySummary.value = r.data }).catch(() => {})
+  loadRevenue()
   try {
     const role = auth.user?.role ?? ''
     const myPendingStatuses = ROLE_PENDING_STATUSES[role] ?? []

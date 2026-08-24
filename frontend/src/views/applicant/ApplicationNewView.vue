@@ -55,21 +55,16 @@
             <p class="mt-1.5 text-xs text-slate-500">Selecting your locality zooms the map to it and sets the ward automatically.</p>
           </div>
 
-          <!-- Ward -->
-          <div>
-            <label class="block text-sm font-semibold text-slate-700 mb-1.5">
-              Ward <span class="text-red-500">*</span>
-            </label>
-            <div class="relative">
-              <select v-model="form.ward" required
-                      class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 pr-10 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:bg-white transition-all appearance-none">
-                <option value="" disabled>Select the ward</option>
-                <option v-for="(label, code) in WARD_LABELS" :key="code" :value="code">{{ label }}</option>
-              </select>
-              <ChevronDownIcon class="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <!-- Ward — derived from the locality, never asked for. A locality sits in
+               exactly one ward, so asking invites the two answers to disagree. -->
+          <div v-if="form.locality">
+            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Ward</label>
+            <div class="rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm flex items-center gap-2">
+              <span v-if="form.ward" class="text-slate-800 font-medium">{{ WARD_LABELS[form.ward] }}</span>
+              <span v-else class="text-slate-500">Will be set from the location you pick on the map.</span>
             </div>
-            <p class="mt-1.5 text-xs" :class="wardAutoSet ? 'text-emerald-600' : 'text-slate-500'">
-              {{ wardAutoSet ? '✓ Ward set automatically from your locality — change it if needed.' : 'Set automatically from your locality; you can also choose it here.' }}
+            <p class="mt-1.5 text-xs text-slate-500">
+              Determined by your locality — the council assigns wards, so there is nothing to choose.
             </p>
           </div>
 
@@ -124,14 +119,29 @@
             <div class="relative">
               <select v-model="form.registry_street_id" required @change="onRegistryStreetChange"
                       class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent focus:bg-white transition-all appearance-none">
-                <option value="" disabled>Select the street from the registry</option>
-                <option v-for="s in registryStreets" :key="s.id" :value="s.id">{{ s.name }}</option>
+                <option value="" disabled>
+                  {{ form.locality ? 'Select the street from the registry' : 'Choose your locality first' }}
+                </option>
+                <optgroup v-if="streetsInLocality.length" :label="`Streets in ${form.locality}`">
+                  <option v-for="s in streetsInLocality" :key="s.id" :value="s.id">{{ s.name }}</option>
+                </optgroup>
+                <optgroup v-if="streetsWithoutLocality.length" label="Locality not recorded — check this is your street">
+                  <option v-for="s in streetsWithoutLocality" :key="s.id" :value="s.id">{{ s.name }}</option>
+                </optgroup>
               </select>
               <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
                 <ChevronDownIcon class="w-4 h-4 text-slate-400" />
               </div>
             </div>
-            <p class="mt-1.5 text-xs text-slate-500">Choose the existing street you want to validate. It is highlighted on the map automatically — you only need to upload your documents.</p>
+            <p class="mt-1.5 text-xs text-slate-500">
+              <template v-if="form.locality">Only streets in {{ form.locality }} are listed. The one you choose is highlighted on the map automatically.</template>
+              <template v-else>Choose your locality above and this list will narrow to the streets in it.</template>
+            </p>
+            <p v-if="form.locality && !streetsInLocality.length && streetsWithoutLocality.length"
+               class="mt-1 text-xs text-amber-700">
+              No street in {{ form.locality }} has been recorded yet. The streets below are from the old
+              register, which does not record a locality — pick yours only if you are sure it is the one.
+            </p>
             <div v-if="validateNote" class="mt-2 rounded-xl border p-3"
                  :class="validateNote.ok ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'">
               <p class="text-xs" :class="validateNote.ok ? 'text-emerald-700' : 'text-amber-700'">{{ validateNote.msg }}</p>
@@ -272,7 +282,7 @@
           <!-- Actions -->
           <div class="flex items-center gap-3 pt-1">
             <button type="submit"
-                    :disabled="submitting || !form.locality || !form.ward || geoState !== 'success'
+                    :disabled="submitting || !form.locality || geoState !== 'success'
                       || (isLegacy ? (!form.registry_street_id || !legacyCertFile || wrongStreet)
                                    : (!form.proposed_street_name || !form.street_type || dup?.verdict === 'duplicate' || !!dup?.rename_blocked || !!streetTaken))"
                     class="flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold text-white transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
@@ -332,7 +342,35 @@ interface StreetType { id: number; name: string }
 
 const router = useRouter()
 const form = ref({ proposed_street_name: '', street_type: '', ward: '', locality: '', location_description: '', registry_street_id: '' })
-const registryStreets = ref<{ id: string; name: string; latitude?: number | string | null; longitude?: number | string | null }[]>([])
+interface RegistryStreet {
+  id: string
+  name: string
+  locality?: string
+  latitude?: number | string | null
+  longitude?: number | string | null
+  geometry?: string | null
+}
+const registryStreets = ref<RegistryStreet[]>([])
+
+// Validation is for a street the applicant already has papers for, so the list is
+// narrowed to their locality — picking a same-named street in another town is the
+// mistake this prevents. Streets carried over from the old register have no
+// locality recorded at all; those are offered separately rather than hidden,
+// because they are the ones most often validated.
+const sameLocality = (a?: string | null, b?: string | null) => {
+  const norm = (x?: string | null) => (x || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  const x = norm(a), y = norm(b)
+  return !!x && !!y && (x === y || x.startsWith(y + ' ') || y.startsWith(x + ' '))
+}
+const streetsInLocality = computed(() =>
+  form.value.locality
+    ? registryStreets.value.filter(s => sameLocality(s.locality, form.value.locality))
+    : [])
+const streetsWithoutLocality = computed(() =>
+  form.value.locality
+    ? registryStreets.value.filter(s => !(s.locality || '').trim())
+    : [])
+const selectableStreets = computed(() => [...streetsInLocality.value, ...streetsWithoutLocality.value])
 const validateNote = ref<{ ok: boolean; msg: string } | null>(null)
 // Validate mode only. When the street chosen in the dropdown has a known location
 // the map is LOCKED to it: the location is auto-picked, the street is highlighted,
@@ -555,16 +593,45 @@ function rebuildLocalityIndex() {
   localityMeta.value = meta
 }
 
-function onLocalityChange() {
-  const meta = localityMeta.value[form.value.locality]
-  if (streetLocked.value) {           // keep the map framed on the locked street
-    if (meta && meta.ward) { form.value.ward = meta.ward; wardAutoSet.value = true }
-    return
+/** The ward for a locality. The council's own community list is the authority;
+ *  the surveyed buildings cover estates and layouts that are not on it. The
+ *  server derives this again on submit, so a stale value here cannot be stored. */
+function wardForLocality(locality: string): string {
+  if (!locality) return ''
+  const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  const want = norm(locality)
+  const official = localityWards.value
+  for (const name of Object.keys(official)) {
+    if (norm(name) === want) return official[name] as string
   }
-  // Prefer the ward derived from the locality's points; if none could be derived,
-  // keep whatever the applicant already chose so they can set it manually.
-  if (meta && meta.ward) { form.value.ward = meta.ward; wardAutoSet.value = true }
-  else { wardAutoSet.value = false }
+  // "Abijo GRA", "Awoyaya Town" — an official community with a qualifier attached.
+  const words = new Set(want.split(' '))
+  let best = '', bestLen = 0
+  for (const name of Object.keys(official)) {
+    const parts = norm(name).split(' ')
+    if (parts.every(p => words.has(p)) && norm(name).length > bestLen) {
+      best = official[name] as string; bestLen = norm(name).length
+    }
+  }
+  if (best) return best
+  return localityMeta.value[locality]?.ward || ''
+}
+
+function applyWardFromLocality() {
+  const ward = wardForLocality(form.value.locality)
+  if (ward) { form.value.ward = ward; wardAutoSet.value = true }
+  else { wardAutoSet.value = false }   // the map click will settle it
+}
+
+function onLocalityChange() {
+  applyWardFromLocality()
+  // A street chosen under the previous locality may not be on offer any more.
+  if (form.value.registry_street_id
+      && !selectableStreets.value.some(s => String(s.id) === String(form.value.registry_street_id))) {
+    form.value.registry_street_id = ''
+    onRegistryStreetChange()
+  }
+  if (streetLocked.value) return       // keep the map framed on the locked street
   zoomToLocality()
 }
 
@@ -704,7 +771,16 @@ function selectAt(lat: number, lng: number) {
       photo_url: near.pt.photo_url || '',
     }
     // Auto-fill locality if empty.
-    if (!form.value.locality && near.pt.locality) form.value.locality = near.pt.locality
+    if (!form.value.locality && near.pt.locality) {
+      form.value.locality = near.pt.locality
+      applyWardFromLocality()
+    }
+    // Last resort for a locality the council's list does not carry: the ward the
+    // enumerator recorded for the nearest surveyed building.
+    if (!form.value.ward) {
+      const w = normalizeWard(near.pt.ward || '')
+      if (w) { form.value.ward = w; wardAutoSet.value = true }
+    }
   } else {
     recognized.value = { is_named: false, name: '', locality: '', photo_url: '' }
   }

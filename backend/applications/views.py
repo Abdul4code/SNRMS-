@@ -1193,32 +1193,45 @@ class ChairmanAuditView(APIView):
         start = timezone.make_aware(_dt.datetime.combine(d_from, _dt.time.min))
         end = timezone.make_aware(_dt.datetime.combine(d_to, _dt.time.max))
 
+        # The Chairman can look at one kind of work at a time: new street names,
+        # validations of existing streets, or renewals.
+        from .revenue import (CATEGORIES, CATEGORY_LABELS, applications_in_category,
+                              revenue_breakdown, revenue_by_stage)
+        category = request.query_params.get('category') or ''
+        category = category if category in CATEGORIES else ''
+
         apps = Application.objects.filter(created_at__range=(start, end), is_deleted=False)
+        if category:
+            apps = applications_in_category(apps, category)
         by_status = {row['status']: row['n'] for row in apps.values('status').annotate(n=Count('id'))}
 
         # Certificates ISSUED within the period (by the actual issuance date, not by
         # when the application was created) — anything issued outside the dates is ignored.
         from applications.models import StatusHistory
-        certificates_issued = StatusHistory.objects.filter(
+        issued_q = StatusHistory.objects.filter(
             to_status='certificate_issued', created_at__range=(start, end),
             application__is_deleted=False,
-        ).values('application').distinct().count()
+        )
+        if category:
+            issued_q = issued_q.filter(
+                application__in=applications_in_category(
+                    Application.objects.filter(is_deleted=False), category))
+        certificates_issued = issued_q.values('application').distinct().count()
 
-        pays = Payment.objects.filter(status=PaymentStatus.CONFIRMED, confirmed_at__range=(start, end))
-        by_stage = {}
-        for stage in ('stage_a', 'stage_c', 'renewal'):
-            agg = pays.filter(stage=stage).aggregate(n=Count('id'), total=Sum('amount_submitted'))
-            by_stage[stage] = {'count': agg['n'] or 0, 'total': float(agg['total'] or 0)}
-        grand_total = sum(v['total'] for v in by_stage.values())
+        breakdown = revenue_breakdown(start, end, category or None)
 
         return Response({
             'from': d_from, 'to': d_to,
+            'category': category,
+            'category_label': CATEGORY_LABELS.get(category, 'All categories'),
+            'category_options': [{'value': c, 'label': CATEGORY_LABELS[c]} for c in CATEGORIES],
             'total_applications': apps.count(),
             'applications_by_status': by_status,
             'certificates_issued': certificates_issued,
-            'payments_by_category': by_stage,
-            'total_revenue': grand_total,
-            'payments_confirmed_count': pays.count(),
+            'revenue_by_category': breakdown['categories'],
+            'payments_by_fee': revenue_by_stage(start, end),
+            'total_revenue': breakdown['total'],
+            'payments_confirmed_count': breakdown['count'],
         })
 
 
@@ -1251,17 +1264,25 @@ class ChairmanAuditReportView(APIView):
         start = timezone.make_aware(_dt.datetime.combine(d_from, _dt.time.min))
         end = timezone.make_aware(_dt.datetime.combine(d_to, _dt.time.max))
 
+        from .revenue import (CATEGORIES, CATEGORY_LABELS, applications_in_category,
+                              revenue_breakdown)
+        category = request.query_params.get('category') or ''
+        category = category if category in CATEGORIES else ''
+
         apps = Application.objects.filter(created_at__range=(start, end), is_deleted=False)
-        pays = Payment.objects.filter(status=PaymentStatus.CONFIRMED, confirmed_at__range=(start, end))
+        if category:
+            apps = applications_in_category(apps, category)
         from applications.models import StatusHistory
-        certs_issued = StatusHistory.objects.filter(
+        issued_q = StatusHistory.objects.filter(
             to_status='certificate_issued', created_at__range=(start, end),
             application__is_deleted=False,
-        ).values('application').distinct().count()
-        for stage, label in (('stage_a', 'Application Fee'), ('stage_c', 'Certificate Fee'), ('renewal', 'Renewal Fee')):
-            agg = pays.filter(stage=stage).aggregate(n=Count('id'), total=Sum('amount_submitted'))
-            by_stage[label] = (agg['n'] or 0, float(agg['total'] or 0))
-        grand = sum(v[1] for v in by_stage.values())
+        )
+        if category:
+            issued_q = issued_q.filter(application__in=applications_in_category(
+                Application.objects.filter(is_deleted=False), category))
+        certs_issued = issued_q.values('application').distinct().count()
+        breakdown = revenue_breakdown(start, end, category or None)
+        grand = breakdown['total']
         by_status = {row['status']: row['n'] for row in apps.values('status').annotate(n=Count('id'))}
 
         buf = io.BytesIO()
@@ -1277,6 +1298,8 @@ class ChairmanAuditReportView(APIView):
         c.drawString(48 * mm, h - 30 * mm, 'Street Naming — Audit & Revenue Report')
         c.setFillColor(grey); c.setFont('Helvetica', 9)
         c.drawString(48 * mm, h - 35 * mm, f'Period: {d_from.strftime("%d %b %Y")} to {d_to.strftime("%d %b %Y")}')
+        c.drawString(48 * mm, h - 39.5 * mm,
+                     f'Category: {CATEGORY_LABELS.get(category, "All categories")}')
         c.setStrokeColor(green); c.setLineWidth(1.5); c.line(22 * mm, h - 44 * mm, w - 22 * mm, h - 44 * mm)
 
         y = h - 58 * mm
@@ -1289,12 +1312,22 @@ class ChairmanAuditReportView(APIView):
         c.setFillColor(dark); c.setFont('Helvetica-Bold', 12); c.drawString(24 * mm, y, 'Summary'); y -= 9 * mm
         row('Total applications', apps.count())
         row('Certificates issued', certs_issued)
-        row('Payments confirmed', pays.count())
+        row('Payments confirmed', breakdown['count'])
         row('Total revenue', f'NGN {grand:,.2f}', bold=True)
         y -= 4 * mm
-        c.setFillColor(dark); c.setFont('Helvetica-Bold', 12); c.drawString(24 * mm, y, 'Revenue by category'); y -= 9 * mm
-        for label, (n, total) in by_stage.items():
-            row(f'{label} ({n})', f'NGN {total:,.2f}')
+        # What each kind of work brought in, and which fee inside it. With no
+        # category chosen this is the whole answer to "where did the money come
+        # from"; with one chosen it is that category on its own.
+        c.setFillColor(dark); c.setFont('Helvetica-Bold', 12)
+        c.drawString(24 * mm, y, 'Revenue by category'); y -= 9 * mm
+        for cat, bucket in breakdown['categories'].items():
+            row(f"{bucket['label']} ({bucket['count']})", f"NGN {bucket['total']:,.2f}", bold=True)
+            for fee in bucket['fees'].values():
+                c.setFillColor(grey); c.setFont('Helvetica', 9)
+                c.drawString(32 * mm, y, f"— {fee['label']} ({fee['count']})")
+                c.drawRightString(w - 26 * mm, y, f"NGN {fee['total']:,.2f}")
+                y -= 6.5 * mm
+            y -= 2 * mm
         y -= 4 * mm
         c.setFillColor(dark); c.setFont('Helvetica-Bold', 12); c.drawString(24 * mm, y, 'Applications by status'); y -= 9 * mm
         for stat, n in by_status.items():
