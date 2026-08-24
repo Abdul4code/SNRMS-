@@ -31,11 +31,70 @@
       <template v-else>
         <div class="flex items-center justify-between rounded-xl bg-white border border-slate-200 px-4 py-3">
           <p class="text-sm text-slate-700">Signed in as <strong>Member {{ member.number }} — {{ member.name }}</strong>
-            <span v-if="member.is_chairman" class="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded" style="background:#dcfce7;color:#059669">Committee Chairman</span>
+            <span v-if="member.title" class="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded" style="background:#e2e8f0;color:#475569">{{ member.title }}</span>
+            <span v-else-if="member.is_chairman" class="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded" style="background:#dcfce7;color:#059669">Committee Chairman</span>
           </p>
           <div class="flex items-center gap-3">
+            <button @click="openProfile" class="text-xs font-semibold text-slate-600 hover:text-slate-800">My details</button>
             <RouterLink to="/admin/applications-database" class="text-xs font-semibold text-emerald-600 hover:text-emerald-700">Applications database →</RouterLink>
             <button @click="signOut" class="text-xs text-slate-500 hover:text-slate-700">Switch member</button>
+          </div>
+        </div>
+
+        <!-- Still on the PIN this system shipped with: anyone who knows the member
+             number can guess it, and the PIN is what signs a recommendation. -->
+        <div v-if="member.using_default_pin && !profileOpen"
+             class="rounded-xl px-4 py-3 flex flex-wrap items-center gap-3"
+             style="background:rgba(251,191,36,0.10); border:1px solid rgba(251,191,36,0.4)">
+          <p class="text-xs text-amber-800">
+            <strong>Your PIN is still the default one.</strong>
+            Anyone who knows your member number can guess it — and your PIN is what signs
+            your recommendation to the Chairman.
+          </p>
+          <button @click="openProfile" class="ml-auto rounded-lg px-3 py-1.5 text-xs font-semibold text-white"
+                  style="background:#b45309">Set my own PIN</button>
+        </div>
+
+        <!-- A member maintains their own entry: their name, their office, their PIN. -->
+        <div v-if="profileOpen" class="rounded-2xl bg-white border border-slate-200 p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm font-bold text-slate-900">My details</p>
+              <p class="text-xs text-slate-400 mt-0.5">Only you can change these — no one else can rename you or see your PIN.</p>
+            </div>
+            <button @click="profileOpen = false" class="text-xs text-slate-400 hover:text-slate-600">Close</button>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Full name</label>
+              <input v-model="profileForm.name" type="text" placeholder="e.g. Hon. Adebanjo Adewale"
+                     class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Office <span class="font-normal text-slate-400">(optional)</span></label>
+              <input v-model="profileForm.title" type="text" placeholder="e.g. Secretary"
+                     class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm" />
+            </div>
+          </div>
+
+          <div class="pt-2" style="border-top:1px solid #f1f5f9">
+            <p class="text-xs font-semibold text-slate-600 mb-2">Change my PIN <span class="font-normal text-slate-400">(leave blank to keep it)</span></p>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <input v-model="profileForm.current_pin" type="password" inputmode="numeric" placeholder="Current PIN"
+                     class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm" />
+              <input v-model="profileForm.new_pin" type="password" inputmode="numeric" placeholder="New PIN (4+ digits)"
+                     class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm" />
+              <input v-model="profileForm.confirm_pin" type="password" inputmode="numeric" placeholder="Repeat new PIN"
+                     class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm" />
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <button @click="saveProfile" :disabled="profileBusy"
+                    class="rounded-lg px-4 py-2 text-xs font-semibold text-white disabled:opacity-60"
+                    style="background:#059669">{{ profileBusy ? 'Saving…' : 'Save my details' }}</button>
+            <p v-if="profileNote" class="text-xs" :class="profileOk ? 'text-emerald-600' : 'text-red-600'">{{ profileNote }}</p>
           </div>
         </div>
 
@@ -200,7 +259,7 @@ import { committeeApi, applicationApi, documentApi, configApi } from '@/services
 import ApplicationMap from '@/components/ApplicationMap.vue'
 import DocumentRepository from '@/components/DocumentRepository.vue'
 
-interface Member { number: number; name: string; is_chairman: boolean; responded?: boolean }
+interface Member { number: number; name: string; title?: string; is_chairman: boolean; responded?: boolean; using_default_pin?: boolean }
 interface AppRow { id: string; proposed_street_name: string; reference_number: string; locality: string; is_legacy?: boolean }
 interface AppDetail { street_geometry?: string | null; proposed_street_name: string; street_type_name?: string; ward?: string; ward_display?: string; locality?: string; location_description?: string; latitude?: number | string | null; longitude?: number | string | null; is_legacy?: boolean }
 interface DocRow { id: string; document_type: string; document_type_display?: string; title?: string; file?: string; file_url?: string }
@@ -235,6 +294,46 @@ const overallRec = ref(''); const generalComment = ref(''); const finalDecision 
 onMounted(async () => {
   try { members.value = (await committeeApi.members()).data } catch { /* not committee */ }
 })
+
+// --- A member's own entry: their name, their office, their PIN ----------------
+const profileOpen = ref(false)
+const profileBusy = ref(false)
+const profileNote = ref('')
+const profileOk = ref(false)
+const profileForm = ref({ name: '', title: '', current_pin: '', new_pin: '', confirm_pin: '' })
+
+function openProfile() {
+  profileNote.value = ''
+  profileForm.value = {
+    name: member.value?.name || '', title: member.value?.title || '',
+    current_pin: '', new_pin: '', confirm_pin: '',
+  }
+  profileOpen.value = true
+}
+
+async function saveProfile() {
+  profileNote.value = ''
+  const f = profileForm.value
+  if (f.new_pin && f.new_pin !== f.confirm_pin) {
+    profileOk.value = false
+    profileNote.value = 'The two new PINs do not match.'
+    return
+  }
+  profileBusy.value = true
+  try {
+    const payload: Record<string, unknown> = { name: f.name, title: f.title }
+    if (f.new_pin) { payload.current_pin = f.current_pin; payload.new_pin = f.new_pin }
+    const { data } = await committeeApi.updateProfile(token, payload)
+    member.value = { ...(member.value as Member), ...data }
+    profileOk.value = true
+    profileNote.value = data.detail
+    f.current_pin = f.new_pin = f.confirm_pin = ''
+  } catch (err: unknown) {
+    const e = err as { response?: { data?: { detail?: string } } }
+    profileOk.value = false
+    profileNote.value = e.response?.data?.detail || 'Could not save your details.'
+  } finally { profileBusy.value = false }
+}
 
 async function signIn() {
   busy.value = true; signinError.value = ''

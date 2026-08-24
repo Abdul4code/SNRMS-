@@ -200,6 +200,9 @@ class CommitteeMember(models.Model):
     """
     number = models.PositiveSmallIntegerField(unique=True)  # 1..7
     name = models.CharField(max_length=150)
+    # The office they hold on the committee, where they hold one — Chairman,
+    # Secretary. Shown beside the name on the recommendation the LG Chairman reads.
+    title = models.CharField(max_length=80, blank=True, default='')
     pin_hash = models.CharField(max_length=255)
     is_active = models.BooleanField(default=True)
 

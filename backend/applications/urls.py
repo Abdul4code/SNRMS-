@@ -1,5 +1,5 @@
 from applications.committee_views import (
-    CommitteeMembersView, VerifyMemberView, CommitteeQuorumReviewView,
+    CommitteeMembersView, VerifyMemberView, MemberProfileView, CommitteeQuorumReviewView,
     SubmitMemberCommentView, ForwardRecommendationView, MarkSubmissionsViewedView,
 )
 from django.urls import path
@@ -37,6 +37,7 @@ urlpatterns = [
     path('check-duplicate/', DuplicateCheckView.as_view(), name='application-check-duplicate'),
     path('committee/members/', CommitteeMembersView.as_view(), name='committee-members'),
     path('committee/verify-member/', VerifyMemberView.as_view(), name='committee-verify-member'),
+    path('committee/profile/', MemberProfileView.as_view(), name='committee-profile'),
     path('committee/<uuid:pk>/review/', CommitteeQuorumReviewView.as_view(), name='committee-review'),
     path('committee/<uuid:pk>/comment/', SubmitMemberCommentView.as_view(), name='committee-comment'),
     path('committee/<uuid:pk>/mark-viewed/', MarkSubmissionsViewedView.as_view(), name='committee-mark-viewed'),

@@ -61,7 +61,8 @@ class CommitteeMembersView(APIView):
             return Response({'detail': 'Committee only.'}, status=status.HTTP_403_FORBIDDEN)
         members = CommitteeMember.objects.filter(is_active=True)
         return Response([
-            {'number': m.number, 'name': m.name, 'is_chairman': m.is_chairman}
+            {'number': m.number, 'name': m.name, 'title': m.title,
+             'is_chairman': m.is_chairman}
             for m in members
         ])
 
@@ -79,7 +80,89 @@ class VerifyMemberView(APIView):
         token = signing.dumps({'m': member.pk}, salt=TOKEN_SALT)
         return Response({
             'token': token,
-            'member': {'number': member.number, 'name': member.name, 'is_chairman': member.is_chairman},
+            'member': {'number': member.number, 'name': member.name,
+                       'title': member.title, 'is_chairman': member.is_chairman,
+                       'using_default_pin': member.check_pin(str(member.number) * 4)},
+        })
+
+
+class MemberProfileView(APIView):
+    """GET/PATCH /committee/profile/ — the signed-in member's own name and PIN.
+
+    A member maintains their own entry: nobody else can rename them, and nobody
+    else — including whoever set the system up — needs to know their PIN. The
+    member token proves who is asking, so there is no way to edit another member.
+    """
+    permission_classes = [IsAuthenticated]
+
+    # Rejected outright: the shipped defaults and anything as guessable.
+    def _weak(self, pin, member):
+        # Check the shipped default first: for most members it is also four of the
+        # same digit, and naming it as "the default" is the more useful message.
+        if pin == str(member.number) * len(pin):    # the default this system shipped with
+            return 'That is the default PIN for your member number. Choose your own.'
+        if len(set(pin)) == 1:                      # 1111, 0000, 9999
+            return 'Choose a PIN that is not the same digit four times.'
+        if pin in ('1234', '0123', '12345', '123456'):
+            return 'That PIN is too easy to guess. Choose another.'
+        return ''
+
+    def get(self, request):
+        member = _member_from_token(request)
+        if not member:
+            return Response({'detail': 'Verify as a committee member first.'},
+                            status=status.HTTP_403_FORBIDDEN)
+        return Response({
+            'number': member.number, 'name': member.name, 'title': member.title,
+            'is_chairman': member.is_chairman,
+            'using_default_pin': member.check_pin(str(member.number) * 4),
+        })
+
+    def patch(self, request):
+        member = _member_from_token(request)
+        if not member:
+            return Response({'detail': 'Verify as a committee member first.'},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        changed = []
+        name = (request.data.get('name') or '').strip()
+        if name:
+            if len(name) < 3:
+                return Response({'detail': 'Please give your full name.'},
+                                status=status.HTTP_400_BAD_REQUEST)
+            member.name = name[:150]
+            changed.append('name')
+
+        if 'title' in request.data:
+            member.title = (request.data.get('title') or '').strip()[:80]
+            changed.append('title')
+
+        new_pin = str(request.data.get('new_pin') or '').strip()
+        if new_pin:
+            # The current PIN is required even though the token already proves
+            # identity — a console left open should not be enough to lock the
+            # rightful member out of their own account.
+            if not member.check_pin(str(request.data.get('current_pin') or '')):
+                return Response({'detail': 'Your current PIN is not correct.'},
+                                status=status.HTTP_400_BAD_REQUEST)
+            if not new_pin.isdigit() or len(new_pin) < 4:
+                return Response({'detail': 'A PIN must be at least 4 digits.'},
+                                status=status.HTTP_400_BAD_REQUEST)
+            weak = self._weak(new_pin, member)
+            if weak:
+                return Response({'detail': weak}, status=status.HTTP_400_BAD_REQUEST)
+            member.set_pin(new_pin)
+            changed.append('PIN')
+
+        if not changed:
+            return Response({'detail': 'Nothing to change.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        member.save()
+        return Response({
+            'detail': f'Updated your {" and ".join(changed)}.',
+            'number': member.number, 'name': member.name, 'title': member.title,
+            'is_chairman': member.is_chairman,
+            'using_default_pin': member.check_pin(str(member.number) * 4),
         })
 
 

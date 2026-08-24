@@ -275,6 +275,10 @@ export const committeeApi = {
     api.post(`/applications/committee/${appId}/comment/`, { ...data, member_token: token }, { headers: { 'X-Committee-Member': token } }),
   forward: (appId: string, token: string, data: Record<string, unknown>) =>
     api.post(`/applications/committee/${appId}/forward/`, { ...data, member_token: token }, { headers: { 'X-Committee-Member': token } }),
+  profile: (token: string) =>
+    api.get('/applications/committee/profile/', { headers: { 'X-Committee-Member': token }, params: { member_token: token } }),
+  updateProfile: (token: string, data: Record<string, unknown>) =>
+    api.patch('/applications/committee/profile/', { ...data, member_token: token }, { headers: { 'X-Committee-Member': token } }),
 }
 
 // Secure receipts (#13)
