@@ -159,13 +159,17 @@ class ApplicationDetailSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_street_geometry(self, obj):
-        """The registry's centre-line for this street, so the map can draw the
-        street itself rather than a scatter of the buildings along it.
+        """The line to draw for this application's street.
 
-        Matched by name and then by distance, because an application records a
-        name and a point, not a link to a registry row. Returns None when the
-        registry has no line — the map falls back to the pin.
+        The applicant's own tap wins: they pointed at the road, so that is the
+        street, and it is recorded on the application itself. Otherwise fall back
+        to the registry's centre-line, matched by name and then by distance —
+        an application records a name and a point, not a link to a registry row.
+        Returns None when there is no line at all, and the map draws the pin.
         """
+        if obj.street_line:
+            return obj.street_line
+
         import math
 
         from config.management.commands.import_osm_streets import name_key as key
@@ -250,6 +254,7 @@ class ApplicationCreateSerializer(serializers.ModelSerializer):
             'locality',
             'latitude',
             'longitude',
+            'street_line',
             'lga_area',
             'is_legacy',
             'legacy_certificate',

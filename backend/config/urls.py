@@ -1,6 +1,6 @@
 from django.urls import path
 
-from config.views import (BuildingPhotoProxyView, StreetViewProxyView, PublicSettingsView, CommunityListView, LocalityWardView, BuildingSurveyListView, RenewalSettingsView,
+from config.views import (BuildingPhotoProxyView, StreetViewProxyView, PublicSettingsView, CommunityListView, LocalityWardView, RoadNetworkView, BuildingSurveyListView, RenewalSettingsView,
     StreetBuildingsView, StreetListView, StreetMergeView, StreetSplitView, StreetSummaryView,
     StreetUpdateView, StreetTypeDetailView, StreetTypeListView)
 
@@ -15,6 +15,7 @@ urlpatterns = [
     path('streets/', StreetListView.as_view(), name='street-list'),
     path('streets/summary/', StreetSummaryView.as_view(), name='street-summary'),
     path('locality-wards/', LocalityWardView.as_view(), name='locality-wards'),
+    path('road-network/', RoadNetworkView.as_view(), name='road-network'),
     path('communities/', CommunityListView.as_view(), name='communities'),
     path('streets/merge/', StreetMergeView.as_view(), name='street-merge'),
     path('streets/<uuid:pk>/split/', StreetSplitView.as_view(), name='street-split'),

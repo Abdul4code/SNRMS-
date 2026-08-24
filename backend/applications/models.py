@@ -106,6 +106,11 @@ class Application(models.Model):
     locality = models.CharField(max_length=200, blank=True, help_text='Town/estate/community — a finer check than ward')
     latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
     longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    # The line of the street the applicant pointed at, as GeoJSON. A pin says
+    # roughly where; this says where the street starts and ends, which is what
+    # signage and house numbering need. Blank when they could only drop a pin.
+    street_line = models.TextField(blank=True, default='',
+                                   help_text='GeoJSON LineString of the chosen road')
     status = models.CharField(
         max_length=50, choices=ApplicationStatus.choices,
         default=ApplicationStatus.DRAFT

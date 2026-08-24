@@ -210,10 +210,11 @@
             <!-- Map street picker -->
             <div class="rounded-xl overflow-hidden border border-slate-200">
               <div class="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                <p class="text-xs font-medium" :class="streetLocked ? 'text-emerald-700' : 'text-slate-600'">
+                <p class="text-xs font-medium" :class="streetLocked || pickedRoad ? 'text-emerald-700' : 'text-slate-600'">
                   <template v-if="streetLocked">🔒 Selected street — set from the registry</template>
-                  <template v-else-if="isLegacy">Click the location of the street you selected above</template>
-                  <template v-else>Click the street you want to name on the map</template>
+                  <template v-else-if="pickedRoad">✓ Street selected — tap another to change it</template>
+                  <template v-else-if="isLegacy">Tap the street you selected above</template>
+                  <template v-else>Tap the street you want to name</template>
                 </p>
                 <button type="button" v-if="!streetLocked" @click="locateMe"
                         class="text-xs font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1">
@@ -224,8 +225,14 @@
                    :class="streetLocked ? 'cursor-not-allowed' : ''" style="background:#eef2f7"></div>
               <div class="flex items-center gap-4 px-4 py-2 text-[11px] border-t border-slate-100 text-slate-500">
                 <span v-if="streetLocked">The location of this street is fixed by the registry and cannot be changed.</span>
-                <span v-else>Zoom in and click the exact location of your street.</span>
-                <span v-if="pickerLoading" class="text-slate-400 ml-auto">Loading…</span>
+                <span v-else-if="pickedRoad">
+                  <strong class="text-emerald-700">{{ pickedRoad.name || 'This street' }}</strong>
+                  is highlighted end to end. Tap a different road to change it, or tap
+                  anywhere else to drop a pin instead.
+                </span>
+                <span v-else>Zoom in and tap the road your street runs along — it will light up.
+                  If your street is not drawn on the map, tap its location to drop a pin.</span>
+                <span v-if="pickerLoading || roadsLoading" class="text-slate-400 ml-auto">Loading…</span>
               </div>
             </div>
 
@@ -699,6 +706,75 @@ let clickMarker: L.CircleMarker | null = null
 let streetHighlightLayer: L.LayerGroup | null = null
 let streetLineLayer: L.LayerGroup | null = null
 
+// --- The road network: what the applicant actually taps ------------------------
+// OpenStreetMap names barely a twentieth of the roads here but has the shape of
+// nearly all of them, and 94% of surveyed buildings sit within 60 m of one. So
+// the applicant points at the road they live on instead of dropping a pin, and
+// sees the whole street light up. Roads are drawn wide and invisible over the
+// basemap, which is already showing them — the tap target, not the picture.
+interface RoadSegment { id: number; name: string; geometry: string }
+const ROAD_IDLE = 0.22          // enough to read as "these are tappable"
+const ROAD_HOVER = 0.45
+let roadLayer: L.LayerGroup | null = null
+let roadsLoadedFor = ''
+const pickedRoad = ref<{ id: number; name: string; line: [number, number][] } | null>(null)
+const roadsLoading = ref(false)
+
+async function loadRoadsInView() {
+  if (!pickerMap) return
+  const b = pickerMap.getBounds()
+  // One decimal place of slack, so small pans reuse what is already loaded.
+  const key = [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()]
+    .map(n => n.toFixed(2)).join(',')
+  if (key === roadsLoadedFor) return
+  if (pickerMap.getZoom() < 14) return       // whole-LGA view: too many to be useful
+  roadsLoadedFor = key
+  roadsLoading.value = true
+  try {
+    const bbox = `${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`
+    const { data } = await configApi.getRoadNetwork(bbox)
+    drawRoads(data as RoadSegment[])
+  } catch { /* the map still works; the applicant can drop a pin */ }
+  finally { roadsLoading.value = false }
+}
+
+function drawRoads(roads: RoadSegment[]) {
+  if (!pickerMap) return
+  if (!roadLayer) roadLayer = L.layerGroup().addTo(pickerMap)
+  roadLayer.clearLayers()
+  for (const road of roads) {
+    const line = lineOf(road.geometry)
+    if (!line) continue
+    // Faintly tinted rather than invisible: on a phone there is no hover, so the
+    // roads have to *look* tappable or nobody will think to tap them.
+    const hit = L.polyline(line, { color: '#0284c7', weight: 12, opacity: ROAD_IDLE })
+      .addTo(roadLayer)
+    hit.on('mouseover', () => hit.setStyle({ opacity: ROAD_HOVER }))
+    hit.on('mouseout', () => {
+      if (pickedRoad.value?.id !== road.id) hit.setStyle({ opacity: ROAD_IDLE })
+    })
+    hit.on('click', (e: L.LeafletMouseEvent) => {
+      L.DomEvent.stopPropagation(e)          // tapping a road is not dropping a pin
+      pickRoad(road, line)
+    })
+  }
+}
+
+/** The applicant tapped a road: adopt its whole length as their street. */
+function pickRoad(road: RoadSegment, line: [number, number][]) {
+  if (streetLocked.value) return
+  const mid = line[Math.floor(line.length / 2)] as [number, number]
+  selectAt(mid[0], mid[1])
+  drawStreetHighlight(line, road.name || form.value.proposed_street_name || 'Selected street', true)
+  pickedRoad.value = { id: road.id, name: road.name, line }
+}
+
+function clearPickedRoad() {
+  pickedRoad.value = null
+  clearStreetHighlight()
+  clearPickedLocation()
+}
+
 /** Parse a stored GeoJSON LineString into Leaflet's [lat, lng] order. */
 function lineOf(geometry?: string | null): [number, number][] | null {
   if (!geometry) return null
@@ -876,12 +952,18 @@ async function initPicker() {
   pickerMap.on('click', (e: L.LeafletMouseEvent) => {
     // Validate mode with a registry location: the street is fixed, ignore clicks.
     if (streetLocked.value) return
+    // A click that misses every road: keep the pin as the fallback, exactly as
+    // before. Taps that land on a road are handled by the road layer itself.
+    pickedRoad.value = null
+    clearStreetHighlight()
     selectAt(e.latlng.lat, e.latlng.lng)
   })
   streetLabelLayer = L.layerGroup().addTo(pickerMap)
   streetLineLayer = L.layerGroup().addTo(pickerMap)
   pickerMap.on('zoomend moveend', refreshStreetLabels)
+  pickerMap.on('zoomend moveend', loadRoadsInView)
   drawRegistryStreetLines()
+  loadRoadsInView()
   try {
     const { data } = await configApi.getBuildingSurveys()
     const bounds: L.LatLngTuple[] = []
@@ -981,6 +1063,10 @@ async function handleSubmit() {
       fd.append('registry_street_id', String(form.value.registry_street_id))
       fd.append('street_type', form.value.street_type || '')
       fd.append('ward', form.value.ward)
+      if (pickedRoad.value) fd.append('street_line', JSON.stringify({
+        type: 'LineString',
+        coordinates: pickedRoad.value.line.map(([la, ln]) => [ln, la]),
+      }))
       fd.append('locality', form.value.locality)
       fd.append('location_description', form.value.location_description)
       if (geoCoords.value.lat) fd.append('latitude', geoCoords.value.lat)
@@ -997,6 +1083,12 @@ async function handleSubmit() {
         location_description: form.value.location_description,
         latitude: geoCoords.value.lat || null,
         longitude: geoCoords.value.lng || null,
+        // The street's own line, when the applicant tapped a road rather than
+        // dropping a pin — this is the shape the register has always lacked.
+        street_line: pickedRoad.value
+          ? JSON.stringify({ type: 'LineString',
+                             coordinates: pickedRoad.value.line.map(([la, ln]) => [ln, la]) })
+          : '',
       }
     }
     const { data } = await applicationApi.create(payload)

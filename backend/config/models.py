@@ -289,3 +289,40 @@ class Street(models.Model):
 
     def __str__(self):
         return f'{self.code} — {self.name}'
+
+
+class RoadSegment(models.Model):
+    """A stretch of road as OpenStreetMap has it — geometry only, no name needed.
+
+    This is the layer that lets an applicant point at their street instead of
+    dropping a pin. OSM names barely 5% of the roads here (228 of 4,510), but it
+    has the shape of nearly all of them, and the shape is the part we cannot get
+    anywhere else — the name comes from the applicant or the registry.
+
+    Segments are OSM ways, which are already split at junctions, so one tap
+    usually selects one block. The bounding box is stored alongside the geometry
+    so the map can ask for "roads in this view" without parsing every line.
+    """
+    osm_id = models.BigIntegerField(unique=True)
+    name = models.CharField(max_length=200, blank=True, db_index=True)
+    highway = models.CharField(max_length=40, blank=True,
+                               help_text='OSM class: residential, trunk, track…')
+    geometry = models.TextField(help_text='GeoJSON LineString')
+
+    # Bounding box, for cheap "what is in this view" queries.
+    min_lat = models.DecimalField(max_digits=10, decimal_places=7)
+    max_lat = models.DecimalField(max_digits=10, decimal_places=7)
+    min_lng = models.DecimalField(max_digits=10, decimal_places=7)
+    max_lng = models.DecimalField(max_digits=10, decimal_places=7)
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'road_segments'
+        indexes = [
+            models.Index(fields=['min_lat', 'max_lat']),
+            models.Index(fields=['min_lng', 'max_lng']),
+        ]
+
+    def __str__(self):
+        return self.name or f'unnamed road {self.osm_id}'

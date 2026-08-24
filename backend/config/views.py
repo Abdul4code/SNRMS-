@@ -383,6 +383,35 @@ class LocalityWardView(APIView):
         })
 
 
+class RoadNetworkView(APIView):
+    """GET /config/road-network/?bbox=south,west,north,east — roads in view.
+
+    The layer the applicant taps to say "this is my street". Geometry only: OSM
+    names barely a twentieth of the roads here, and the name is not what we want
+    from it anyway. Without a bbox the whole LGA comes back — about 4,500
+    segments, which is a couple of megabytes and fine to hold in a browser.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from config.models import RoadSegment
+        qs = RoadSegment.objects.all()
+        raw = request.query_params.get('bbox') or ''
+        if raw:
+            try:
+                south, west, north, east = [float(x) for x in raw.split(',')]
+            except ValueError:
+                return Response({'detail': 'bbox must be south,west,north,east'},
+                                status=400)
+            # Overlap, not containment: a road crossing the view still belongs in it.
+            qs = qs.filter(min_lat__lte=north, max_lat__gte=south,
+                           min_lng__lte=east, max_lng__gte=west)
+        return Response([
+            {'id': r.osm_id, 'name': r.name, 'geometry': r.geometry}
+            for r in qs.only('osm_id', 'name', 'geometry')
+        ])
+
+
 class CommunityListView(APIView):
     """GET /config/communities/ — flat list of official community names (for pickers)."""
     permission_classes = [AllowAny]

@@ -244,6 +244,8 @@ export const configApi = {
     api.get('/config/streets/summary/'),
   getLocalityWards: () =>
     api.get('/config/locality-wards/'),
+  getRoadNetwork: (bbox?: string) =>
+    api.get('/config/road-network/', { params: bbox ? { bbox } : {} }),
   getStreetBuildings: (id: string) =>
     api.get(`/config/streets/${id}/buildings/`),
   mergeStreets: (targetId: string, sourceIds: string[]) =>
