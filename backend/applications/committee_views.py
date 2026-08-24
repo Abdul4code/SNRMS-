@@ -124,9 +124,12 @@ class MemberProfileView(APIView):
             return Response({'detail': 'Verify as a committee member first.'},
                             status=status.HTTP_403_FORBIDDEN)
 
+        # Only what actually differs is reported back: the form posts every field
+        # each time, so comparing is the difference between "Updated your PIN" and
+        # claiming to have changed a name the member never touched.
         changed = []
         name = (request.data.get('name') or '').strip()
-        if name:
+        if name and name[:150] != member.name:
             if len(name) < 3:
                 return Response({'detail': 'Please give your full name.'},
                                 status=status.HTTP_400_BAD_REQUEST)
@@ -134,8 +137,10 @@ class MemberProfileView(APIView):
             changed.append('name')
 
         if 'title' in request.data:
-            member.title = (request.data.get('title') or '').strip()[:80]
-            changed.append('title')
+            title = (request.data.get('title') or '').strip()[:80]
+            if title != member.title:
+                member.title = title
+                changed.append('office')
 
         new_pin = str(request.data.get('new_pin') or '').strip()
         if new_pin:
@@ -158,8 +163,12 @@ class MemberProfileView(APIView):
             return Response({'detail': 'Nothing to change.'},
                             status=status.HTTP_400_BAD_REQUEST)
         member.save()
+        if len(changed) > 1:
+            what = ', '.join(changed[:-1]) + ' and ' + changed[-1]
+        else:
+            what = changed[0]
         return Response({
-            'detail': f'Updated your {" and ".join(changed)}.',
+            'detail': f'Updated your {what}.',
             'number': member.number, 'name': member.name, 'title': member.title,
             'is_chairman': member.is_chairman,
             'using_default_pin': member.check_pin(str(member.number) * 4),

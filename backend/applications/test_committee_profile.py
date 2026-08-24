@@ -100,3 +100,19 @@ class MemberProfileTests(TestCase):
         self.patch({'current_pin': '2222', 'new_pin': '8473'})
         r = self.client.get(PROFILE, **self.hdr())
         self.assertFalse(r.data['using_default_pin'])
+
+    def test_only_what_changed_is_reported(self):
+        """The form posts every field each time; the message must not claim more."""
+        r = self.patch({'name': self.me.name, 'title': self.me.title,
+                        'current_pin': '2222', 'new_pin': '8473'})
+        self.assertEqual(r.status_code, 200, r.content[:300])
+        self.assertEqual(r.data['detail'], 'Updated your PIN.')
+
+    def test_several_changes_read_naturally(self):
+        r = self.patch({'name': 'Dr Adekoya Augustine A.', 'title': 'Secretary',
+                        'current_pin': '2222', 'new_pin': '8473'})
+        self.assertEqual(r.data['detail'], 'Updated your name, office and PIN.')
+
+    def test_resubmitting_the_same_details_changes_nothing(self):
+        r = self.patch({'name': self.me.name, 'title': self.me.title})
+        self.assertEqual(r.status_code, 400)

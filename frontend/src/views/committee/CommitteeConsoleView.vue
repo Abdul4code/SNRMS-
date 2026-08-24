@@ -35,10 +35,28 @@
             <span v-else-if="member.is_chairman" class="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded" style="background:#dcfce7;color:#059669">Committee Chairman</span>
           </p>
           <div class="flex items-center gap-3">
-            <button @click="openProfile" class="text-xs font-semibold text-slate-600 hover:text-slate-800">My details</button>
+            <!-- Always available: a member may change their name or PIN whenever
+                 they like, not only while the default PIN is still in place. -->
+            <button @click="profileOpen ? (profileOpen = false) : openProfile()"
+                    class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors"
+                    :style="profileOpen
+                      ? 'background:#0f172a;color:#fff;border-color:#0f172a'
+                      : 'background:#fff;color:#334155;border-color:#cbd5e1'">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+              Edit my name &amp; PIN
+            </button>
             <RouterLink to="/admin/applications-database" class="text-xs font-semibold text-emerald-600 hover:text-emerald-700">Applications database →</RouterLink>
             <button @click="signOut" class="text-xs text-slate-500 hover:text-slate-700">Switch member</button>
           </div>
+        </div>
+
+        <!-- Confirmation lives out here, because saving closes the panel. -->
+        <div v-if="profileSaved" class="rounded-xl px-4 py-2.5 flex items-center gap-2"
+             style="background:rgba(5,150,105,0.08); border:1px solid rgba(5,150,105,0.3)">
+          <svg class="w-4 h-4 flex-shrink-0" style="color:#059669" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"/>
+          </svg>
+          <p class="text-xs font-semibold text-emerald-800">{{ profileSaved }}</p>
         </div>
 
         <!-- Still on the PIN this system shipped with: anyone who knows the member
@@ -301,9 +319,12 @@ const profileBusy = ref(false)
 const profileNote = ref('')
 const profileOk = ref(false)
 const profileForm = ref({ name: '', title: '', current_pin: '', new_pin: '', confirm_pin: '' })
+const profileSaved = ref('')
+let profileSavedTimer: ReturnType<typeof setTimeout>
 
 function openProfile() {
   profileNote.value = ''
+  profileSaved.value = ''
   profileForm.value = {
     name: member.value?.name || '', title: member.value?.title || '',
     current_pin: '', new_pin: '', confirm_pin: '',
@@ -325,9 +346,14 @@ async function saveProfile() {
     if (f.new_pin) { payload.current_pin = f.current_pin; payload.new_pin = f.new_pin }
     const { data } = await committeeApi.updateProfile(token, payload)
     member.value = { ...(member.value as Member), ...data }
-    profileOk.value = true
-    profileNote.value = data.detail
     f.current_pin = f.new_pin = f.confirm_pin = ''
+    // Saved means done: close the panel and confirm above it, rather than
+    // leaving the member to dismiss a form they have finished with.
+    profileOpen.value = false
+    profileNote.value = ''
+    profileSaved.value = data.detail
+    clearTimeout(profileSavedTimer)
+    profileSavedTimer = setTimeout(() => { profileSaved.value = '' }, 6000)
   } catch (err: unknown) {
     const e = err as { response?: { data?: { detail?: string } } }
     profileOk.value = false
