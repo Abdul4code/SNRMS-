@@ -440,7 +440,19 @@ function onRegistryStreetChange() {
   if (!selected) { validateNote.value = null; return }
   if (pickerLoading.value) { streetPendingId = String(selected.id); return }
 
-  // Prefer the surveyed extent of the street; fall back to its registry centroid.
+  // The street's own centre-line if the registry has one — that is the street,
+  // where the surveyed buildings are only near it.
+  const centreLine = lineOf(selected.geometry)
+  if (centreLine) {
+    const mid = centreLine[Math.floor(centreLine.length / 2)] as [number, number]
+    streetLocked.value = true
+    selectAt(mid[0], mid[1])
+    drawStreetHighlight(centreLine, selected.name, true)
+    validateNote.value = { ok: true, msg: `\u2713 ${selected.name} is selected and drawn on the map. Its location comes from the registry, so it cannot be changed.` }
+    return
+  }
+
+  // No line on record: fall back to the surveyed extent, then to the centroid.
   // coreCluster drops bad GPS fixes — on a locked map a centroid dragged
   // kilometres off by one stray point is not something the applicant can correct.
   let pts = coreCluster(pointsForStreet(selected.name))
@@ -685,6 +697,57 @@ let streetLabelLayer: L.LayerGroup | null = null
 let pendingZoomLocality = ""
 let clickMarker: L.CircleMarker | null = null
 let streetHighlightLayer: L.LayerGroup | null = null
+let streetLineLayer: L.LayerGroup | null = null
+
+/** Parse a stored GeoJSON LineString into Leaflet's [lat, lng] order. */
+function lineOf(geometry?: string | null): [number, number][] | null {
+  if (!geometry) return null
+  try {
+    const geo = JSON.parse(geometry)
+    const coords = geo?.type === 'LineString' ? geo.coordinates
+      : geo?.type === 'MultiLineString' ? geo.coordinates.flat() : null
+    if (!Array.isArray(coords) || coords.length < 2) return null
+    return coords.map((c: number[]) => [c[1] as number, c[0] as number])
+  } catch { return null }
+}
+
+/** Every registry street we hold a centre-line for, drawn so it can be clicked.
+ *  Picking the line is the marking; the pin is only for streets we have no line
+ *  for. Buildings are deliberately not drawn — they are not the street. */
+function drawRegistryStreetLines() {
+  if (!pickerMap || !streetLineLayer) return
+  streetLineLayer.clearLayers()
+  for (const st of registryStreets.value) {
+    const line = lineOf(st.geometry)
+    if (!line) continue
+    L.polyline(line, { color: '#ffffff', weight: 8, opacity: 0.7 }).addTo(streetLineLayer)
+    const poly = L.polyline(line, { color: '#0284c7', weight: 4, opacity: 0.9 })
+      .addTo(streetLineLayer)
+      .bindTooltip(st.name, { sticky: true })
+    poly.on('click', (e: L.LeafletMouseEvent) => {
+      L.DomEvent.stopPropagation(e)          // do not also drop a pin underneath
+      pickStreetLine(st)
+    })
+  }
+}
+
+/** The applicant clicked a street line on the map. */
+function pickStreetLine(street: RegistryStreet) {
+  if (isLegacy.value) {
+    // In validate mode the dropdown is the source of truth; clicking the street
+    // selects it there so the two can never disagree.
+    form.value.registry_street_id = String(street.id)
+    onRegistryStreetChange()
+    return
+  }
+  const line = lineOf(street.geometry)
+  if (!line) return
+  const mid = line[Math.floor(line.length / 2)] as [number, number]
+  selectAt(mid[0], mid[1])
+  drawStreetHighlight(line, street.name, true)
+  pickedStreetName.value = street.name
+}
+const pickedStreetName = ref('')
 const pickPoints: PickPoint[] = []
 
 function clearStreetHighlight() {
@@ -702,14 +765,22 @@ function clearPickedLocation() {
 }
 
 /** Paint the selected registry street on the map and frame it. */
-function drawStreetHighlight(pts: [number, number][], name: string) {
+function drawStreetHighlight(pts: [number, number][], name: string, asLine = false) {
   if (!pickerMap) return
   clearStreetHighlight()
   streetHighlightLayer = L.layerGroup().addTo(pickerMap)
-  for (const [lat, lng] of pts) {
-    L.circleMarker([lat, lng], {
-      radius: 7, color: '#047857', weight: 2, fillColor: '#34d399', fillOpacity: 0.85, interactive: false,
-    }).addTo(streetHighlightLayer)
+  if (asLine && pts.length >= 2) {
+    // A real centre-line: draw the street, not a string of beads.
+    L.polyline(pts, { color: '#ffffff', weight: 11, opacity: 0.9, interactive: false })
+      .addTo(streetHighlightLayer)
+    L.polyline(pts, { color: '#047857', weight: 6, opacity: 1, interactive: false })
+      .addTo(streetHighlightLayer)
+  } else {
+    for (const [lat, lng] of pts) {
+      L.circleMarker([lat, lng], {
+        radius: 7, color: '#047857', weight: 2, fillColor: '#34d399', fillOpacity: 0.85, interactive: false,
+      }).addTo(streetHighlightLayer)
+    }
   }
   const cLat = pts.reduce((a, p) => a + p[0], 0) / pts.length
   const cLng = pts.reduce((a, p) => a + p[1], 0) / pts.length
@@ -808,7 +879,9 @@ async function initPicker() {
     selectAt(e.latlng.lat, e.latlng.lng)
   })
   streetLabelLayer = L.layerGroup().addTo(pickerMap)
+  streetLineLayer = L.layerGroup().addTo(pickerMap)
   pickerMap.on('zoomend moveend', refreshStreetLabels)
+  drawRegistryStreetLines()
   try {
     const { data } = await configApi.getBuildingSurveys()
     const bounds: L.LatLngTuple[] = []
@@ -949,11 +1022,13 @@ onMounted(async () => {
   }
   configApi.getLocalityWards().then(r => { localityWards.value = r.data.community_to_ward || {}; communities.value = Object.keys(r.data.community_to_ward || {}).sort() }).catch(() => {})
   configApi.publicSettings().then(r => { googleEnabled.value = !!r.data.google_maps_enabled }).catch(() => {})
-  if (isLegacy.value) {
-    configApi.getStreets().then(r => {
-      registryStreets.value = (r.data as typeof registryStreets.value).slice().sort((a, b) => a.name.localeCompare(b.name))
-    }).catch(() => {})
-  }
+  // Loaded whichever mode this is: validation needs the list, and a new
+  // application needs the lines to be visible and clickable on the map.
+  configApi.getStreets().then(r => {
+    registryStreets.value = (r.data as RegistryStreet[]).slice()
+      .sort((a, b) => a.name.localeCompare(b.name))
+    drawRegistryStreetLines()
+  }).catch(() => {})
   initPicker()
 })
 
@@ -978,9 +1053,11 @@ watch(() => route.fullPath, async () => {
   pendingZoomLocality = ''
   if (pickerMap) { pickerMap.remove(); pickerMap = null }
   pickerLoading.value = true
-  if (isLegacy.value && !registryStreets.value.length) {
+  if (!registryStreets.value.length) {
     configApi.getStreets().then(r => {
-      registryStreets.value = (r.data as typeof registryStreets.value).slice().sort((a, b) => a.name.localeCompare(b.name))
+      registryStreets.value = (r.data as RegistryStreet[]).slice()
+        .sort((a, b) => a.name.localeCompare(b.name))
+      drawRegistryStreetLines()
     }).catch(() => {})
   }
   await initPicker()

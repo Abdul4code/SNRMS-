@@ -25,22 +25,26 @@
       </div>
 
       <!-- Legend -->
-      <div v-if="allSurveys.length && !surveysLoading"
+      <div v-if="!surveysLoading && (streetLine || coords || (showBuildings && allSurveys.length))"
            class="absolute bottom-2 left-2 z-[400] flex flex-col gap-1 px-2.5 py-2 rounded-lg text-xs"
            style="background: rgba(255,255,255,0.92); border: 1px solid rgba(0,0,0,0.1); backdrop-filter: blur(4px)">
-        <div v-if="matchedSurveys.length" class="flex items-center gap-1.5">
+        <div v-if="streetLine" class="flex items-center gap-1.5">
+          <span class="w-4 h-1.5 rounded-sm flex-shrink-0" style="background: #047857"></span>
+          <span class="text-slate-700 font-medium">{{ streetName || 'The street' }}</span>
+        </div>
+        <div v-if="showBuildings && matchedSurveys.length" class="flex items-center gap-1.5">
           <span class="w-3 h-3 rounded-full flex-shrink-0" style="background: #059669; border: 1.5px solid #047857"></span>
           <span class="text-slate-700 font-medium">{{ streetName || 'Proposed street' }} ({{ matchedSurveys.length }})</span>
         </div>
-        <div v-if="otherSurveys.length && !hideOtherBuildings" class="flex items-center gap-1.5">
+        <div v-if="showBuildings && otherSurveys.length && !hideOtherBuildings" class="flex items-center gap-1.5">
           <span class="w-3 h-3 rounded-full flex-shrink-0" style="background: #94a3b8; border: 1.5px solid #64748b"></span>
           <span class="text-slate-700 font-medium">Other buildings ({{ otherSurveys.length }})</span>
         </div>
-        <div v-if="coords" class="flex items-center gap-1.5">
+        <div v-if="coords && !streetLine" class="flex items-center gap-1.5">
           <span class="w-3 h-3 rounded-sm flex-shrink-0" style="background: #1d4ed8; border: 1.5px solid #1e40af"></span>
           <span class="text-slate-700 font-medium">Application pin</span>
         </div>
-        <div v-if="!hideOtherBuildings" class="flex items-center gap-1.5 mt-0.5 pt-0.5" style="border-top: 1px solid #e2e8f0">
+        <div v-if="showBuildings && !hideOtherBuildings" class="flex items-center gap-1.5 mt-0.5 pt-0.5" style="border-top: 1px solid #e2e8f0">
           <span class="text-slate-400 italic">Click a building to view details</span>
         </div>
       </div>
@@ -410,7 +414,24 @@ const props = defineProps<{
   proposedStreetName?: string
   hideOtherBuildings?: boolean
   showStreetPicture?: boolean
+  /** GeoJSON LineString for this street, as stored on the registry record. */
+  streetGeometry?: string | null
+  /** Draw the individual survey buildings. Off by default — see addSurveyMarkers. */
+  showBuildings?: boolean
 }>()
+
+/** The centre-line as Leaflet wants it: [lat, lng] pairs. */
+const streetLine = computed<[number, number][] | null>(() => {
+  const raw = props.streetGeometry
+  if (!raw) return null
+  try {
+    const geo = typeof raw === 'string' ? JSON.parse(raw) : raw
+    const coords = geo?.type === 'LineString' ? geo.coordinates
+      : geo?.type === 'MultiLineString' ? geo.coordinates.flat() : null
+    if (!Array.isArray(coords) || coords.length < 2) return null
+    return coords.map((c: number[]) => [c[1] as number, c[0] as number])
+  } catch { return null }
+})
 
 const mapEl = ref<HTMLElement | null>(null)
 const modalMapEl = ref<HTMLElement | null>(null)
@@ -479,7 +500,10 @@ function selectBuilding(s: SurveyBuilding) {
 }
 
 function addSurveyMarkers(m: L.Map) {
-  // Grey circles for non-matching buildings (suppressed when hideOtherBuildings)
+  // The buildings are survey records, not the street. Showing thousands of them
+  // buried the one thing the reader is looking for, so they are only drawn when
+  // asked for explicitly (showBuildings) — the street's own line is the subject.
+  if (!props.showBuildings) return
   if (!props.hideOtherBuildings) {
     for (const s of otherSurveys.value) {
       L.circleMarker([s.latitude, s.longitude], {
@@ -492,8 +516,6 @@ function addSurveyMarkers(m: L.Map) {
       }).addTo(m).on('click', () => selectBuilding(s))
     }
   }
-
-  // Emerald circles for matched buildings
   for (const s of matchedSurveys.value) {
     L.circleMarker([s.latitude, s.longitude], {
       radius: 9,
@@ -506,6 +528,17 @@ function addSurveyMarkers(m: L.Map) {
   }
 }
 
+/** The street itself, drawn as its centre-line when the registry has one. */
+function addStreetLine(m: L.Map): L.Polyline | null {
+  const line = streetLine.value
+  if (!line || line.length < 2) return null
+  // A soft casing under a solid line, so it reads as a street rather than a route.
+  L.polyline(line, { color: '#ffffff', weight: 9, opacity: 0.85 }).addTo(m)
+  const poly = L.polyline(line, { color: '#047857', weight: 5, opacity: 0.95 }).addTo(m)
+  if (props.streetName) poly.bindPopup(`<strong>${props.streetName}</strong>`)
+  return poly
+}
+
 function initMap(el: HTMLElement, scrollWheel: boolean): L.Map {
   const m = L.map(el, { scrollWheelZoom: scrollWheel })
 
@@ -515,8 +548,11 @@ function initMap(el: HTMLElement, scrollWheel: boolean): L.Map {
   }).addTo(m)
 
   addSurveyMarkers(m)
+  const poly = addStreetLine(m)
 
-  if (coords.value) {
+  // The pin is the fallback for a street with no centre-line on record; where
+  // there is a line, the line is the marking and a pin only adds clutter.
+  if (coords.value && !poly) {
     L.marker(coords.value)
       .addTo(m)
       .bindPopup(
@@ -525,8 +561,10 @@ function initMap(el: HTMLElement, scrollWheel: boolean): L.Map {
       )
   }
 
-  // Always centre on the application location first
-  if (coords.value) {
+  // Frame the street itself when we have it, otherwise the application location.
+  if (poly) {
+    m.fitBounds(poly.getBounds(), { padding: [50, 50], maxZoom: 18 })
+  } else if (coords.value) {
     m.setView(coords.value, 16)
   } else if (matchedSurveys.value.length > 0) {
     const group = L.featureGroup(

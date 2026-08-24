@@ -113,6 +113,7 @@ class ApplicationDetailSerializer(serializers.ModelSerializer):
     legacy_certificate_url = serializers.SerializerMethodField()
     street_hold = serializers.SerializerMethodField()
     location_contention = serializers.SerializerMethodField()
+    street_geometry = serializers.SerializerMethodField()
 
     class Meta:
         model = Application
@@ -153,8 +154,46 @@ class ApplicationDetailSerializer(serializers.ModelSerializer):
             'payments',
             'street_hold',
             'location_contention',
+            'street_geometry',
         ]
         read_only_fields = fields
+
+    def get_street_geometry(self, obj):
+        """The registry's centre-line for this street, so the map can draw the
+        street itself rather than a scatter of the buildings along it.
+
+        Matched by name and then by distance, because an application records a
+        name and a point, not a link to a registry row. Returns None when the
+        registry has no line — the map falls back to the pin.
+        """
+        import math
+
+        from config.management.commands.import_osm_streets import name_key as key
+        from config.models import Street
+
+        # An application stores the name with its type word stripped ("Akili"),
+        # while the registry keeps it ("Akili Street") — so compare on the same
+        # type-less key the importer matches with, or nothing ever lines up.
+        want = key(obj.proposed_street_name)
+        if not want:
+            return None
+        candidates = [s for s in Street.objects.exclude(geometry='').exclude(geometry=None)
+                      if key(s.name) == want]
+        if not candidates:
+            return None
+        if obj.latitude is None or obj.longitude is None:
+            return candidates[0].geometry
+        lat, lng = float(obj.latitude), float(obj.longitude)
+        best, best_d = None, float('inf')
+        for s in candidates:
+            if s.latitude is None:
+                continue
+            d = math.hypot((float(s.latitude) - lat) * 111000,
+                           (float(s.longitude) - lng) * 111000 * math.cos(math.radians(lat)))
+            if d < best_d:
+                best, best_d = s, d
+        # Same name a long way off is a different street with the same name.
+        return best.geometry if best and best_d <= 1000 else None
 
     def get_street_hold(self, obj):
         """Whether this application still holds its street, and for how long —

@@ -101,6 +101,7 @@
                 :location-description="appDetail.location_description"
                 :street-name="appDetail.proposed_street_name"
                 :proposed-street-name="appDetail.proposed_street_name"
+                :street-geometry="appDetail.street_geometry"
                 hide-other-buildings
                 show-street-picture />
             </div>
@@ -201,7 +202,7 @@ import DocumentRepository from '@/components/DocumentRepository.vue'
 
 interface Member { number: number; name: string; is_chairman: boolean; responded?: boolean }
 interface AppRow { id: string; proposed_street_name: string; reference_number: string; locality: string; is_legacy?: boolean }
-interface AppDetail { proposed_street_name: string; street_type_name?: string; ward?: string; ward_display?: string; locality?: string; location_description?: string; latitude?: number | string | null; longitude?: number | string | null; is_legacy?: boolean }
+interface AppDetail { street_geometry?: string | null; proposed_street_name: string; street_type_name?: string; ward?: string; ward_display?: string; locality?: string; location_description?: string; latitude?: number | string | null; longitude?: number | string | null; is_legacy?: boolean }
 interface DocRow { id: string; document_type: string; document_type_display?: string; title?: string; file?: string; file_url?: string }
 interface Review {
   members: Member[]; responded_count: number; others_responded: number; quorum_met: boolean; my_viewed: boolean

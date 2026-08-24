@@ -145,6 +145,7 @@
                   :location-description="application.location_description"
                   :street-name="application.proposed_street_name"
                   :proposed-street-name="application.proposed_street_name"
+                  :street-geometry="application.street_geometry"
                 />
                 <!-- Street picture + external views + duplicate check -->
                 <div v-if="coords" class="mt-3">
@@ -730,6 +731,7 @@ interface Application {
   is_royalty_exempt?: boolean
   signboard_number?: string
   pole_number?: string
+  street_geometry?: string | null
   location_contention?: {
     position: number
     total: number
