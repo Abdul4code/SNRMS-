@@ -27,6 +27,7 @@ class MemberProfileTests(TestCase):
         self.client.force_authenticate(self.staff)
         self.token = self.client.post('/api/applications/committee/verify-member/',
                                       {'number': 2, 'pin': '2222'}, format='json').data['token']
+        self.current = '2222'
 
     def hdr(self, token=None):
         return {'HTTP_X_COMMITTEE_MEMBER': token or self.token}
@@ -65,16 +66,21 @@ class MemberProfileTests(TestCase):
         self.me.refresh_from_db()
         self.assertTrue(self.me.check_pin('2222'), 'the old PIN must still work')
 
-    def test_the_shipped_default_is_refused(self):
-        r = self.patch({'current_pin': '2222', 'new_pin': '2222'})
-        self.assertEqual(r.status_code, 400)
-        self.assertIn('default', r.data['detail'].lower())
+    def test_a_member_may_keep_a_simple_pin_if_they_choose(self):
+        """Which PIN is worth having is the member's judgement. The console says
+        when one is the default; it does not overrule them."""
+        for pin in ('9999', '1234', '2222'):
+            r = self.patch({'current_pin': self.current, 'new_pin': pin})
+            self.assertEqual(r.status_code, 200, f'{pin}: {r.content[:200]}')
+            self.me.refresh_from_db()
+            self.assertTrue(self.me.check_pin(pin))
+            self.current = pin
 
-    def test_four_of_the_same_digit_is_refused(self):
-        self.assertEqual(self.patch({'current_pin': '2222', 'new_pin': '9999'}).status_code, 400)
-
-    def test_an_obvious_run_of_digits_is_refused(self):
-        self.assertEqual(self.patch({'current_pin': '2222', 'new_pin': '1234'}).status_code, 400)
+    def test_the_console_is_still_told_when_a_pin_is_the_default(self):
+        self.patch({'current_pin': '2222', 'new_pin': '8473'})
+        self.patch({'current_pin': '8473', 'new_pin': '2222'})
+        r = self.client.get(PROFILE, **self.hdr())
+        self.assertTrue(r.data['using_default_pin'], 'warn, but do not block')
 
     def test_a_short_pin_is_refused(self):
         self.assertEqual(self.patch({'current_pin': '2222', 'new_pin': '12'}).status_code, 400)

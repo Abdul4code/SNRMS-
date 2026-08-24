@@ -95,18 +95,6 @@ class MemberProfileView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
-    # Rejected outright: the shipped defaults and anything as guessable.
-    def _weak(self, pin, member):
-        # Check the shipped default first: for most members it is also four of the
-        # same digit, and naming it as "the default" is the more useful message.
-        if pin == str(member.number) * len(pin):    # the default this system shipped with
-            return 'That is the default PIN for your member number. Choose your own.'
-        if len(set(pin)) == 1:                      # 1111, 0000, 9999
-            return 'Choose a PIN that is not the same digit four times.'
-        if pin in ('1234', '0123', '12345', '123456'):
-            return 'That PIN is too easy to guess. Choose another.'
-        return ''
-
     def get(self, request):
         member = _member_from_token(request)
         if not member:
@@ -150,12 +138,12 @@ class MemberProfileView(APIView):
             if not member.check_pin(str(request.data.get('current_pin') or '')):
                 return Response({'detail': 'Your current PIN is not correct.'},
                                 status=status.HTTP_400_BAD_REQUEST)
+            # Format only. Which PIN is worth having is the member's judgement,
+            # not this system's — the console still tells them when theirs is the
+            # default one, but it does not refuse it.
             if not new_pin.isdigit() or len(new_pin) < 4:
                 return Response({'detail': 'A PIN must be at least 4 digits.'},
                                 status=status.HTTP_400_BAD_REQUEST)
-            weak = self._weak(new_pin, member)
-            if weak:
-                return Response({'detail': weak}, status=status.HTTP_400_BAD_REQUEST)
             member.set_pin(new_pin)
             changed.append('PIN')
 
