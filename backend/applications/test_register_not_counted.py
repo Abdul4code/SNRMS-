@@ -74,3 +74,60 @@ class RegisterImportNotCountedTests(TestCase):
         self.client.force_authenticate(self.applicant)
         rows = self.rows(self.client.get('/api/applications/'))
         self.assertEqual([r['proposed_street_name'] for r in rows], ['Real Validation'])
+
+
+class RegistryStatusLabelTests(TestCase):
+    """In the applications database, an imported row says what it is."""
+
+    def setUp(self):
+        self.st = StreetType.objects.create(name='Street', code='ST')
+        self.importer = User.objects.create_user(
+            email='legacy-registry@ibeju-lekki.gov.ng', password='x',
+            first_name='Legacy', last_name='Registry', role=Role.APPLICANT)
+        self.applicant = User.objects.create_user(
+            email='someone@example.com', password='x', first_name='S', last_name='O',
+            role=Role.APPLICANT)
+        self.chairman = User.objects.create_user(
+            email='chair3@example.com', password='x', first_name='C', last_name='H',
+            role=Role.COMMITTEE_CHAIRMAN)
+        self.client = APIClient()
+        self.client.force_authenticate(self.chairman)
+
+    def row_for(self, name):
+        r = self.client.get('/api/applications/registry/')
+        self.assertEqual(r.status_code, 200, r.content[:300])
+        return next(x for x in r.data['results'] if x['proposed_street_name'] == name)
+
+    def test_an_imported_register_row_reads_as_legacy(self):
+        Application.objects.create(
+            applicant=self.importer, proposed_street_name='Imported Street',
+            location_description='d', street_type=self.st, is_legacy=True,
+            is_register_import=True, status=ApplicationStatus.CERTIFICATE_ISSUED)
+        row = self.row_for('Imported Street')
+        self.assertEqual(row['status_display'], 'Legacy')
+        self.assertTrue(row['is_register_import'])
+
+    def test_a_certificate_this_system_issued_still_says_so(self):
+        """A validation that ran the full course earned its certificate."""
+        Application.objects.create(
+            applicant=self.applicant, proposed_street_name='Earned Street',
+            location_description='d', street_type=self.st, is_legacy=True,
+            status=ApplicationStatus.CERTIFICATE_ISSUED)
+        row = self.row_for('Earned Street')
+        self.assertEqual(row['status_display'], 'Certificate Issued')
+        self.assertFalse(row['is_register_import'])
+
+    def test_an_ordinary_application_reads_normally(self):
+        Application.objects.create(
+            applicant=self.applicant, proposed_street_name='New Street',
+            location_description='d', street_type=self.st,
+            status=ApplicationStatus.UNDER_NAMING_COMMITTEE_REVIEW)
+        self.assertEqual(self.row_for('New Street')['status_display'],
+                         'Under Naming Committee Review')
+
+    def test_the_raw_status_is_still_there_for_anything_that_needs_it(self):
+        Application.objects.create(
+            applicant=self.importer, proposed_street_name='Imported Two',
+            location_description='d', street_type=self.st, is_legacy=True,
+            is_register_import=True, status=ApplicationStatus.CERTIFICATE_ISSUED)
+        self.assertEqual(self.row_for('Imported Two')['status'], 'certificate_issued')

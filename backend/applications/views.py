@@ -1132,6 +1132,12 @@ class AdminApplicationRegistryView(APIView):
                 'proposed_street_name': a.proposed_street_name,
                 'street_type': a.street_type.name if a.street_type else '',
                 'status': a.status,
+                # A row lifted from the old paper register never went through
+                # this system, so "Certificate Issued" claims a process that did
+                # not happen. It reads as what it is.
+                'status_display': 'Legacy' if a.is_register_import else a.get_status_display(),
+                'is_register_import': a.is_register_import,
+                'is_legacy': a.is_legacy,
                 'ward': a.get_ward_display(),
                 'locality': a.locality or '',
                 'applicant_name': f'{a.applicant.first_name} {a.applicant.last_name}'.strip() if a.applicant else '',

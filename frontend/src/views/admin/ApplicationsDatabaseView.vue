@@ -51,7 +51,14 @@
                 <td class="px-4 py-3 text-slate-600 text-xs">{{ r.applicant_email }}</td>
                 <td class="px-4 py-3 text-slate-600 text-xs">{{ r.applicant_phone || '—' }}</td>
                 <td class="px-4 py-3 text-slate-600 text-xs">{{ r.locality || '—' }}</td>
-                <td class="px-4 py-3"><span class="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600">{{ r.status }}</span></td>
+                <td class="px-4 py-3">
+                  <span class="text-xs px-2 py-0.5 rounded"
+                        :style="r.is_register_import
+                          ? 'background:#fef3c7;color:#92400e'
+                          : 'background:#f1f5f9;color:#475569'">
+                    {{ r.status_display || r.status }}
+                  </span>
+                </td>
                 <td class="px-4 py-3 text-right font-semibold text-slate-800">{{ r.total_paid.toLocaleString() }}</td>
                 <td class="px-4 py-3">
                   <div v-for="(p, i) in r.payment_refs" :key="i" class="text-[11px] font-mono text-slate-500">
@@ -79,7 +86,8 @@ import { applicationApi } from '@/services/api'
 interface PayRef { stage: string; reference: string; status: string }
 interface Row {
   id: string; reference_number: string; proposed_street_name: string; street_type: string
-  status: string; ward: string; locality: string
+  status: string; status_display?: string; is_register_import?: boolean
+  ward: string; locality: string
   applicant_name: string; applicant_email: string; applicant_phone: string
   total_paid: number; payment_refs: PayRef[]
 }
@@ -104,7 +112,7 @@ function exportCsv() {
   const head = ['Reference', 'Street', 'Type', 'Applicant', 'Email', 'Phone', 'Locality', 'Status', 'Paid', 'Payment IDs']
   const lines = rows.value.map(r => [
     r.reference_number, r.proposed_street_name, r.street_type, r.applicant_name,
-    r.applicant_email, r.applicant_phone, r.locality, r.status, r.total_paid,
+    r.applicant_email, r.applicant_phone, r.locality, r.status_display || r.status, r.total_paid,
     r.payment_refs.map(p => `${p.reference}(${p.status})`).join(' | '),
   ].map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))
   const blob = new Blob([[head.join(','), ...lines].join('\n')], { type: 'text/csv' })
