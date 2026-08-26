@@ -44,7 +44,7 @@
                 <MenuItem v-slot="{ active }"><RouterLink to="/admin/applications-database" :class="['block px-4 py-2 text-sm', active ? 'bg-slate-50 text-emerald-700' : 'text-slate-700']">Database</RouterLink></MenuItem>
               </MenuItems>
             </Menu>
-            <NavLink v-if="auth.isChairman" to="/admin/audit">Audit</NavLink>
+            <NavLink v-if="auth.isChairman || auth.isFinance" to="/admin/audit">Audit</NavLink>
             <NavLink v-if="auth.isNamingCommittee" to="/committee/console">Committee Console</NavLink>
             <NavLink v-if="auth.isFinance" to="/admin/confirm-payments">Confirm Payments</NavLink>
             <NavLink v-if="auth.isFinance" to="/admin/official-signature">Signature</NavLink>

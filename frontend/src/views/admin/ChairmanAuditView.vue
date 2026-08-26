@@ -2,7 +2,7 @@
   <div class="min-h-screen" style="background:#f1f5f9">
     <div style="background:#0f172a">
       <div class="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-        <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1.5">Local Government Chairman</p>
+        <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1.5">Ibeju-Lekki LGA · Administration</p>
         <h1 class="text-white text-2xl font-bold tracking-tight">Audit &amp; Reports</h1>
         <p class="text-slate-400 text-sm mt-1">Applications and revenue within a period.</p>
       </div>

@@ -93,7 +93,7 @@ const router = createRouter({
       path: '/admin/audit',
       name: 'chairman-audit',
       component: () => import('@/views/admin/ChairmanAuditView.vue'),
-      meta: { requiresAuth: true, roles: ['committee_chairman'] },
+      meta: { requiresAuth: true, roles: ['finance', 'committee_chairman'] },
     },
     {
       path: '/admin/official-signature',

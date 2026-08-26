@@ -1195,8 +1195,8 @@ class ChairmanAuditView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        if getattr(request.user, 'role', None) != 'committee_chairman':
-            return Response({'detail': 'Local Government Chairman only.'}, status=status.HTTP_403_FORBIDDEN)
+        if getattr(request.user, 'role', None) not in ('committee_chairman', 'finance'):
+            return Response({'detail': 'Chairman or Finance only.'}, status=status.HTTP_403_FORBIDDEN)
         import datetime as _dt
         from django.utils import timezone
         from django.db.models import Count, Sum
@@ -1262,8 +1262,8 @@ class ChairmanAuditReportView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        if getattr(request.user, 'role', None) != 'committee_chairman':
-            return Response({'detail': 'Local Government Chairman only.'}, status=status.HTTP_403_FORBIDDEN)
+        if getattr(request.user, 'role', None) not in ('committee_chairman', 'finance'):
+            return Response({'detail': 'Chairman or Finance only.'}, status=status.HTTP_403_FORBIDDEN)
         import datetime as _dt, io, os
         from django.utils import timezone
         from django.http import FileResponse
