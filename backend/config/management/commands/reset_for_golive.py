@@ -50,6 +50,10 @@ class Command(BaseCommand):
         parser.add_argument('--reassign-legacy', action='store_true',
                             help='Move legacy applications owned by ordinary users to the '
                                  'import account, so those accounts can be removed too.')
+        parser.add_argument('--keep-accounts', action='store_true',
+                            help='Keep every account, including public applicants. Their test '
+                                 'applications and payments still go; only the logins survive, '
+                                 'so testers do not have to register again.')
         parser.add_argument('--delete-media', action='store_true',
                             help='Delete uploaded files belonging to the removed records.')
         parser.add_argument('--apply-fees', action='store_true',
@@ -127,9 +131,12 @@ class Command(BaseCommand):
         self.stdout.write(f'    documents                : {Document.objects.filter(application__in=doomed_apps).count()}')
         self.stdout.write(f'    verification codes       : {EmailVerification.objects.count()}')
         removable = self._removable_users(options)
-        self.stdout.write(f'    applicant accounts       : {len(removable)}')
-        for u in removable:
-            self.stdout.write(f'        {u.email}')
+        if options.get('keep_accounts'):
+            self.stdout.write('    applicant accounts       : 0 (--keep-accounts: every login stays)')
+        else:
+            self.stdout.write(f'    applicant accounts       : {len(removable)}')
+            for u in removable:
+                self.stdout.write(f'        {u.email}')
         self.stdout.write('')
         self.stdout.write('  WILL KEEP')
         self.stdout.write(f'    legacy registry apps     : {kept_legacy}')
@@ -138,7 +145,8 @@ class Command(BaseCommand):
         self.stdout.write(f'    street types             : {StreetType.objects.count()}')
         self.stdout.write(f'    fee rows                 : {FeeConfiguration.objects.count()}')
         kept_users = User.objects.exclude(id__in=[u.id for u in removable])
-        self.stdout.write(f'    accounts (all staff)     : {kept_users.count()}')
+        label = 'accounts (all)' if options.get('keep_accounts') else 'accounts (all staff)'
+        self.stdout.write(f'    {label:24s} : {kept_users.count()}')
         for u in kept_users.order_by('role', 'email'):
             self.stdout.write(f'        {u.email}  ({u.role}{", superuser" if u.is_superuser else ""})')
 
@@ -154,6 +162,8 @@ class Command(BaseCommand):
         An applicant still holding an application is also kept, because
         Application.applicant is PROTECTed.
         """
+        if options.get('keep_accounts'):
+            return []                      # the logins stay; their test data still goes
         removable = []
         for user in User.objects.all():
             if user.is_superuser or user.is_staff:

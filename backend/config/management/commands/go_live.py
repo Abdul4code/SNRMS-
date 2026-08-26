@@ -29,6 +29,9 @@ class Command(BaseCommand):
         parser.add_argument('--reassign-legacy', action='store_true',
                             help='Move legacy imports owned by ordinary accounts to the import '
                                  'account, so every test account can be removed.')
+        parser.add_argument('--keep-accounts', action='store_true',
+                            help='Keep every account, including public applicants — only '
+                                 'their test applications and payments are removed.')
         parser.add_argument('--keep-media', action='store_true',
                             help='Leave uploaded files on disk instead of deleting the ones '
                                  'belonging to removed records.')
@@ -74,6 +77,8 @@ class Command(BaseCommand):
             reset_args.append('--dry-run')
         if options['reassign_legacy']:
             reset_args.append('--reassign-legacy')
+        if options['keep_accounts']:
+            reset_args.append('--keep-accounts')
         call_command(*reset_args)
 
         if not write:
