@@ -129,6 +129,11 @@ class Application(models.Model):
     certificate_issued_at = models.DateTimeField(null=True, blank=True)
     expires_at = models.DateField(null=True, blank=True)
     is_legacy = models.BooleanField(default=False, help_text='Applicant had a manual certificate before digital registration')
+    # A row from the council's old paper register, imported in bulk. Historical
+    # reference, not work anybody submitted — so it is not counted as an
+    # application and does not sit in anyone's queue. A validation someone
+    # actually applies for is is_legacy too, but not this.
+    is_register_import = models.BooleanField(default=False, db_index=True)
     legacy_certificate = models.FileField(upload_to='legacy_certificates/', null=True, blank=True)
     google_map_uploaded = models.BooleanField(default=False)
     signpost_installed = models.BooleanField(default=False)

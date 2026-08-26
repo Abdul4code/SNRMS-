@@ -90,6 +90,14 @@ def _auto_expire_certificates():
             pass
 
 
+def request_flag(request, name):
+    """Read a query-string boolean, or None when it was not given."""
+    raw = request.query_params.get(name)
+    if raw is None:
+        return None
+    return str(raw).lower() in ('1', 'true', 'yes')
+
+
 def street_under_consideration(lat, lng, exclude_id=None):
     """The application holding this street, or None if it is free.
 
@@ -152,6 +160,12 @@ class ApplicationListCreateView(generics.ListCreateAPIView):
                 ApplicationStatus.DRAFT,
                 ApplicationStatus.WITHDRAWN,
             ])
+            # The old paper register was imported in bulk as historical reference.
+            # Counting those rows as applications made the dashboard read 352
+            # approved on a system nobody had applied to yet. They stay out of the
+            # queues and the counts; ?include_register=true asks for them.
+            if request_flag(self.request, 'include_register') is not True:
+                qs = qs.filter(is_register_import=False)
 
         status_filter = self.request.query_params.get('status')
         if status_filter:
@@ -1200,7 +1214,9 @@ class ChairmanAuditView(APIView):
         category = request.query_params.get('category') or ''
         category = category if category in CATEGORIES else ''
 
-        apps = Application.objects.filter(created_at__range=(start, end), is_deleted=False)
+        apps = (Application.objects
+                .filter(created_at__range=(start, end), is_deleted=False)
+                .filter(is_register_import=False))   # the old paper register is not activity
         if category:
             apps = applications_in_category(apps, category)
         by_status = {row['status']: row['n'] for row in apps.values('status').annotate(n=Count('id'))}
@@ -1210,7 +1226,7 @@ class ChairmanAuditView(APIView):
         from applications.models import StatusHistory
         issued_q = StatusHistory.objects.filter(
             to_status='certificate_issued', created_at__range=(start, end),
-            application__is_deleted=False,
+            application__is_deleted=False, application__is_register_import=False,
         )
         if category:
             issued_q = issued_q.filter(
@@ -1269,13 +1285,15 @@ class ChairmanAuditReportView(APIView):
         category = request.query_params.get('category') or ''
         category = category if category in CATEGORIES else ''
 
-        apps = Application.objects.filter(created_at__range=(start, end), is_deleted=False)
+        apps = (Application.objects
+                .filter(created_at__range=(start, end), is_deleted=False)
+                .filter(is_register_import=False))
         if category:
             apps = applications_in_category(apps, category)
         from applications.models import StatusHistory
         issued_q = StatusHistory.objects.filter(
             to_status='certificate_issued', created_at__range=(start, end),
-            application__is_deleted=False,
+            application__is_deleted=False, application__is_register_import=False,
         )
         if category:
             issued_q = issued_q.filter(application__in=applications_in_category(

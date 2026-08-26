@@ -421,6 +421,7 @@ class Command(BaseCommand):
                 lga_area='Ibeju-Lekki',
                 status=ApplicationStatus.CERTIFICATE_ISSUED,
                 is_legacy=True,
+                is_register_import=True,   # historical record, not a submitted application
                 certificate_issued_at=timezone.now(),
                 expires_at=expiry,
                 google_map_uploaded=True,
