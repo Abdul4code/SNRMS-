@@ -29,6 +29,12 @@
             </div>
             <!-- Action buttons -->
             <div class="flex flex-wrap gap-2">
+              <RouterLink v-if="EDITABLE_STATUSES.includes(application.status)"
+                          :to="`/applications/${application.id}/edit`"
+                          class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-slate-700 border border-slate-200 bg-white hover:bg-slate-50 transition-all">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zM19.5 7.125L16.875 4.5"/></svg>
+                Edit application
+              </RouterLink>
               <RouterLink v-if="application.status === 'draft' && !application.is_legacy && !allDocsUploaded"
                           :to="`/applications/${application.id}/documents`"
                           class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all"
@@ -382,6 +388,8 @@ interface Application {
 interface Document { id: number; document_type: string; document_type_display?: string; file?: string; file_url?: string; is_verified?: boolean }
 interface HistoryEntry { new_status?: string; status?: string; created_at?: string; timestamp?: string; remarks?: string; comment?: string }
 
+// Editable until the applicant has paid (payment submitted -> locked).
+const EDITABLE_STATUSES = ['draft', 'submitted', 'awaiting_stage_a_payment']
 const PAYMENT_STATUSES = ['awaiting_stage_a_payment', 'awaiting_stage_c_payment', 'awaiting_renewal_payment']
 const RENEWAL_STATUSES = ['certificate_issued', 'expired', 'renewed']
 

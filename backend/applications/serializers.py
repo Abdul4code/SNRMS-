@@ -93,6 +93,7 @@ class ApplicationListSerializer(serializers.ModelSerializer):
             'applicant_name',
             'status',
             'is_legacy',      # lets every queue show new-application vs validation
+            'is_renewal_request',
             'google_map_uploaded',
             'signpost_installed',
             'expires_at',
@@ -133,6 +134,7 @@ class ApplicationDetailSerializer(serializers.ModelSerializer):
             'lga_area',
             'status',
             'is_legacy',
+            'is_renewal_request',
             'committee_remarks',
             'chairman_remarks',
             'certificate_number',
@@ -257,6 +259,7 @@ class ApplicationCreateSerializer(serializers.ModelSerializer):
             'street_line',
             'lga_area',
             'is_legacy',
+            'is_renewal_request',
             'legacy_certificate',
         ]
         read_only_fields = ['id']
@@ -269,7 +272,16 @@ class ApplicationCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {'legacy_certificate': 'Please upload your existing certificate for legacy registration.'}
             )
-        if not attrs.get('is_legacy') and not attrs.get('street_type'):
+        if attrs.get('is_renewal_request'):
+            # The expired certificate is the evidence there is anything to renew.
+            if not attrs.get('legacy_certificate'):
+                raise serializers.ValidationError(
+                    {'legacy_certificate': 'Please upload the certificate you are renewing.'})
+            if attrs.get('is_legacy'):
+                raise serializers.ValidationError(
+                    {'is_renewal_request': 'An application is either a validation or a '
+                                           'renewal, not both.'})
+        elif not attrs.get('is_legacy') and not attrs.get('street_type'):
             raise serializers.ValidationError({'street_type': 'Street type is required.'})
         return attrs
 
@@ -314,8 +326,13 @@ class ApplicationUpdateSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         instance = self.instance
-        if instance and instance.status != ApplicationStatus.DRAFT:
+        editable = (
+            ApplicationStatus.DRAFT,
+            ApplicationStatus.SUBMITTED,
+            ApplicationStatus.AWAITING_STAGE_A_PAYMENT,
+        )
+        if instance and instance.status not in editable:
             raise serializers.ValidationError(
-                'Application can only be edited while in draft status.'
+                'This application can no longer be edited — a payment has already been made.'
             )
         return attrs

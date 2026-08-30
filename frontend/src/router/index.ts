@@ -58,6 +58,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/applications/:id/edit',
+      name: 'application-edit',
+      component: () => import('@/views/applicant/ApplicationEditView.vue'),
+      meta: { requiresAuth: true, roles: ['applicant'] },
+    },
+    {
       path: '/applications/:id/documents',
       name: 'application-documents',
       component: () => import('@/views/applicant/ApplicationDocumentsView.vue'),

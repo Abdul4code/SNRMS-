@@ -311,9 +311,16 @@ class ApplicationDetailView(generics.RetrieveUpdateDestroyAPIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        if application.status != ApplicationStatus.DRAFT:
+        # Editable up until the applicant has paid. Once a payment is submitted
+        # (awaiting confirmation) or confirmed, the application is locked.
+        EDITABLE_STATUSES = (
+            ApplicationStatus.DRAFT,
+            ApplicationStatus.SUBMITTED,
+            ApplicationStatus.AWAITING_STAGE_A_PAYMENT,
+        )
+        if application.status not in EDITABLE_STATUSES:
             return Response(
-                {'detail': 'Application can only be edited while in draft status.'},
+                {'detail': 'This application can no longer be edited — a payment has already been made.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -1138,6 +1145,11 @@ class AdminApplicationRegistryView(APIView):
                 'status_display': 'Legacy' if a.is_register_import else a.get_status_display(),
                 'is_register_import': a.is_register_import,
                 'is_legacy': a.is_legacy,
+                'is_renewal_request': a.is_renewal_request,
+                'kind': ('Register import' if a.is_register_import
+                         else 'Renewal' if a.is_renewal_request
+                         else 'Validation' if a.is_legacy
+                         else 'New street name'),
                 'ward': a.get_ward_display(),
                 'locality': a.locality or '',
                 'applicant_name': f'{a.applicant.first_name} {a.applicant.last_name}'.strip() if a.applicant else '',
