@@ -822,6 +822,13 @@ function drawRoads(roads: RoadSegment[]) {
   refreshStreetLabels()
 }
 
+/** Identifies a line by its endpoints, so two copies of one road compare equal. */
+function lineKey(line: [number, number][] | null): string {
+  if (!line || line.length < 2) return ''
+  const a = line[0]!, b = line[line.length - 1]!
+  return `${a[0].toFixed(6)},${a[1].toFixed(6)}|${b[0].toFixed(6)},${b[1].toFixed(6)}`
+}
+
 /** Does this road already carry a name — its own, or one on the register?
  *
  *  Judged on the road the applicant tapped. Reading the nearest surveyed
@@ -831,8 +838,16 @@ function drawRoads(roads: RoadSegment[]) {
  */
 function nameOfRoad(road: RoadSegment, line: [number, number][]): string {
   if ((road.name || '').trim()) return road.name.trim()
-  // Named on the council's register but not in OpenStreetMap: match a registry
-  // street that runs along this road, or sits on it.
+  // A registered street that was located on this very road carries the road's
+  // own line, so the two lines are identical — the surest match there is, and it
+  // does not care how far the street's marker point drifted from it.
+  const key = lineKey(line)
+  if (key) {
+    for (const st of registryStreets.value) {
+      if (st.geometry && lineKey(lineOf(st.geometry)) === key) return st.name
+    }
+  }
+  // Otherwise fall back to a registry street sitting on this road.
   let best = '', bestD = Infinity
   for (const st of registryStreets.value) {
     if (st.latitude == null || st.longitude == null) continue
