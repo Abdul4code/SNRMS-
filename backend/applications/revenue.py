@@ -28,7 +28,7 @@ CATEGORIES = (NEW_STREET, VALIDATION, RENEWAL)
 CATEGORY_LABELS = {
     NEW_STREET: 'New street names',
     VALIDATION: 'Validations of existing streets',
-    RENEWAL: 'Renewals',
+    RENEWAL: 'Renewals of expired registrations',
 }
 
 FEE_LABELS = {
@@ -41,7 +41,7 @@ FEE_LABELS = {
 
 def category_of(payment):
     """Which category a single payment belongs to."""
-    if payment.stage == PaymentStage.RENEWAL:
+    if payment.stage == PaymentStage.RENEWAL or payment.application.is_renewal_request:
         return RENEWAL
     return VALIDATION if payment.application.is_legacy else NEW_STREET
 
@@ -87,15 +87,20 @@ def revenue_breakdown(start, end, category=None):
 def applications_in_category(queryset, category):
     """Narrow an Application queryset to one revenue category.
 
-    Renewal is not a kind of application but a stage an application reaches, so it
-    is matched by the renewal payments raised against it.
+    A renewal is either an application to renew an expired registration, or an
+    ordinary application that has since been renewed — so it is matched both by
+    the kind of application and by the renewal payments raised against it. That
+    also keeps renewals out of the other two categories.
     """
+    from django.db.models import Q
+
+    renewals = Q(is_renewal_request=True) | Q(payments__stage=PaymentStage.RENEWAL)
     if category == NEW_STREET:
-        return queryset.filter(is_legacy=False)
+        return queryset.filter(is_legacy=False).exclude(renewals).distinct()
     if category == VALIDATION:
-        return queryset.filter(is_legacy=True)
+        return queryset.filter(is_legacy=True).exclude(renewals).distinct()
     if category == RENEWAL:
-        return queryset.filter(payments__stage=PaymentStage.RENEWAL).distinct()
+        return queryset.filter(renewals).distinct()
     return queryset
 
 

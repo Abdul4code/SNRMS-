@@ -102,7 +102,10 @@ def submit_application(application: Application, actor) -> Application:
         ValueError: if the street name is already taken.
         ValueError: if the transition is not valid.
     """
-    if not application.is_legacy and not application.documents.filter(is_deleted=False).exists():
+    # A validation and a renewal both carry their evidence as the certificate
+    # uploaded on the application itself, not as a Document record.
+    carries_own_certificate = application.is_legacy or application.is_renewal_request
+    if not carries_own_certificate and not application.documents.filter(is_deleted=False).exists():
         raise ValueError(
             'At least one supporting document must be uploaded before submitting.'
         )
@@ -150,14 +153,24 @@ def submit_payment_reference(application: Application, actor) -> Payment:
         FeeComponent.RADIO_TV_TAX,
         FeeComponent.COMMITTEE_VERIFICATION_FEE,
     ]
-    total = FeeConfiguration.objects.filter(
-        component__in=stage_a_components,
-        is_active=True,
-    ).aggregate(total=_Sum('amount'))['total'] or Decimal('0.00')
+    # Renewing an expired registration is one payment — the renewal fee — rather
+    # than the processing fee a new name or a validation opens with. The road it
+    # travels afterwards is the same: committee, then the Chairman.
+    if application.is_renewal_request:
+        from payments.services import calculate_renewal_fee
+        fee = calculate_renewal_fee(application.street_type_id)
+        total = fee['amount'] if fee else Decimal('0.00')
+        stage = PaymentStage.RENEWAL
+    else:
+        total = FeeConfiguration.objects.filter(
+            component__in=stage_a_components,
+            is_active=True,
+        ).aggregate(total=_Sum('amount'))['total'] or Decimal('0.00')
+        stage = PaymentStage.STAGE_A
 
     payment = Payment.objects.create(
         application=application,
-        stage=PaymentStage.STAGE_A,
+        stage=stage,
         status=PaymentStatus.PENDING,
         amount_expected=total,
     )
@@ -173,7 +186,8 @@ def submit_payment_reference(application: Application, actor) -> Payment:
         notification_type=NotificationType.APPLICATION_STATUS_CHANGE,
         title='Payment Required',
         message=(
-            f'Your application {application.reference_number} requires Stage A payment '
+            f'Your application {application.reference_number} requires '
+            f'{"the renewal fee" if application.is_renewal_request else "Stage A payment"} '
             f'of ₦{total:,.2f}. Please proceed with payment.'
         ),
     )

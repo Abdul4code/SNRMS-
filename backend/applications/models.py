@@ -134,6 +134,12 @@ class Application(models.Model):
     # application and does not sit in anyone's queue. A validation someone
     # actually applies for is is_legacy too, but not this.
     is_register_import = models.BooleanField(default=False, db_index=True)
+    # Renewing a registration that has run out. Follows the same road as a
+    # validation — committee, then Chairman — but it renews a grant the council
+    # already made rather than bringing a new street onto the register, and it
+    # pays the renewal fee. Tracked apart so the council can see what renewals
+    # are worth on their own.
+    is_renewal_request = models.BooleanField(default=False, db_index=True)
     legacy_certificate = models.FileField(upload_to='legacy_certificates/', null=True, blank=True)
     google_map_uploaded = models.BooleanField(default=False)
     signpost_installed = models.BooleanField(default=False)

@@ -307,7 +307,14 @@ def confirm_renewal_payment(payment: Payment, actor) -> Payment:
     """
     Mark the renewal payment as confirmed, transition the application through
     renewal_payment_confirmed → renewed, and notify the applicant.
+
+    A renew-expired *application* is different: its renewal fee is the fee that
+    opens the file, and the council has not looked at it yet. That one goes to
+    the committee like any other application instead of being renewed on the
+    spot — the road is the same as a validation, only the fee differs.
     """
+    if payment.application.is_renewal_request:
+        return confirm_stage_a_payment(payment, actor)
     return _confirm_term_payment(
         payment, actor, kind='renewal',
         confirm_remark='Renewal payment confirmed by finance.',

@@ -43,13 +43,13 @@
           <p class="text-xs text-slate-500 mt-1">Enter a street name already registered so it's recognised.</p>
         </RouterLink>
 
-        <RouterLink to="/applications?tab=renew"
+        <RouterLink to="/applications/new?mode=renewal"
                     class="group rounded-2xl p-5 bg-white border border-slate-200 hover:border-sky-300 hover:shadow-md transition-all">
           <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-3" style="background:rgba(2,132,199,0.12)">
             <ArrowPathIcon class="w-6 h-6" style="color:#0284c7" />
           </div>
           <p class="text-sm font-bold text-slate-900">Renew Expired Registration</p>
-          <p class="text-xs text-slate-500 mt-1">Renew a certificate that has expired.</p>
+          <p class="text-xs text-slate-500 mt-1">Renew a certificate that has expired — choose the street and upload it.</p>
         </RouterLink>
       </div>
 

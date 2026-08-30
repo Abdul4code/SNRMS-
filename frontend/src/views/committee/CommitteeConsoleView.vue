@@ -125,8 +125,8 @@
               <span class="text-xs text-slate-400 ml-2">{{ a.reference_number }}</span>
               <!-- Which kind of application the member is about to open -->
               <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded ml-2 whitespace-nowrap"
-                    :style="a.is_legacy ? 'background:#fef3c7;color:#92400e' : 'background:#dcfce7;color:#047857'">
-                {{ a.is_legacy ? 'Validation' : 'New application' }}
+                    :style="a.is_renewal_request ? 'background:#e0f2fe;color:#0369a1' : a.is_legacy ? 'background:#fef3c7;color:#92400e' : 'background:#dcfce7;color:#047857'">
+                {{ a.is_renewal_request ? 'Renewal' : a.is_legacy ? 'Validation' : 'New application' }}
               </span></span>
             <span class="text-xs text-emerald-600 font-semibold">Review →</span>
           </button>
@@ -278,7 +278,7 @@ import ApplicationMap from '@/components/ApplicationMap.vue'
 import DocumentRepository from '@/components/DocumentRepository.vue'
 
 interface Member { number: number; name: string; title?: string; is_chairman: boolean; responded?: boolean; using_default_pin?: boolean }
-interface AppRow { id: string; proposed_street_name: string; reference_number: string; locality: string; is_legacy?: boolean }
+interface AppRow { id: string; proposed_street_name: string; reference_number: string; locality: string; is_legacy?: boolean; is_renewal_request?: boolean }
 interface AppDetail { street_geometry?: string | null; proposed_street_name: string; street_type_name?: string; ward?: string; ward_display?: string; locality?: string; location_description?: string; latitude?: number | string | null; longitude?: number | string | null; is_legacy?: boolean }
 interface DocRow { id: string; document_type: string; document_type_display?: string; title?: string; file?: string; file_url?: string }
 interface Review {

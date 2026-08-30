@@ -7,11 +7,11 @@
         <nav class="flex items-center gap-2 text-xs text-slate-400 mb-4">
           <RouterLink to="/applications" class="hover:text-emerald-400 transition-colors">My Applications</RouterLink>
           <ChevronRightIcon class="w-3.5 h-3.5 opacity-40" />
-          <span class="text-slate-300">{{ isLegacy ? 'Validate Existing Registration' : 'New Application' }}</span>
+          <span class="text-slate-300">{{ pageTitle }}</span>
         </nav>
-        <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1.5">{{ isLegacy ? 'Existing Registration' : 'New Request' }}</p>
-        <h1 class="text-white text-2xl font-bold tracking-tight">{{ isLegacy ? 'Validate Existing Registration' : 'Street Name Application' }}</h1>
-        <p class="text-slate-400 text-sm mt-1">{{ isLegacy ? 'Register a street name that already exists so it is validated and recognised in the system.' : 'Submit a request to register a new street name in Ibeju-Lekki Local Government Area' }}</p>
+        <p class="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-1.5">{{ pageEyebrow }}</p>
+        <h1 class="text-white text-2xl font-bold tracking-tight">{{ pageTitle }}</h1>
+        <p class="text-slate-400 text-sm mt-1">{{ pageBlurb }}</p>
       </div>
     </div>
 
@@ -69,7 +69,7 @@
           </div>
 
           <!-- Street name: free text (new) OR select from registry (validate) -->
-          <div v-if="!isLegacy">
+          <div v-if="!usesRegistry">
             <label class="block text-sm font-semibold text-slate-700 mb-1.5">
               Proposed Street Name <span class="text-red-500">*</span>
             </label>
@@ -148,7 +148,7 @@
             </div>
           </div>
           <!-- Street type (new applications only) -->
-          <div v-if="!isLegacy">
+          <div v-if="!usesRegistry">
             <label class="block text-sm font-semibold text-slate-700 mb-1.5">
               Street Type <span class="text-red-500">*</span>
             </label>
@@ -213,7 +213,7 @@
                 <p class="text-xs font-medium" :class="streetLocked || pickedRoad ? 'text-emerald-700' : 'text-slate-600'">
                   <template v-if="streetLocked">🔒 Selected street — set from the registry</template>
                   <template v-else-if="pickedRoad">✓ Street selected — tap another to change it</template>
-                  <template v-else-if="isLegacy">Tap the street you selected above</template>
+                  <template v-else-if="usesRegistry">Tap the street you selected above</template>
                   <template v-else>Tap the street you want to name</template>
                 </p>
                 <button type="button" v-if="!streetLocked" @click="locateMe"
@@ -264,9 +264,10 @@
           </div>
 
           <!-- Validate mode: upload the existing document -->
-          <div v-if="isLegacy" class="rounded-xl p-4" style="background: rgba(251,191,36,0.06); border: 1px solid rgba(251,191,36,0.25)">
+          <div v-if="usesRegistry" class="rounded-xl p-4" style="background: rgba(251,191,36,0.06); border: 1px solid rgba(251,191,36,0.25)">
             <label class="block text-sm font-semibold text-slate-700 mb-1.5">
-              Existing Document / Certificate <span class="text-red-500">*</span>
+              {{ isRenewal ? 'Certificate being renewed' : 'Existing Document / Certificate' }}
+              <span class="text-red-500">*</span>
             </label>
             <div class="relative">
               <input type="file" ref="legacyCertInput" accept=".pdf,.jpg,.jpeg,.png" class="hidden" @change="onLegacyCertChange" />
@@ -283,14 +284,18 @@
                 <span v-if="legacyCertFile" class="ml-auto text-xs text-amber-600 underline hover:text-amber-700" @click.stop="legacyCertFile = null">Remove</span>
               </button>
             </div>
-            <p class="text-xs text-slate-400 mt-1.5">Upload the document that proves your existing registration. The committee will validate it against the registry.</p>
+            <p class="text-xs text-slate-400 mt-1.5">
+              {{ isRenewal
+                ? 'Upload the certificate that has expired. The committee checks it against the registry before the Chairman approves the renewal.'
+                : 'Upload the document that proves your existing registration. The committee will validate it against the registry.' }}
+            </p>
           </div>
 
           <!-- Actions -->
           <div class="flex items-center gap-3 pt-1">
             <button type="submit"
                     :disabled="submitting || !form.locality || geoState !== 'success'
-                      || (isLegacy ? (!form.registry_street_id || !legacyCertFile || wrongStreet)
+                      || (usesRegistry ? (!form.registry_street_id || !legacyCertFile || wrongStreet)
                                    : (!form.proposed_street_name || !form.street_type || dup?.verdict === 'duplicate' || !!dup?.rename_blocked || !!streetTaken))"
                     class="flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold text-white transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
                     style="background: linear-gradient(135deg, #059669, #047857); box-shadow: 0 4px 16px rgba(5,150,105,0.3)">
@@ -409,7 +414,7 @@ function pointsForStreet(name: string): [number, number][] {
 }
 
 function checkValidateMatch() {
-  if (!isLegacy.value) { validateNote.value = null; wrongStreet.value = false; return }
+  if (!usesRegistry.value) { validateNote.value = null; wrongStreet.value = false; return }
   if (streetLocked.value) return          // the location came from the registry itself
   const sid = form.value.registry_street_id
   const lat = parseFloat(geoCoords.value.lat), lng = parseFloat(geoCoords.value.lng)
@@ -500,9 +505,29 @@ const dupChecking = ref(false)
 let dupTimer: ReturnType<typeof setTimeout>
 
 const isLegacy = ref(false)
+// Renewing a registration that has run out. It walks the same road as a
+// validation — pick your street, upload the certificate, the committee looks at
+// it — so the two share this screen; only the wording and the fee differ.
+const isRenewal = ref(false)
+/** Both kinds pick an existing street from the registry and upload a certificate. */
+const usesRegistry = computed(() => isLegacy.value || isRenewal.value)
+
+const pageTitle = computed(() =>
+  isRenewal.value ? 'Renew Expired Registration'
+  : isLegacy.value ? 'Validate Existing Registration'
+  : 'Street Name Application')
+const pageEyebrow = computed(() =>
+  isRenewal.value ? 'Renewal' : isLegacy.value ? 'Existing Registration' : 'New Request')
+const pageBlurb = computed(() =>
+  isRenewal.value
+    ? 'Renew a street name registration that has expired. Choose the street, upload the certificate that ran out, and pay the renewal fee.'
+  : isLegacy.value
+    ? 'Register a street name that already exists so it is validated and recognised in the system.'
+    : 'Submit a request to register a new street name in Ibeju-Lekki Local Government Area')
 const route = useRoute()
 // "Validate existing registration" enters this form in legacy mode.
 if (route.query.mode === 'legacy') isLegacy.value = true
+if (route.query.mode === 'renewal') isRenewal.value = true
 const legacyCertFile = ref<File | null>(null)
 const legacyCertInput = ref<HTMLInputElement | null>(null)
 
@@ -809,9 +834,9 @@ function drawRegistryStreetLines() {
 
 /** The applicant clicked a street line on the map. */
 function pickStreetLine(street: RegistryStreet) {
-  if (isLegacy.value) {
-    // In validate mode the dropdown is the source of truth; clicking the street
-    // selects it there so the two can never disagree.
+  if (usesRegistry.value) {
+    // Here the dropdown is the source of truth; clicking the street selects it
+    // there so the two can never disagree.
     form.value.registry_street_id = String(street.id)
     onRegistryStreetChange()
     return
@@ -895,7 +920,7 @@ function selectAt(lat: number, lng: number) {
   geoState.value = 'success'
   // Item 1: is this street already being pursued by another applicant?
   streetTaken.value = ''
-  if (!isLegacy.value) {
+  if (!usesRegistry.value) {
     applicationApi.streetAvailability(lat.toFixed(6), lng.toFixed(6))
       .then(({ data }) => {
         if (data && data.available === false) {
@@ -1055,7 +1080,7 @@ async function handleSubmit() {
   submitting.value = true
   try {
     let payload: FormData | Record<string, unknown>
-    if (isLegacy.value && legacyCertFile.value) {
+    if (usesRegistry.value && legacyCertFile.value) {
       const selected = registryStreets.value.find(s => String(s.id) === String(form.value.registry_street_id))
       const fd = new FormData()
       // In validate mode the name comes from the selected registry street.
@@ -1071,7 +1096,10 @@ async function handleSubmit() {
       fd.append('location_description', form.value.location_description)
       if (geoCoords.value.lat) fd.append('latitude', geoCoords.value.lat)
       if (geoCoords.value.lng) fd.append('longitude', geoCoords.value.lng)
-      fd.append('is_legacy', 'true')
+      // A renewal and a validation are different kinds of application, and the
+      // council counts them apart.
+      fd.append('is_legacy', isLegacy.value ? 'true' : 'false')
+      fd.append('is_renewal_request', isRenewal.value ? 'true' : 'false')
       fd.append('legacy_certificate', legacyCertFile.value)
       payload = fd
     } else {
@@ -1130,6 +1158,7 @@ onMounted(async () => {
 watch(() => route.fullPath, async () => {
   if (route.name !== 'application-new' && !route.path.startsWith('/applications/new')) return
   isLegacy.value = route.query.mode === 'legacy'
+  isRenewal.value = route.query.mode === 'renewal'
   // reset the form for a clean entry
   form.value = { proposed_street_name: '', street_type: '', ward: '', locality: '', location_description: '', registry_street_id: '' }
   geoCoords.value = { lat: '', lng: '', accuracy: '' }

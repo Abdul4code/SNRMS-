@@ -110,8 +110,8 @@
                   <!-- Validating an existing street reads very differently from a
                        brand-new name, so say which this is right in the queue. -->
                   <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded ml-2 align-middle whitespace-nowrap"
-                        :style="app.is_legacy ? 'background:#fef3c7;color:#92400e' : 'background:#dcfce7;color:#047857'">
-                    {{ app.is_legacy ? 'Validation' : 'New' }}
+                        :style="app.is_renewal_request ? 'background:#e0f2fe;color:#0369a1' : app.is_legacy ? 'background:#fef3c7;color:#92400e' : 'background:#dcfce7;color:#047857'">
+                    {{ app.is_renewal_request ? 'Renewal' : app.is_legacy ? 'Validation' : 'New' }}
                   </span>
                 </td>
                 <td class="px-5 py-4 text-slate-500 text-sm hidden sm:table-cell">{{ app.applicant_name || '—' }}</td>
@@ -167,6 +167,7 @@ interface Application {
   created_at: string
   updated_at?: string
   is_legacy?: boolean
+  is_renewal_request?: boolean
 }
 
 const auth = useAuthStore()
