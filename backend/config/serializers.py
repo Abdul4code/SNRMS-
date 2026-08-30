@@ -62,6 +62,15 @@ class BuildingSurveyMapSerializer(serializers.ModelSerializer):
     # Placeholder values enumerators used to mean "no name".
     _UNNAMED_TOKENS = {'', 'none', 'na', 'n/a', 'nil', 'null', 'no', 'nan', '-', '.'}
 
+    # The map groups these points by locality to build the applicant's picker and
+    # to zoom to a community. Enumerators spelled the same place several ways, so
+    # the council's own name is what goes out.
+    locality = serializers.SerializerMethodField()
+
+    def get_locality(self, obj):
+        from applications.localities import canonical_locality
+        return canonical_locality(obj.locality)
+
     def get_is_named(self, obj):
         val = (obj.existing_street_name or '').strip().lower()
         return val not in self._UNNAMED_TOKENS

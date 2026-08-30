@@ -39,6 +39,10 @@ def ward_for_locality(locality):
     """The official ward for a locality name, or '' when it is not on the list."""
     if not locality:
         return ''
+    # Fold the spelling onto the council's own name first — "Ayeteju" and
+    # "Aiyeteju" are one community and must resolve to one ward.
+    from .localities import canonical_locality
+    locality = canonical_locality(locality)
     official = _official_map()
     key = _key(locality)
     if key in official:

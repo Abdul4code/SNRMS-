@@ -296,6 +296,11 @@ class ApplicationCreateSerializer(serializers.ModelSerializer):
                 StreetType.objects.filter(name__iexact='Street').first()
                 or StreetType.objects.first()
             )
+        # One name per place: whatever spelling arrived, store the community the
+        # council knows it by, so filters and counts agree with the register.
+        from .localities import canonical_locality
+        if validated_data.get('locality'):
+            validated_data['locality'] = canonical_locality(validated_data['locality'])
         # The applicant is no longer asked for a ward — a locality sits in one ward,
         # so it is derived here rather than taken on trust from the form.
         validated_data['ward'] = resolve_ward(

@@ -417,13 +417,8 @@ class CommunityListView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        import json
-        import os
-        from django.conf import settings as dj_settings
-        path = os.path.join(dj_settings.BASE_DIR, 'config', 'data', 'illg_wards.json')
-        with open(path, encoding='utf-8') as f:
-            data = json.load(f)
-        return Response(sorted(data['community_to_ward'].keys()))
+        from applications.localities import official_communities
+        return Response(official_communities())
 
 
 def _bearing(lat1, lng1, lat2, lng2):
