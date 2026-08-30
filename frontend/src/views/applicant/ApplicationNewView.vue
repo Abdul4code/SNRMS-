@@ -773,6 +773,7 @@ const ROAD_IDLE = 0.22          // enough to read as "these are tappable"
 const ROAD_HOVER = 0.45
 let roadLayer: L.LayerGroup | null = null
 let roadsLoadedFor = ''
+const roadsInView = ref<{ road: RoadSegment; line: [number, number][] }[]>([])
 const pickedRoad = ref<{ id: number; name: string; line: [number, number][] } | null>(null)
 const roadsLoading = ref(false)
 
@@ -798,9 +799,11 @@ function drawRoads(roads: RoadSegment[]) {
   if (!pickerMap) return
   if (!roadLayer) roadLayer = L.layerGroup().addTo(pickerMap)
   roadLayer.clearLayers()
+  roadsInView.value = []
   for (const road of roads) {
     const line = lineOf(road.geometry)
     if (!line) continue
+    roadsInView.value.push({ road, line })
     // Faintly tinted rather than invisible: on a phone there is no hover, so the
     // roads have to *look* tappable or nobody will think to tap them.
     const hit = L.polyline(line, { color: '#0284c7', weight: 12, opacity: ROAD_IDLE })
@@ -814,6 +817,33 @@ function drawRoads(roads: RoadSegment[]) {
       pickRoad(road, line)
     })
   }
+  // The labels are read off these roads, so they are only right once the roads
+  // are here — 'moveend' fires long before this load comes back.
+  refreshStreetLabels()
+}
+
+/** Does this road already carry a name — its own, or one on the register?
+ *
+ *  Judged on the road the applicant tapped. Reading the nearest surveyed
+ *  building instead told people their road was "Agbaje Street" because a
+ *  building on the next street over was, and called a plainly labelled road
+ *  unnamed because the buildings along it had no name recorded.
+ */
+function nameOfRoad(road: RoadSegment, line: [number, number][]): string {
+  if ((road.name || '').trim()) return road.name.trim()
+  // Named on the council's register but not in OpenStreetMap: match a registry
+  // street that runs along this road, or sits on it.
+  let best = '', bestD = Infinity
+  for (const st of registryStreets.value) {
+    if (st.latitude == null || st.longitude == null) continue
+    const sLat = Number(st.latitude), sLng = Number(st.longitude)
+    for (const [lat, lng] of line) {
+      const d = Math.hypot((lat - sLat) * 111000,
+                           (lng - sLng) * 111000 * Math.cos(lat * Math.PI / 180))
+      if (d < bestD) { bestD = d; best = st.name }
+    }
+  }
+  return bestD <= 40 ? best : ''      // 40 m: on this road, not the next one
 }
 
 /** The applicant tapped a road: adopt its whole length as their street. */
@@ -821,8 +851,11 @@ function pickRoad(road: RoadSegment, line: [number, number][]) {
   if (streetLocked.value) return
   const mid = line[Math.floor(line.length / 2)] as [number, number]
   selectAt(mid[0], mid[1])
-  drawStreetHighlight(line, road.name || form.value.proposed_street_name || 'Selected street', true)
-  pickedRoad.value = { id: road.id, name: road.name, line }
+  const existing = nameOfRoad(road, line)
+  // selectAt guessed from the nearest building; the road itself knows better.
+  recognized.value = { is_named: !!existing, name: existing, locality: '', photo_url: '' }
+  drawStreetHighlight(line, existing || form.value.proposed_street_name || 'Selected street', true)
+  pickedRoad.value = { id: road.id, name: existing, line }
 }
 
 function clearPickedRoad() {
@@ -1046,23 +1079,30 @@ async function initPicker() {
 
 // Overlay existing street names (from the survey records) as labels, so the
 // applicant can see the names of nearby streets on the auto-zoomed map.
+/** Name labels, placed on the road they belong to.
+ *
+ *  These used to be drawn at the centre of a cluster of surveyed buildings, which
+ *  put the label between roads rather than on one — so a label and the road under
+ *  it could disagree about the name. A label now sits on the road that carries it,
+ *  and says exactly what tapping that road will say.
+ */
 function refreshStreetLabels() {
   if (!pickerMap || !streetLabelLayer) return
   streetLabelLayer.clearLayers()
   if (pickerMap.getZoom() < 15) return  // only when zoomed in enough to be readable
   const b = pickerMap.getBounds()
-  const groups: Record<string, { lat: number; lng: number; n: number }> = {}
-  for (const p of pickPoints) {
-    const name = (p.existing_street_name || p.street_name || '').trim()
-    if (!name || !p.is_named) continue
-    if (!b.contains([p.lat, p.lng] as L.LatLngTuple)) continue
-    const g = groups[name] || (groups[name] = { lat: 0, lng: 0, n: 0 })
-    g.lat += p.lat; g.lng += p.lng; g.n += 1
+  const placed: Record<string, { lat: number; lng: number }> = {}
+  for (const { road, line } of roadsInView.value) {
+    const name = nameOfRoad(road, line)
+    if (!name) continue
+    const mid = line[Math.floor(line.length / 2)] as [number, number]
+    if (!b.contains(mid as L.LatLngTuple)) continue
+    if (placed[name]) continue          // one label per name keeps it readable
+    placed[name] = { lat: mid[0], lng: mid[1] }
   }
-  const names = Object.keys(groups)
-  for (const name of names.slice(0, 60)) {  // cap to keep the map readable
-    const g = groups[name]!
-    L.marker([g.lat / g.n, g.lng / g.n], {
+  for (const name of Object.keys(placed).slice(0, 60)) {
+    const at = placed[name]!
+    L.marker([at.lat, at.lng], {
       interactive: false,
       icon: L.divIcon({
         className: 'street-name-label',
@@ -1184,6 +1224,7 @@ onMounted(async () => {
     registryStreets.value = (r.data as RegistryStreet[]).slice()
       .sort((a, b) => a.name.localeCompare(b.name))
     drawRegistryStreetLines()
+    refreshStreetLabels()          // a road's name may come from this list
   }).catch(() => {})
   initPicker()
 })
@@ -1215,6 +1256,7 @@ watch(() => route.fullPath, async () => {
       registryStreets.value = (r.data as RegistryStreet[]).slice()
         .sort((a, b) => a.name.localeCompare(b.name))
       drawRegistryStreetLines()
+      refreshStreetLabels()
     }).catch(() => {})
   }
   await initPicker()
