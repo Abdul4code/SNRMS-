@@ -76,5 +76,56 @@ class ApplicationLocalityTests(TestCase):
     def test_the_picker_offers_only_council_names(self):
         r = self.client.get('/api/config/communities/')
         self.assertEqual(r.status_code, 200)
-        self.assertIn('Aiyeteju', r.data)
-        self.assertNotIn('Ayeteju', r.data)
+        names = [c['name'] for c in r.data]
+        self.assertIn('Aiyeteju', names)
+        self.assertNotIn('Ayeteju', names, 'a misspelling must never be offered')
+
+
+class CommunityPickerTests(TestCase):
+    """The picker is the council's whole list, with a position where one is known."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email='pick@example.com', password='x', first_name='P', last_name='K',
+            role=Role.APPLICANT)
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+
+    def test_every_community_is_offered_not_just_the_surveyed_ones(self):
+        r = self.client.get('/api/config/communities/')
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(len(r.data), 112,
+                         'the council names 110, plus Igbojia and Majek')
+        names = [c['name'] for c in r.data]
+        # A community the survey never reached must still be pickable.
+        self.assertIn('Orofun', names)
+        self.assertIn('Magbon-Alade', names)
+
+    def test_each_entry_carries_its_ward(self):
+        r = self.client.get('/api/config/communities/')
+        abijo = next(c for c in r.data if c['name'] == 'Abijo')
+        self.assertTrue(abijo['ward'], 'the ward is what the map falls back to')
+
+    def test_a_position_is_null_rather_than_guessed(self):
+        """Nobody has mapped every hamlet; an invented centre would be worse."""
+        r = self.client.get('/api/config/communities/')
+        for c in r.data:
+            if c['latitude'] is None:
+                self.assertIsNone(c['longitude'])
+            else:
+                self.assertTrue(6.3 <= c['latitude'] <= 6.6, c['name'])
+                self.assertTrue(3.5 <= c['longitude'] <= 4.2, c['name'])
+
+    def test_a_position_comes_from_real_evidence(self):
+        """Survey buildings, an OSM place, or the geocoder — never a guess."""
+        r = self.client.get('/api/config/communities/')
+        placed = [c for c in r.data if c['latitude'] is not None]
+        self.assertTrue(placed, 'some communities must be placeable')
+        for c in placed:
+            self.assertIn(c['position_from'], ('survey', 'osm', 'geocode'), c['name'])
+
+    def test_a_surveyed_community_is_placed_by_its_own_buildings(self):
+        r = self.client.get('/api/config/communities/')
+        abijo = next(c for c in r.data if c['name'] == 'Abijo')
+        self.assertEqual(abijo['position_from'], 'survey')
+        self.assertGreater(abijo['buildings'], 0)

@@ -574,7 +574,15 @@ const WARD_LABELS: Record<string, string> = {
   ward_f: 'Ward F (Iwerekun 2)',
 }
 const localityWards = ref<Record<string, string>>({})
-const communities = ref<string[]>([])
+// Every community the council names — the whole list, not only the ones the
+// field survey reached. `latitude`/`longitude` is the middle of the place where
+// anyone has mapped it; null where nobody has.
+interface Community {
+  name: string; ward: string
+  latitude: number | null; longitude: number | null
+  buildings: number; position_from: string
+}
+const communities = ref<Community[]>([])
 
 // Locality options are built from the SURVEY points themselves, so every option is
 // guaranteed to have points on the map to zoom to and a ward to auto-fill.
@@ -633,7 +641,11 @@ function rebuildLocalityIndex() {
     opts.push(g.display)
   }
   opts.sort((a, b) => a.localeCompare(b))
-  localityOptions.value = opts
+  // The survey only reached a couple of dozen communities, but an applicant may
+  // live in any of them, so the picker is the council's whole list. The surveyed
+  // points still drive the zoom wherever they exist.
+  const fromCouncil = communities.value.map(c => c.name)
+  localityOptions.value = fromCouncil.length ? fromCouncil : opts
   localityMeta.value = meta
 }
 
@@ -708,13 +720,32 @@ function coreCluster(pts: [number, number][]): [number, number][] {
 function zoomToLocality() {
   const sel = form.value.locality
   if (!pickerMap || !sel) return
-  if (!pickPoints.length) { pendingZoomLocality = sel; return }
-  const meta = localityMeta.value[sel]
-  const pts = coreCluster(meta?.pts || [])
+  if (!pickPoints.length && !communities.value.length) { pendingZoomLocality = sel; return }
+  pickerMap.invalidateSize()   // Leaflet mis-measures a container that was hidden
+
+  // 1. Its own surveyed buildings — the best evidence of where a place is.
+  const pts = coreCluster(localityMeta.value[sel]?.pts || [])
   if (pts.length >= 1) {
-    // Leaflet mis-measures if the container was resized/hidden — fix before fitting.
-    pickerMap.invalidateSize()
     pickerMap.fitBounds(L.latLngBounds(pts).pad(0.25), { maxZoom: 16 })
+    return
+  }
+
+  // 2. No buildings surveyed here: go to the middle of the community.
+  const community = communities.value.find(c => c.name === sel)
+  if (community?.latitude != null && community.longitude != null) {
+    pickerMap.setView([community.latitude, community.longitude], 15)
+    return
+  }
+
+  // 3. Nobody has mapped it. Show the ward it belongs to, which we do know,
+  //    rather than leaving the applicant staring at the whole LGA.
+  const ward = community?.ward
+  const sameWard = communities.value.filter(
+    c => c.ward === ward && c.latitude != null && c.longitude != null)
+  if (ward && sameWard.length) {
+    pickerMap.fitBounds(
+      L.latLngBounds(sameWard.map(c => [c.latitude as number, c.longitude as number])).pad(0.2),
+      { maxZoom: 14 })
   }
 }
 
@@ -1140,7 +1171,12 @@ onMounted(async () => {
   } finally {
     streetTypesLoading.value = false
   }
-  configApi.getLocalityWards().then(r => { localityWards.value = r.data.community_to_ward || {}; communities.value = Object.keys(r.data.community_to_ward || {}).sort() }).catch(() => {})
+  configApi.getLocalityWards().then(r => { localityWards.value = r.data.community_to_ward || {} }).catch(() => {})
+  configApi.getCommunities().then(r => {
+    communities.value = r.data as Community[]
+    rebuildLocalityIndex()          // the picker is the council's list
+    if (form.value.locality) zoomToLocality()
+  }).catch(() => {})
   configApi.publicSettings().then(r => { googleEnabled.value = !!r.data.google_maps_enabled }).catch(() => {})
   // Loaded whichever mode this is: validation needs the list, and a new
   // application needs the lines to be visible and clickable on the map.

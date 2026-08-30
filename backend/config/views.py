@@ -417,8 +417,44 @@ class CommunityListView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
+        """Every community the council names, with a position where one is known.
+
+        The applicant's picker is this list — all of it, not only the communities
+        the field survey happened to reach. `latitude`/`longitude` is the middle
+        of the place: its own surveyed buildings where we have them, otherwise an
+        OpenStreetMap place of that name. It is null for the communities nobody
+        has mapped, and the map falls back to the ward.
+        """
+        import json
+        import os
+        from django.conf import settings as dj_settings
         from applications.localities import official_communities
-        return Response(official_communities())
+
+        wards_path = os.path.join(dj_settings.BASE_DIR, 'config', 'data', 'illg_wards.json')
+        with open(wards_path, encoding='utf-8') as f:
+            ward_of = json.load(f)['community_to_ward']
+        centres = {}
+        centres_path = os.path.join(dj_settings.BASE_DIR, 'config', 'data',
+                                    'community_centres.json')
+        try:
+            with open(centres_path, encoding='utf-8') as f:
+                centres = json.load(f)
+        except (OSError, ValueError):
+            pass
+
+        from applications.wards import ward_for_locality
+        out = []
+        for name in official_communities():
+            c = centres.get(name) or {}
+            out.append({
+                'name': name,
+                'ward': ward_of.get(name) or ward_for_locality(name),
+                'latitude': c.get('lat'),
+                'longitude': c.get('lng'),
+                'buildings': c.get('buildings', 0),
+                'position_from': c.get('source', ''),
+            })
+        return Response(out)
 
 
 def _bearing(lat1, lng1, lat2, lng2):

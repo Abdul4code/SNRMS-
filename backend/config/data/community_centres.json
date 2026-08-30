@@ -1,0 +1,218 @@
+{
+ "Abegede": {
+  "buildings": 0,
+  "lat": 6.5023844,
+  "lng": 3.7318292,
+  "source": "osm"
+ },
+ "Abijo": {
+  "buildings": 175,
+  "lat": 6.470777,
+  "lng": 3.660781,
+  "source": "survey"
+ },
+ "Abule Panu": {
+  "buildings": 48,
+  "lat": 6.47606,
+  "lng": 3.8284105,
+  "source": "survey"
+ },
+ "Adeba": {
+  "buildings": 95,
+  "lat": 6.470175,
+  "lng": 3.730876,
+  "source": "survey"
+ },
+ "Aiyeteju": {
+  "buildings": 250,
+  "lat": 6.473343,
+  "lng": 3.816014,
+  "source": "survey"
+ },
+ "Akodo": {
+  "buildings": 0,
+  "lat": 6.435457,
+  "lng": 3.9302655,
+  "source": "osm"
+ },
+ "Alatise": {
+  "buildings": 155,
+  "lat": 6.467024,
+  "lng": 3.796215,
+  "source": "survey"
+ },
+ "Araromi Ibeju": {
+  "buildings": 0,
+  "lat": 6.5096182,
+  "lng": 3.7882679,
+  "source": "geocode"
+ },
+ "Araromi Tope": {
+  "buildings": 0,
+  "lat": 6.5096182,
+  "lng": 3.7882679,
+  "source": "osm"
+ },
+ "Awoyaya": {
+  "buildings": 583,
+  "lat": 6.470291,
+  "lng": 3.705414,
+  "source": "survey"
+ },
+ "Bankole": {
+  "buildings": 9,
+  "lat": 6.468567,
+  "lng": 3.793974,
+  "source": "survey"
+ },
+ "Bogije": {
+  "buildings": 236,
+  "lat": 6.4782805,
+  "lng": 3.757914,
+  "source": "survey"
+ },
+ "Desa": {
+  "buildings": 184,
+  "lat": 6.474882,
+  "lng": 3.79396,
+  "source": "survey"
+ },
+ "Dongo": {
+  "buildings": 0,
+  "lat": 6.496465,
+  "lng": 3.7189072,
+  "source": "osm"
+ },
+ "Eleko": {
+  "buildings": 191,
+  "lat": 6.477005,
+  "lng": 3.842807,
+  "source": "survey"
+ },
+ "Elemoro": {
+  "buildings": 105,
+  "lat": 6.473785,
+  "lng": 3.758481,
+  "source": "survey"
+ },
+ "Elesekan": {
+  "buildings": 124,
+  "lat": 6.477046,
+  "lng": 3.774787,
+  "source": "survey"
+ },
+ "Eluju": {
+  "buildings": 76,
+  "lat": 6.4741465,
+  "lng": 3.826462,
+  "source": "survey"
+ },
+ "Eputu": {
+  "buildings": 69,
+  "lat": 6.473277,
+  "lng": 3.714197,
+  "source": "survey"
+ },
+ "Gbarada": {
+  "buildings": 1,
+  "lat": 6.474769,
+  "lng": 3.826669,
+  "source": "survey"
+ },
+ "Gbetu": {
+  "buildings": 26,
+  "lat": 6.463472,
+  "lng": 3.7103835,
+  "source": "survey"
+ },
+ "Golf Lakowe": {
+  "buildings": 13,
+  "lat": 6.474563,
+  "lng": 3.740647,
+  "source": "survey"
+ },
+ "Igando Oloja": {
+  "buildings": 218,
+  "lat": 6.4737545,
+  "lng": 3.806732,
+  "source": "survey"
+ },
+ "Igbojia": {
+  "buildings": 143,
+  "lat": 6.482215,
+  "lng": 3.775976,
+  "source": "survey"
+ },
+ "Iwerekun": {
+  "buildings": 0,
+  "lat": 6.4300863,
+  "lng": 3.7288113,
+  "source": "osm"
+ },
+ "Lagasa": {
+  "buildings": 359,
+  "lat": 6.479913,
+  "lng": 3.72508,
+  "source": "survey"
+ },
+ "Lakowe": {
+  "buildings": 495,
+  "lat": 6.47486,
+  "lng": 3.733464,
+  "source": "survey"
+ },
+ "Losoro": {
+  "buildings": 46,
+  "lat": 6.479799,
+  "lng": 3.7319695,
+  "source": "survey"
+ },
+ "Majek": {
+  "buildings": 67,
+  "lat": 6.47275,
+  "lng": 3.653616,
+  "source": "survey"
+ },
+ "Mopo Ijebu": {
+  "buildings": 0,
+  "lat": 6.4258407,
+  "lng": 3.6364363,
+  "source": "geocode"
+ },
+ "Ogogoro": {
+  "buildings": 0,
+  "lat": 6.498093,
+  "lng": 3.934863,
+  "source": "osm"
+ },
+ "Ogunfayo": {
+  "buildings": 232,
+  "lat": 6.4695235,
+  "lng": 3.7212795,
+  "source": "survey"
+ },
+ "Onosa": {
+  "buildings": 291,
+  "lat": 6.480488,
+  "lng": 3.800643,
+  "source": "survey"
+ },
+ "Oribanwa": {
+  "buildings": 135,
+  "lat": 6.476778,
+  "lng": 3.725894,
+  "source": "survey"
+ },
+ "Orimedu": {
+  "buildings": 0,
+  "lat": 6.4377745,
+  "lng": 3.902729,
+  "source": "osm"
+ },
+ "Shapati": {
+  "buildings": 201,
+  "lat": 6.476838,
+  "lng": 3.781435,
+  "source": "survey"
+ }
+}
