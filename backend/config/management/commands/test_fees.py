@@ -55,6 +55,21 @@ TEST_RATES = {
 # fee paid on its own — so a renewal below it cannot be put through the gateway.
 GATEWAY_MINIMUM = Decimal('100')
 
+# Five of the sheet's renewal rates (N80 to N96) are under that minimum, so the
+# council added N100 to each to bring them over it. The sheet above is left as
+# the council issued it and the lift is applied here, so which rates were changed
+# and why stays visible.
+SHORTFALL_LIFT = Decimal('100')
+
+# Only fees paid on their own have to clear the minimum. The Stage A components
+# are summed into one payment (N124.67 together) and the signpost and map-upload
+# fees ride along with Stage C, so none of them is lifted for being small.
+STANDALONE_COMPONENTS = (
+    FeeComponent.STREET_NAME_FEE,     # dominates Stage C
+    FeeComponent.REVALIDATION_FEE,    # the whole revalidation payment
+    FeeComponent.RENEWAL_FEE,         # the whole renewal payment
+)
+
 
 class Command(BaseCommand):
     help = "Apply the council's test rates to the per-street-type fees."
@@ -83,28 +98,34 @@ class Command(BaseCommand):
             Decimal('0'))
 
         changed = 0
-        below_minimum = []
+        lifted = []
         self.stdout.write(f'\n  {"street type":12} {"stage C":>12} {"revalidation":>13} '
                           f'{"renewal":>9}')
         for name, (new_app, reval, renewal) in TEST_RATES.items():
             street_type = types.get(name)
             if street_type is None:
                 continue
-            for component, amount in (
+            row = {}
+            for component, sheet_amount in (
                 (FeeComponent.STREET_NAME_FEE, new_app),
                 (FeeComponent.REVALIDATION_FEE, reval),
                 (FeeComponent.RENEWAL_FEE, renewal),
             ):
+                amount = Decimal(sheet_amount)
+                if component in STANDALONE_COMPONENTS and amount < GATEWAY_MINIMUM:
+                    amount += SHORTFALL_LIFT
+                    lifted.append((name, component, Decimal(sheet_amount), amount))
+                row[component] = amount
                 if not dry:
                     FeeConfiguration.objects.update_or_create(
                         component=component, street_type=street_type,
-                        defaults={'amount': Decimal(amount), 'is_active': True},
+                        defaults={'amount': amount, 'is_active': True},
                     )
                 changed += 1
-            if Decimal(renewal) < GATEWAY_MINIMUM:
-                below_minimum.append((name, renewal))
-            self.stdout.write(f'  {name:12} {new_app + addons:>12} {reval:>13} '
-                              f'{renewal:>9}')
+            self.stdout.write(
+                f'  {name:12} {row[FeeComponent.STREET_NAME_FEE] + addons:>12} '
+                f'{row[FeeComponent.REVALIDATION_FEE]:>13} '
+                f'{row[FeeComponent.RENEWAL_FEE]:>9}')
 
         self.stdout.write('')
         self.stdout.write(self.style.SUCCESS(
@@ -112,15 +133,14 @@ class Command(BaseCommand):
             f'{len(TEST_RATES) - len(missing)} street types.'))
         self.stdout.write(f'  Stage C shows the rate plus N{addons} of signpost and map fees.')
 
-        if below_minimum:
+        if lifted:
             self.stdout.write('')
-            self.stdout.write(self.style.WARNING(
-                f'  {len(below_minimum)} renewal rates are under the gateway\'s '
-                f'N{GATEWAY_MINIMUM:g} minimum and cannot be paid online:'))
-            for name, amount in below_minimum:
-                self.stdout.write(f'    {name:12} N{amount}')
-            self.stdout.write('  Those renewals can still be tested by bank transfer, '
-                              'which Finance confirms by hand.')
+            self.stdout.write(f'  {len(lifted)} rates were under the gateway\'s '
+                              f'N{GATEWAY_MINIMUM:g} minimum, so N{SHORTFALL_LIFT:g} '
+                              f'was added to each:')
+            for name, component, was, now in lifted:
+                self.stdout.write(f'    {name:12} {component:16} N{was:g} -> N{now:g}')
+            self.stdout.write('  Every payable stage now clears the minimum.')
 
         if dry:
             self.stdout.write(self.style.WARNING('\nDry run: nothing was written.'))
