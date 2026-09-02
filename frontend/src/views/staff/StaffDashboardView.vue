@@ -93,9 +93,9 @@
         </div>
       </div>
 
-      <!-- What each kind of work brought in — the Chairman's at-a-glance view.
-           The cards above are by fee; this is by the work the fee paid for. -->
-      <div v-if="auth.isChairman" class="rounded-2xl overflow-hidden"
+      <!-- What each kind of work brought in — the Chairman's and Treasurer's
+           at-a-glance view. Cards above are by fee; this is by the work it paid for. -->
+      <div v-if="auth.isChairman || auth.isFinance" class="rounded-2xl overflow-hidden"
            style="background:#fff; border:1px solid #e2e8f0; box-shadow:0 2px 8px rgba(0,0,0,0.06)">
         <div class="px-6 py-5 flex flex-wrap items-center gap-3" style="border-bottom:1px solid #f1f5f9">
           <div>
@@ -551,7 +551,7 @@ const revenueCategory = ref('')
 const revenueLoading = ref(false)
 
 async function loadRevenue() {
-  if (!auth.isChairman) return
+  if (!auth.isChairman && !auth.isFinance) return
   revenueLoading.value = true
   try {
     const year = new Date().getFullYear()
