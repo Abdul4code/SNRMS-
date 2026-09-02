@@ -7,6 +7,17 @@
       'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
     color: #1e293b;
   }
+
+  /* Tailwind v4's reset no longer sets this, so clickable controls show the
+     default arrow. Restore the hand pointer on interactive elements. */
+  button:not(:disabled),
+  [role="button"]:not(:disabled),
+  summary {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
 }
 
 @layer components {
